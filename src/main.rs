@@ -5,13 +5,15 @@ use aide_rs::{
 };
 use clap::Parser;
 use tracing::info;
-use tracing_subscriber::{EnvFilter, FmtSubscriber};
+use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter, FmtSubscriber};
 
 fn setup_logging() {
     let subscriber = FmtSubscriber::builder()
         .with_env_filter(
             EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
         )
+        .with_span_events(FmtSpan::CLOSE)
+        .pretty()
         .finish();
 
     tracing::subscriber::set_global_default(subscriber)
@@ -20,6 +22,8 @@ fn setup_logging() {
 
 async fn run() -> Result<()> {
     let cli = Cli::parse();
+
+    info!(command = ?cli.command, "Executing command");
 
     match cli.command {
         Commands::Plan {

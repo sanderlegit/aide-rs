@@ -1,11 +1,11 @@
 use crate::error::{Error, Result};
 use dotenvy::dotenv;
 use gemini_client_rs::types::{
-    Content, GenerateContentRequest, GenerateContentResponse, ToolConfig,
+    Content, GenerateContentRequest, GenerateContentResponse, PartResponse, ToolConfig,
 };
 use reqwest::Client;
 use std::env;
-use tracing::info;
+use tracing::{debug, info};
 
 pub struct GeminiClientWrapper {
     client: Client,
@@ -62,6 +62,7 @@ impl GeminiClientWrapper {
             "Sending request to Gemini model '{}' at '{}'.",
             self.model_name, self.base_url
         );
+        debug!(request = ?request, "Gemini request body");
 
         let url = format!(
             "{}/{}:generateContent?key={}",
@@ -81,6 +82,25 @@ impl GeminiClientWrapper {
             )));
         }
 
-        Ok(response.json().await?)
+        let response: GenerateContentResponse = response.json().await?;
+        debug!(?response, "Gemini response received");
+
+        // Log text parts of response at info level for visibility
+        if let Some(candidates) = &response.candidates {
+            for candidate in candidates {
+                for part in &candidate.content.parts {
+                    if let PartResponse::Text(text) = part {
+                        if !text.trim().is_empty() {
+                            info!(
+                                response_text = %format!("\n---\n{}\n---", text.trim()),
+                                "Gemini response text part"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(response)
     }
 }

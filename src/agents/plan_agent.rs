@@ -263,6 +263,10 @@ impl Agent for PlanAgent {
         if prompt.use_google_search_for_deps {
             info!("Using Google Search to find up-to-date libraries.");
             let search_prompt = self.create_dependency_research_prompt(&prompt);
+            info!(
+                prompt = %format!("\n---\n{}\n---", search_prompt),
+                "Sending dependency research prompt to Gemini"
+            );
             let search_contents = vec![Content {
                 role: Role::User,
                 parts: vec![ContentPart::Text(search_prompt)],
@@ -282,6 +286,10 @@ impl Agent for PlanAgent {
         }
 
         let system_prompt = self.create_system_prompt();
+        info!(
+            prompt = %format!("\n--- SYSTEM ---\n{}\n--- USER ---\n{}\n---", system_prompt, user_prompt),
+            "Sending planning prompt to Gemini"
+        );
 
         let contents = vec![
             Content {

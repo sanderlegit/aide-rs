@@ -283,6 +283,7 @@ impl Agent for ImplAgent {
 
                 info!(description = %task.description, "Starting task");
                 task.status = TaskStatus::Pending;
+                info!(status = ?task.status, "Task status updated");
 
                 let mut last_error: Option<String> = None;
                 let mut succeeded = false;
@@ -310,6 +311,10 @@ impl Agent for ImplAgent {
                         &plan.original_prompt,
                         &file_contents,
                         &last_error,
+                    );
+                    info!(
+                        prompt = %format!("\n--- SYSTEM ---\n{}\n--- USER ---\n{}\n---", system_prompt, user_prompt),
+                        "Sending implementation prompt to Gemini"
                     );
 
                     let contents = vec![
@@ -375,6 +380,7 @@ impl Agent for ImplAgent {
                         Ok(_) => {
                             info!(description = %task.description, "Task completed successfully");
                             task.status = TaskStatus::Success;
+                            info!(status = ?task.status, "Task status updated");
                             task.result = Some(TaskResult {
                                 success: true,
                                 agent_tips,
@@ -408,6 +414,7 @@ impl Agent for ImplAgent {
                 std::fs::write(&plan_path, plan_json)?;
             } else {
                 plan.tasks[i].status = TaskStatus::Failed;
+                info!(status = ?plan.tasks[i].status, "Task status updated");
                 error!(description = %plan.tasks[i].description, "Task failed after all retries");
                 let plan_json = serde_json::to_string_pretty(&plan)?;
                 std::fs::write(&plan_path, plan_json)?;
