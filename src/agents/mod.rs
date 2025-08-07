@@ -1,6 +1,14 @@
+use crate::error::Result;
+use async_trait::async_trait;
+
 pub mod impl_agent;
 pub mod plan_agent;
 pub mod state;
 
-// To be implemented in Phase 4
-// pub trait Agent { ... }
+#[async_trait]
+pub trait Agent {
+    type Input;
+    type Output;
+
+    async fn run(&self, input: Self::Input) -> Result<Self::Output>;
+}

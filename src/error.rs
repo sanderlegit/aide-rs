@@ -28,6 +28,9 @@ pub enum Error {
 
     #[error("Glob pattern error: {0}")]
     Glob(#[from] globset::Error),
+
+    #[error("Gemini API error: {0}")]
+    Gemini(#[from] gemini_client_rs::GeminiError),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
