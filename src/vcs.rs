@@ -20,14 +20,14 @@ pub fn add_and_commit(repo_path: &Path, paths: &[PathBuf], message: &str) -> Res
     let head = repo.head()?.peel_to_commit()?;
     let signature = Signature::now("AI Agent", "ai-agent@example.com")?;
 
-    repo.commit(
+    Ok(repo.commit(
         Some("HEAD"),
         &signature,
         &signature,
         message,
         &tree,
         &[&head],
-    )
+    )?)
 }
 
 #[cfg(test)]
