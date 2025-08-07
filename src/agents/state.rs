@@ -93,11 +93,12 @@ mod tests {
         // Test default value
         let toml_without_flag = r#"
 objective = "Test"
+coding_conventions = "..."
+validation_commands = []
+
 [file_scoping]
 include = ["src/*"]
 exclude = []
-coding_conventions = "..."
-validation_commands = []
 "#;
         let deserialized_default: PlanPrompt = toml::from_str(toml_without_flag).unwrap();
         assert!(!deserialized_default.use_google_search_for_deps);
