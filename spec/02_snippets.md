@@ -236,12 +236,18 @@ fn get_filtered_files(base_dir: &Path, scope: &FileScope) -> Result<Vec<PathBuf>
     let excludes = exclude_builder.build()?;
 
     // Walk the directory, respecting .gitignore, and then filter results.
+    // We must canonicalize the base directory to handle cases where it's a symlink
+    // (e.g., /var on macOS), which ensures `strip_prefix` works correctly.
+    let canonical_base_dir = base_dir.canonicalize()?;
     for result in builder.build() {
         let entry = result?;
         if entry.file_type().map_or(false, |ft| ft.is_file()) {
             let path = entry.path();
-            if includes.is_match(path) && !excludes.is_match(path) {
-                files.push(entry.into_path());
+            // Globs are relative, so we match against the path relative to the base directory.
+            if let Ok(relative_path) = path.strip_prefix(&canonical_base_dir) {
+                if includes.is_match(relative_path) && !excludes.is_match(relative_path) {
+                    files.push(entry.into_path());
+                }
             }
         }
     }
