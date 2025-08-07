@@ -47,7 +47,7 @@ validation_commands = [{ command = "cargo check", expected_exit_code = 0 }]
     });
 
     Mock::given(method("POST"))
-        .and(path_regex(r"/gemini-1.5-flash:generateContent.*"))
+        .and(path_regex(r"/gemini-2.5-flash:generateContent.*"))
         .respond_with(ResponseTemplate::new(200).set_body_json(mock_response))
         .mount(&env.mock_server)
         .await;
@@ -121,7 +121,7 @@ async fn test_impl_workflow() {
     });
 
     Mock::given(method("POST"))
-        .and(path_regex(r"/gemini-1.5-pro:generateContent.*"))
+        .and(path_regex(r"/gemini-2.5-pro:generateContent.*"))
         .respond_with(ResponseTemplate::new(200).set_body_json(mock_response))
         .mount(&env.mock_server)
         .await;
@@ -195,6 +195,7 @@ async fn test_impl_workflow_with_auto_commit() {
         }]
     });
     Mock::given(method("POST"))
+        .and(path_regex(r"/gemini-2.5-pro:generateContent.*"))
         .respond_with(ResponseTemplate::new(200).set_body_json(mock_response))
         .mount(&env.mock_server)
         .await;
@@ -258,7 +259,7 @@ async fn test_impl_workflow_with_error_summarization() {
         }]
     });
     Mock::given(method("POST"))
-        .and(path_regex(r"/gemini-1.5-flash:generateContent.*"))
+        .and(path_regex(r"/gemini-2.5-flash:generateContent.*"))
         .respond_with(ResponseTemplate::new(200).set_body_json(summary_response))
         .mount(&env.mock_server)
         .await;
@@ -280,7 +281,7 @@ async fn test_impl_workflow_with_error_summarization() {
         }]
     });
     Mock::given(method("POST"))
-        .and(path_regex(r"/gemini-1.5-pro:generateContent.*"))
+        .and(path_regex(r"/gemini-2.5-pro:generateContent.*"))
         .respond_with(ResponseTemplate::new(200).set_body_json(impl_response))
         .mount(&env.mock_server)
         .await;

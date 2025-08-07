@@ -16,19 +16,19 @@ pub struct GeminiClientWrapper {
 }
 
 impl GeminiClientWrapper {
-    // Using gemini-1.5-flash for planning as it's fast and capable for generation.
+    // Using gemini-2.5-flash for planning as it's fast and capable for generation.
     pub fn new_plan_agent() -> Result<Self> {
-        Self::new("gemini-1.5-flash".to_string())
+        Self::new("gemini-2.5-flash".to_string())
     }
 
-    // Using gemini-1.5-flash for summarization as it's fast and cheap.
+    // Using gemini-2.5-flash for summarization as it's fast and cheap.
     pub fn new_summarize_agent() -> Result<Self> {
-        Self::new("gemini-1.5-flash".to_string())
+        Self::new("gemini-2.5-flash".to_string())
     }
 
-    // Using gemini-1.5-pro for implementation as it's more powerful for complex reasoning.
+    // Using gemini-2.5-pro for implementation as it's more powerful for complex reasoning.
     pub fn new_impl_agent() -> Result<Self> {
-        Self::new("gemini-1.5-pro".to_string())
+        Self::new("gemini-2.5-pro".to_string())
     }
 
     fn new(model_name: String) -> Result<Self> {
