@@ -18,9 +18,7 @@ fn setup_logging() {
         .expect("setting default subscriber failed");
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    setup_logging();
+async fn run() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
@@ -66,4 +64,13 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+#[tokio::main]
+async fn main() {
+    setup_logging();
+    if let Err(e) = run().await {
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
+    }
 }

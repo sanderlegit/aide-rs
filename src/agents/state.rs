@@ -12,6 +12,7 @@ pub struct PlanPrompt {
 
 // Defines file include/exclude rules.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
+#[serde(default)]
 pub struct FileScope {
     pub include: Vec<String>, // Glob patterns
     pub exclude: Vec<String>, // Glob patterns
