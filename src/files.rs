@@ -1,4 +1,5 @@
 use crate::{agents::state::FileScope, error::Result};
+use globset::{Glob, GlobSetBuilder};
 use ignore::WalkBuilder;
 use std::path::{Path, PathBuf};
 
@@ -6,24 +7,29 @@ pub fn get_filtered_files(base_dir: &Path, scope: &FileScope) -> Result<Vec<Path
     let mut files = Vec::new();
     let mut builder = WalkBuilder::new(base_dir);
 
-    // We don't want to ignore hidden files by default, but we do respect .gitignore
+    // We respect .gitignore by default and do not ignore hidden files.
     builder.hidden(false);
 
-    let mut override_builder = ignore::overrides::OverrideBuilder::new(base_dir);
+    let mut include_builder = GlobSetBuilder::new();
     for pattern in &scope.include {
-        override_builder.add(pattern)?;
+        include_builder.add(Glob::new(pattern)?);
     }
+    let includes = include_builder.build()?;
+
+    let mut exclude_builder = GlobSetBuilder::new();
     for pattern in &scope.exclude {
-        let negated_pattern = format!("!{}", pattern);
-        override_builder.add(&negated_pattern)?;
+        exclude_builder.add(Glob::new(pattern)?);
     }
-    let overrides = override_builder.build()?;
-    builder.overrides(overrides);
+    let excludes = exclude_builder.build()?;
 
     for result in builder.build() {
         let entry = result?;
         if entry.file_type().map_or(false, |ft| ft.is_file()) {
-            files.push(entry.into_path());
+            let path = entry.path();
+            // Path must be in include set and not in exclude set.
+            if includes.is_match(path) && !excludes.is_match(path) {
+                files.push(entry.into_path());
+            }
         }
     }
     files.sort();

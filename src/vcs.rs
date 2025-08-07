@@ -7,9 +7,14 @@ pub fn add_and_commit(repo_path: &Path, paths: &[PathBuf], message: &str) -> Res
 
     let mut index = repo.index()?;
 
+    let workdir = repo.workdir().unwrap();
     for path in paths {
         // We need to make the path relative to the repo's workdir.
-        let relative_path = path.strip_prefix(repo.workdir().unwrap())?;
+        // Canonicalize both paths to resolve any symlinks or `..` components, which can
+        // be an issue with temp directories on some platforms (e.g., macOS).
+        let canonical_path = path.canonicalize()?;
+        let canonical_workdir = workdir.canonicalize()?;
+        let relative_path = canonical_path.strip_prefix(&canonical_workdir)?;
         index.add_path(relative_path)?;
     }
 

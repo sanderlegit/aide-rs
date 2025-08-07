@@ -25,6 +25,9 @@ pub enum Error {
 
     #[error("Path stripping error: {0}")]
     StripPrefix(#[from] std::path::StripPrefixError),
+
+    #[error("Glob pattern error: {0}")]
+    Glob(#[from] globset::Error),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

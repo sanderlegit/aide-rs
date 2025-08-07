@@ -31,6 +31,8 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 ignore = "0.4.22"
 # For glob pattern matching, used by the 'ignore' crate.
 glob = "0.3.1"
+# For matching against a set of globs, used in file filtering.
+globset = "0.4.14"
 
 # Version Control System (Git)
 # Provides bindings to libgit2 for Git operations.

@@ -211,6 +211,7 @@ Create a `WalkBuilder` and configure it with your include and exclude glob patte
 // In src/files.rs
 // use crate::agents::state::FileScope; // Your struct
 // use crate::error::Result; // Your project's result type
+use globset::{Glob, GlobSetBuilder};
 use ignore::WalkBuilder;
 use std::path::{Path, PathBuf};
 
@@ -218,25 +219,30 @@ fn get_filtered_files(base_dir: &Path, scope: &FileScope) -> Result<Vec<PathBuf>
     let mut files = Vec::new();
     let mut builder = WalkBuilder::new(base_dir);
 
-    // Respect .gitignore but not other ignore files (.ignore, .rgignore)
-    // and don't ignore hidden files by default.
+    // Respect .gitignore by default and do not ignore hidden files.
     builder.hidden(false);
 
-    let mut override_builder = ignore::overrides::OverrideBuilder::new(base_dir);
+    // Build glob matchers for include and exclude patterns.
+    let mut include_builder = GlobSetBuilder::new();
     for pattern in &scope.include {
-        override_builder.add(pattern)?;
+        include_builder.add(Glob::new(pattern)?);
     }
-    for pattern in &scope.exclude {
-        let negated_pattern = format!("!{}", pattern);
-        override_builder.add(&negated_pattern)?;
-    }
-    let overrides = override_builder.build()?;
-    builder.overrides(overrides);
+    let includes = include_builder.build()?;
 
+    let mut exclude_builder = GlobSetBuilder::new();
+    for pattern in &scope.exclude {
+        exclude_builder.add(Glob::new(pattern)?);
+    }
+    let excludes = exclude_builder.build()?;
+
+    // Walk the directory, respecting .gitignore, and then filter results.
     for result in builder.build() {
         let entry = result?;
         if entry.file_type().map_or(false, |ft| ft.is_file()) {
-            files.push(entry.into_path());
+            let path = entry.path();
+            if includes.is_match(path) && !excludes.is_match(path) {
+                files.push(entry.into_path());
+            }
         }
     }
     files.sort(); // For deterministic order
@@ -283,7 +289,10 @@ fn add_and_commit(repo: &Repository, paths: &[PathBuf], message: &str) -> Result
     // 1. Add specified files to the index, ensuring they are relative paths
     let workdir = repo.workdir().ok_or("Repository has no workdir")?;
     for path in paths {
-        let relative_path = path.strip_prefix(workdir)?;
+        // Canonicalize paths to prevent issues with symlinks (e.g., on macOS)
+        let canonical_path = path.canonicalize()?;
+        let canonical_workdir = workdir.canonicalize()?;
+        let relative_path = canonical_path.strip_prefix(&canonical_workdir)?;
         index.add_path(relative_path)?;
     }
     index.write()?;
