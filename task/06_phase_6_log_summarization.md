@@ -1,5 +1,7 @@
 # Phase 6: LLM-based Log Summarization
 
+**Status: Complete**
+
 ## Goal
 Implement a log summarization feature to manage context window limitations on verbose validation failures. This will involve a pre-processing step that uses a smaller, faster LLM to summarize long error messages before they are passed to the main implementation agent.
 
@@ -24,8 +26,8 @@ Implement a log summarization feature to manage context window limitations on ve
     *   In `tests/e2e.rs` or a new test file, add a test for the `ImplAgent`'s error handling.
     *   Mock the Gemini API. The test will simulate a command failure with a very long error message.
     *   The mock server will have two expectations:
-        1.  An initial call to the summarization model (`gemini-1.5-flash`) with the long error. It should respond with a short, summarized error.
-        2.  A subsequent call to the implementation model (`gemini-1.5-pro`) where the prompt contains the *summarized* error, not the original long one.
+        1.  An initial call to the summarization model (`gemini-2.5-flash`) with the long error. It should respond with a short, summarized error.
+        2.  A subsequent call to the implementation model (`gemini-2.5-pro`) where the prompt contains the *summarized* error, not the original long one.
     *   Assert that both API calls are made as expected.
 
 ## Completion Criteria

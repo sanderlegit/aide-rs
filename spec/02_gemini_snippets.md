@@ -1,3 +1,7 @@
+> **Note:** This document contains the original README from the `gemini_client_rs` crate. While `aide-rs` uses the *type definitions* from this crate (e.g., `Content`, `FunctionDeclaration`), it uses a custom API wrapper built with `reqwest` instead of the `GeminiClient` shown in these examples. The snippets are kept for general reference about the API's structure.
+
+---
+
 gemini_client_rs
 
 A Rust client for the Google Gemini API.

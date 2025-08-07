@@ -171,9 +171,9 @@ pub struct ValidationStep {
 
 #### **6.3. File Filtering (`files.rs`)**
 
-*   **Dependencies:** `ignore` and `glob`.
-*   **Function:** `pub fn get_filtered_files(scope: &FileScope) -> Result<Vec<PathBuf>>`
-*   **Logic:** Uses the `ignore` crate to build a `WalkBuilder`. It will configure the walker with the glob patterns from `scope.include` and `scope.exclude`, leveraging the library's built-in support for `.gitignore` and parallel directory traversal.
+*   **Dependencies:** `ignore` and `globset`.
+*   **Function:** `pub fn get_filtered_files(base_dir: &Path, scope: &FileScope) -> Result<Vec<PathBuf>>`
+*   **Logic:** Uses the `ignore` crate to build a `WalkBuilder`. It uses `globset` to efficiently match files against the include/exclude patterns, while leveraging the `ignore` library's built-in support for `.gitignore` and parallel directory traversal.
 
 ### **7. Testing Strategy**
 
@@ -197,6 +197,6 @@ pub struct ValidationStep {
         *   `tempfile` to create temporary git repositories for the tests to run in.
         *   These tests will also use the `wiremock`ed Gemini server to ensure they are deterministic and can run in CI.
 
-### **8. Future Enhancements (Deferred Features)**
+### **8. Key Implemented Features**
 
-*   **LLM-based Log Summarization:** To manage context window limitations on verbose validation failures, a future version may introduce a pre-processing step. On a failed validation, before constructing the correction context, it will make a separate, quick call to a smaller model (e.g., Gemini Flash) with a prompt like: "Summarize this compiler error into its most critical message." The summarized error would then be used in the main agent's prompt, reducing token count. This feature is deferred to a post-v1.0 release to keep the initial implementation focused.
+*   **LLM-based Log Summarization:** To manage context window limitations on verbose validation failures, the `ImplAgent` includes a pre-processing step for errors. On a failed validation with a long error message, before constructing the correction context for a retry, it makes a separate call to a smaller model (Gemini Flash) with a prompt to "Summarize this compiler error into its most critical message." The summarized error is then used in the main agent's prompt, reducing token count and focusing the agent on the core issue.
