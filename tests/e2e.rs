@@ -216,3 +216,85 @@ async fn test_impl_workflow_with_auto_commit() {
     assert!(commit_message.contains("AI-generated changes for:"));
     assert!(commit_message.contains("- Add a print statement"));
 }
+
+#[tokio::test]
+async fn test_impl_workflow_with_error_summarization() {
+    let env = TestEnv::new().await;
+
+    // 1. Create a project with a file that will cause a validation error
+    let long_error_str = "a very long error message...".repeat(100);
+    let initial_content = format!("fn main() {{ compile_error!(\"{}\"); }}", long_error_str);
+    env.create_file("src/main.rs", &initial_content);
+    env.create_file(
+        "Cargo.toml",
+        "[package]\nname = \"test-proj\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+    );
+
+    let plan_content = json!({
+        "original_prompt": {
+            "objective": "Fix compile error",
+            "file_scoping": { "include": ["src/main.rs"] },
+            "coding_conventions": "",
+            "validation_commands": [{ "command": "cargo check", "expected_exit_code": 0 }]
+        },
+        "tasks": [{
+            "description": "Fix the compile error in main.rs",
+            "file_scoping": { "include": ["src/main.rs"] },
+            "validation_steps": [{ "command": "cargo check", "expected_exit_code": 0 }],
+            "status": "Pending",
+            "attempts": 0,
+            "result": null
+        }]
+    });
+    env.create_file(
+        ".ai/implementation_plan.json",
+        &plan_content.to_string(),
+    );
+
+    // 2. Mock the summarization API response
+    let summary_response = json!({
+        "candidates": [{
+            "content": { "parts": [{ "text": "Summarized: compile_error!" }] }
+        }]
+    });
+    Mock::given(method("POST"))
+        .and(path_regex(r"/gemini-1.5-flash:generateContent.*"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(summary_response))
+        .mount(&env.mock_server)
+        .await;
+
+    // 3. Mock the implementation API response (with the fix)
+    let impl_response = json!({
+        "candidates": [{
+            "content": {
+                "parts": [{
+                    "functionCall": {
+                        "name": "edit_file",
+                        "args": {
+                            "path": "src/main.rs",
+                            "new_content": "fn main() { println!(\"Fixed!\"); }"
+                        }
+                    }
+                }]
+            }
+        }]
+    });
+    Mock::given(method("POST"))
+        .and(path_regex(r"/gemini-1.5-pro:generateContent.*"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(impl_response))
+        .mount(&env.mock_server)
+        .await;
+
+    // 4. Run `aide impl`
+    get_aide_cmd()
+        .current_dir(env.path())
+        .arg("impl")
+        .arg("--plan")
+        .arg(".ai/implementation_plan.json")
+        .assert()
+        .success();
+
+    // 5. Assert file was fixed
+    let new_content = fs::read_to_string(env.full_path("src/main.rs")).unwrap();
+    assert!(new_content.contains("Fixed!"));
+}

@@ -22,6 +22,38 @@ use std::{
 };
 use tracing::{error, info, warn};
 
+async fn summarize_error(error_output: &str) -> Result<String> {
+    info!("Summarizing error output...");
+    let gemini = GeminiClientWrapper::new_summarize_agent()?;
+    let prompt = format!(
+        "Summarize this compiler/tool error into its most critical message, keeping it concise and focusing on the root cause: {}",
+        error_output
+    );
+
+    let contents = vec![Content {
+        role: Role::User,
+        parts: vec![ContentPart::Text(prompt)],
+    }];
+
+    let response = gemini.generate_content(contents, None).await?;
+
+    let candidate = response
+        .candidates
+        .and_then(|mut c| c.pop())
+        .ok_or_else(|| Error::Config("No candidates in summarization response".to_string()))?;
+
+    if let Some(part) = candidate.content.parts.into_iter().next() {
+        if let PartResponse::Text(text) = part {
+            info!(summary = %text, "Successfully summarized error");
+            return Ok(text);
+        }
+    }
+
+    Err(Error::Config(
+        "Expected a text part in the summarization response".to_string(),
+    ))
+}
+
 pub struct ImplAgent {
     gemini: GeminiClientWrapper,
     max_retries: u32,
@@ -344,7 +376,19 @@ impl Agent for ImplAgent {
                         }
                         Err(e) => {
                             warn!(description = %task.description, "Task attempt failed");
-                            last_error = Some(e);
+                            const SUMMARIZATION_THRESHOLD: usize = 1000;
+                            let error_for_prompt = if e.len() > SUMMARIZATION_THRESHOLD {
+                                match summarize_error(&e).await {
+                                    Ok(summary) => summary,
+                                    Err(summary_err) => {
+                                        error!(error = %summary_err, "Failed to summarize error, using full error text");
+                                        e
+                                    }
+                                }
+                            } else {
+                                e
+                            };
+                            last_error = Some(error_for_prompt);
                         }
                     }
                 }

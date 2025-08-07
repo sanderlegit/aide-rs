@@ -21,6 +21,11 @@ impl GeminiClientWrapper {
         Self::new("gemini-1.5-flash".to_string())
     }
 
+    // Using gemini-1.5-flash for summarization as it's fast and cheap.
+    pub fn new_summarize_agent() -> Result<Self> {
+        Self::new("gemini-1.5-flash".to_string())
+    }
+
     // Using gemini-1.5-pro for implementation as it's more powerful for complex reasoning.
     pub fn new_impl_agent() -> Result<Self> {
         Self::new("gemini-1.5-pro".to_string())
