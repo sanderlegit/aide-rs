@@ -8,16 +8,6 @@ use crate::{
     gemini::GeminiClientWrapper,
 };
 use async_trait::async_trait;
-use crate::{
-    agents::{
-        Agent,
-        state::{FileScope, ImplementationPlan, PlanPrompt, Task, TaskStatus, ValidationStep},
-    },
-    error::{Error, Result},
-    files,
-    gemini::GeminiClientWrapper,
-};
-use async_trait::async_trait;
 use gemini_client_rs::types::{
     Content, ContentPart, DynamicRetrieval, DynamicRetrievalConfig, FunctionCall,
     GenerateContentResponse, PartResponse, Role, ToolConfig,
