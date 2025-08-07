@@ -17,6 +17,17 @@ use serde_json::json;
 use std::path::{Path, PathBuf};
 use tracing::info;
 
+#[derive(Deserialize)]
+struct TaskDescriptions {
+    tasks: Vec<String>,
+}
+
+#[derive(Deserialize)]
+struct TaskDetails {
+    file_scoping: FileScope,
+    validation_steps: Vec<ValidationStep>,
+}
+
 pub struct PlanAgent {
     gemini: GeminiClientWrapper,
 }
@@ -27,11 +38,16 @@ impl PlanAgent {
         Ok(Self { gemini })
     }
 
-    fn create_system_prompt(&self) -> String {
-        "You are an expert software architect. Your role is to analyze a user's objective, the provided project context, and create a detailed, step-by-step implementation plan. You must break down the objective into small, verifiable tasks. For each task, you must define the specific files that need to be touched and the commands to validate the changes. You must call the `create_implementation_plan` function with the generated plan.".to_string()
+    // STEP 1: Get task descriptions
+    fn create_description_generation_system_prompt(&self) -> String {
+        "You are an expert software architect. Your role is to analyze a user's objective and the provided project context, and break it down into a high-level list of task descriptions. Focus on the logical steps and do not include implementation details like file paths or validation commands yet. You must call the `create_task_descriptions` function with the generated list of descriptions.".to_string()
     }
 
-    fn create_user_prompt(&self, prompt: &PlanPrompt, files: &[PathBuf]) -> String {
+    fn create_description_generation_user_prompt(
+        &self,
+        prompt: &PlanPrompt,
+        files: &[PathBuf],
+    ) -> String {
         let file_list = files
             .iter()
             .map(|p| p.to_string_lossy())
@@ -40,7 +56,7 @@ impl PlanAgent {
 
         format!(
             r#"
-Please create an implementation plan for the following objective:
+Please create a list of high-level task descriptions for the following objective:
 
 **Objective:**
 {objective}
@@ -53,10 +69,7 @@ Please create an implementation plan for the following objective:
 **Coding Conventions:**
 {coding_conventions}
 
-**Validation Commands (to be run after each task):**
-{validation_commands}
-
-Generate a detailed implementation plan by calling the `create_implementation_plan` function.
+Generate a list of task descriptions by calling the `create_task_descriptions` function.
 "#,
             objective = prompt.objective,
             file_list = if file_list.is_empty() {
@@ -65,73 +78,20 @@ Generate a detailed implementation plan by calling the `create_implementation_pl
                 file_list
             },
             coding_conventions = prompt.coding_conventions,
-            validation_commands = prompt
-                .validation_commands
-                .iter()
-                .map(|v| format!(
-                    "- `{}` (expects exit code {})",
-                    v.command, v.expected_exit_code
-                ))
-                .collect::<Vec<_>>()
-                .join("\n")
         )
     }
 
-    fn create_implementation_plan_tool(&self) -> serde_json::Value {
+    fn create_task_descriptions_tool(&self) -> serde_json::Value {
         json!({
-            "name": "create_implementation_plan",
-            "description": "Creates a structured implementation plan with a list of tasks.",
+            "name": "create_task_descriptions",
+            "description": "Creates a list of high-level task descriptions for an implementation plan.",
             "parameters": {
                 "type": "OBJECT",
                 "properties": {
                     "tasks": {
                         "type": "ARRAY",
-                        "description": "The list of tasks to be executed.",
-                        "items": {
-                            "type": "OBJECT",
-                            "properties": {
-                                "description": {
-                                    "type": "STRING",
-                                    "description": "A detailed description of the task."
-                                },
-                                "file_scoping": {
-                                    "type": "OBJECT",
-                                    "description": "The files relevant to this task.",
-                                    "properties": {
-                                        "include": {
-                                            "type": "ARRAY",
-                                            "description": "Glob patterns for files to include.",
-                                            "items": { "type": "STRING" }
-                                        },
-                                        "exclude": {
-                                            "type": "ARRAY",
-                                            "description": "Glob patterns for files to exclude.",
-                                            "items": { "type": "STRING" }
-                                        }
-                                    },
-                                    "required": ["include"]
-                                },
-                                "validation_steps": {
-                                    "type": "ARRAY",
-                                    "description": "Commands to validate the task's completion.",
-                                    "items": {
-                                        "type": "OBJECT",
-                                        "properties": {
-                                            "command": {
-                                                "type": "STRING",
-                                                "description": "The validation command to run."
-                                            },
-                                            "expected_exit_code": {
-                                                "type": "NUMBER",
-                                                "description": "The expected exit code for the command."
-                                            }
-                                        },
-                                        "required": ["command", "expected_exit_code"]
-                                    }
-                                }
-                            },
-                            "required": ["description", "file_scoping", "validation_steps"]
-                        }
+                        "description": "The list of task descriptions.",
+                        "items": { "type": "STRING" }
                     }
                 },
                 "required": ["tasks"]
@@ -139,6 +99,168 @@ Generate a detailed implementation plan by calling the `create_implementation_pl
         })
     }
 
+    fn process_description_response(
+        &self,
+        response: GenerateContentResponse,
+    ) -> Result<Vec<String>> {
+        let candidate = response
+            .candidates
+            .and_then(|mut c| c.pop())
+            .ok_or_else(|| Error::Config("No candidates in description response".to_string()))?;
+
+        let part = candidate.content.parts.into_iter().next().ok_or_else(|| {
+            Error::Config("No parts in candidate for description response".to_string())
+        })?;
+
+        if let PartResponse::FunctionCall(FunctionCall { name, arguments }) = part {
+            if name == "create_task_descriptions" {
+                info!(
+                    ?arguments,
+                    "Received function call to create task descriptions"
+                );
+                let args: TaskDescriptions = serde_json::from_value(arguments)?;
+                return Ok(args.tasks);
+            }
+        }
+
+        Err(Error::Config(
+            "Expected a function call to `create_task_descriptions`".to_string(),
+        ))
+    }
+
+    // STEP 2: Detail each task
+    fn create_task_detailing_system_prompt(&self) -> String {
+        "You are an expert software architect. Your role is to detail a single task for an implementation plan. Given the overall objective, project context, and a specific task description, you must determine which files are relevant (`file_scoping`) and what commands are needed to validate the task (`validation_steps`). You must call the `create_task_details` function with this information.".to_string()
+    }
+
+    fn create_task_detailing_user_prompt(
+        &self,
+        original_prompt: &PlanPrompt,
+        files: &[PathBuf],
+        task_description: &str,
+    ) -> String {
+        let file_list = files
+            .iter()
+            .map(|p| p.to_string_lossy())
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let validation_commands_list = original_prompt
+            .validation_commands
+            .iter()
+            .map(|v| format!("- `{}`", v.command))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        format!(
+            r#"
+**Overall Objective:**
+{objective}
+
+**Project Context (Scoped Files):**
+```
+{file_list}
+```
+
+**Coding Conventions:**
+{coding_conventions}
+
+**Task to Detail:**
+{task_description}
+
+Please provide the file scoping and validation steps for this specific task by calling the `create_task_details` function. The validation steps must be a subset of the following available commands:
+{validation_commands_list}
+"#,
+            objective = original_prompt.objective,
+            file_list = if file_list.is_empty() {
+                "No files in scope.".to_string()
+            } else {
+                file_list
+            },
+            coding_conventions = original_prompt.coding_conventions,
+            task_description = task_description,
+            validation_commands_list = validation_commands_list,
+        )
+    }
+
+    fn create_task_details_tool(&self) -> serde_json::Value {
+        json!({
+            "name": "create_task_details",
+            "description": "Creates the details (file scope, validation) for a single task.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "file_scoping": {
+                        "type": "OBJECT",
+                        "description": "The files relevant to this task.",
+                        "properties": {
+                            "include": {
+                                "type": "ARRAY",
+                                "description": "Glob patterns for files to include.",
+                                "items": { "type": "STRING" }
+                            },
+                            "exclude": {
+                                "type": "ARRAY",
+                                "description": "Glob patterns for files to exclude.",
+                                "items": { "type": "STRING" }
+                            }
+                        },
+                        "required": ["include"]
+                    },
+                    "validation_steps": {
+                        "type": "ARRAY",
+                        "description": "Commands to validate the task's completion.",
+                        "items": {
+                            "type": "OBJECT",
+                            "properties": {
+                                "command": {
+                                    "type": "STRING",
+                                    "description": "The validation command to run."
+                                },
+                                "expected_exit_code": {
+                                    "type": "NUMBER",
+                                    "description": "The expected exit code for the command."
+                                }
+                            },
+                            "required": ["command", "expected_exit_code"]
+                        }
+                    }
+                },
+                "required": ["file_scoping", "validation_steps"]
+            }
+        })
+    }
+
+    fn process_detailing_response(&self, response: GenerateContentResponse) -> Result<TaskDetails> {
+        let candidate = response
+            .candidates
+            .and_then(|mut c| c.pop())
+            .ok_or_else(|| Error::Config("No candidates in detailing response".to_string()))?;
+
+        let part = candidate
+            .content
+            .parts
+            .into_iter()
+            .next()
+            .ok_or_else(|| Error::Config("No parts in candidate for detailing response".to_string()))?;
+
+        if let PartResponse::FunctionCall(FunctionCall { name, arguments }) = part {
+            if name == "create_task_details" {
+                info!(
+                    ?arguments,
+                    "Received function call to create task details"
+                );
+                let args: TaskDetails = serde_json::from_value(arguments)?;
+                return Ok(args);
+            }
+        }
+
+        Err(Error::Config(
+            "Expected a function call to `create_task_details`".to_string(),
+        ))
+    }
+
+    // Google Search related functions
     fn create_dependency_research_prompt(&self, prompt: &PlanPrompt) -> String {
         format!(
             "Based on the following objective, please use Google Search to find the best and most up-to-date Rust crates (libraries) to accomplish the task. Provide their names and latest versions.
@@ -179,68 +301,6 @@ Focus on libraries that are well-maintained, popular, and fit the requirements. 
             "Expected a text part in the search response".to_string(),
         ))
     }
-
-    fn process_response(
-        &self,
-        response: GenerateContentResponse,
-        prompt: PlanPrompt,
-    ) -> Result<ImplementationPlan> {
-        let candidate = response
-            .candidates
-            .and_then(|mut c| c.pop())
-            .ok_or_else(|| Error::Config("No candidates in response".to_string()))?;
-
-        let part = candidate
-            .content
-            .parts
-            .into_iter()
-            .next()
-            .ok_or_else(|| Error::Config("No parts in candidate".to_string()))?;
-
-        if let PartResponse::FunctionCall(FunctionCall { name, arguments }) = part {
-            if name == "create_implementation_plan" {
-                info!(
-                    ?arguments,
-                    "Received function call to create implementation plan"
-                );
-
-                #[derive(Deserialize)]
-                struct PlanArgs {
-                    tasks: Vec<TaskArgs>,
-                }
-                #[derive(Deserialize)]
-                struct TaskArgs {
-                    description: String,
-                    file_scoping: FileScope,
-                    validation_steps: Vec<ValidationStep>,
-                }
-
-                let plan_args: PlanArgs = serde_json::from_value(arguments)?;
-
-                let tasks = plan_args
-                    .tasks
-                    .into_iter()
-                    .map(|task_arg| Task {
-                        description: task_arg.description,
-                        file_scoping: task_arg.file_scoping,
-                        validation_steps: task_arg.validation_steps,
-                        status: TaskStatus::Pending,
-                        attempts: 0,
-                        result: None,
-                    })
-                    .collect();
-
-                return Ok(ImplementationPlan {
-                    original_prompt: prompt,
-                    tasks,
-                });
-            }
-        }
-
-        Err(Error::Config(
-            "Expected a function call to `create_implementation_plan`".to_string(),
-        ))
-    }
 }
 
 #[async_trait]
@@ -252,7 +312,8 @@ impl Agent for PlanAgent {
         let files = files::get_filtered_files(Path::new("."), &prompt.file_scoping)?;
         info!(?files, "Found files for planning context");
 
-        let mut user_prompt = self.create_user_prompt(&prompt, &files);
+        let mut user_prompt_for_descriptions =
+            self.create_description_generation_user_prompt(&prompt, &files);
 
         if prompt.use_google_search_for_deps {
             info!("Using Google Search to find up-to-date libraries.");
@@ -273,16 +334,18 @@ impl Agent for PlanAgent {
                 .await?;
 
             let search_result_text = self.process_search_response(&search_response)?;
-            user_prompt = format!(
+            user_prompt_for_descriptions = format!(
                 "{}\n\n**Suggested Libraries (from Google Search):**\n{}",
-                user_prompt, search_result_text
+                user_prompt_for_descriptions, search_result_text
             );
         }
 
-        let system_prompt = self.create_system_prompt();
+        // STEP 1: Get task descriptions
+        info!("Step 1: Generating task descriptions...");
+        let system_prompt = self.create_description_generation_system_prompt();
         info!(
-            prompt = %format!("\n--- SYSTEM ---\n{}\n--- USER ---\n{}\n---", system_prompt, user_prompt),
-            "Sending planning prompt to Gemini"
+            prompt = %format!("\n--- SYSTEM ---\n{}\n--- USER ---\n{}\n---", system_prompt, user_prompt_for_descriptions),
+            "Sending description generation prompt to Gemini"
         );
 
         let contents = vec![
@@ -293,17 +356,16 @@ impl Agent for PlanAgent {
             Content {
                 role: Role::Model,
                 parts: vec![ContentPart::Text(
-                    "Understood. I am ready to generate a plan. Please provide the details."
-                        .to_string(),
+                    "Understood. I am ready to generate task descriptions.".to_string(),
                 )],
             },
             Content {
                 role: Role::User,
-                parts: vec![ContentPart::Text(user_prompt)],
+                parts: vec![ContentPart::Text(user_prompt_for_descriptions)],
             },
         ];
 
-        let function_declarations = vec![self.create_implementation_plan_tool()];
+        let function_declarations = vec![self.create_task_descriptions_tool()];
         let tool_config = json!([{
             "functionDeclarations": function_declarations
         }]);
@@ -313,8 +375,66 @@ impl Agent for PlanAgent {
             .generate_content(contents, Some(tool_config))
             .await?;
 
-        let plan = self.process_response(response, prompt)?;
+        let task_descriptions = self.process_description_response(response)?;
+        info!(?task_descriptions, "Generated task descriptions");
 
-        Ok(plan)
+        // STEP 2: Detail each task
+        info!("Step 2: Detailing each task...");
+        let mut tasks = Vec::new();
+        for description in &task_descriptions {
+            info!(task = %description, "Detailing task");
+
+            let system_prompt = self.create_task_detailing_system_prompt();
+            let user_prompt =
+                self.create_task_detailing_user_prompt(&prompt, &files, description);
+            info!(
+                prompt = %format!("\n--- SYSTEM ---\n{}\n--- USER ---\n{}\n---", system_prompt, user_prompt),
+                "Sending task detailing prompt to Gemini"
+            );
+
+            let contents = vec![
+                Content {
+                    role: Role::User,
+                    parts: vec![ContentPart::Text(system_prompt)],
+                },
+                Content {
+                    role: Role::Model,
+                    parts: vec![ContentPart::Text(
+                        "Understood. I am ready to detail the task.".to_string(),
+                    )],
+                },
+                Content {
+                    role: Role::User,
+                    parts: vec![ContentPart::Text(user_prompt)],
+                },
+            ];
+
+            let function_declarations = vec![self.create_task_details_tool()];
+            let tool_config = json!([{
+                "functionDeclarations": function_declarations
+            }]);
+
+            let response = self
+                .gemini
+                .generate_content(contents, Some(tool_config))
+                .await?;
+
+            let details = self.process_detailing_response(response)?;
+
+            tasks.push(Task {
+                description: description.clone(),
+                file_scoping: details.file_scoping,
+                validation_steps: details.validation_steps,
+                status: TaskStatus::Pending,
+                attempts: 0,
+                result: None,
+            });
+        }
+
+        // STEP 3: Assemble and return plan
+        Ok(ImplementationPlan {
+            original_prompt: prompt,
+            tasks,
+        })
     }
 }
