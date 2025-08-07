@@ -15,10 +15,14 @@ impl TestEnv {
         let temp_dir = tempdir().unwrap();
         let mock_server = MockServer::start().await;
 
-        // Set the env var for the Gemini client to use the mock server
-        std::env::set_var("GEMINI_BASE_URL", &mock_server.uri());
-        // Set a dummy API key
-        std::env::set_var("GEMINI_API_KEY", "test-key");
+        // Set the env var for the Gemini client to use the mock server.
+        // This is unsafe because setting environment variables is not thread-safe.
+        // In the context of tests that might run in parallel, this can cause data races.
+        unsafe {
+            std::env::set_var("GEMINI_BASE_URL", &mock_server.uri());
+            // Set a dummy API key
+            std::env::set_var("GEMINI_API_KEY", "test-key");
+        }
 
         Self {
             temp_dir,
