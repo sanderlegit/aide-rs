@@ -1,4 +1,8 @@
-use aide_rs::error::Result;
+use aide_rs::{
+    cli::{Cli, Commands},
+    error::Result,
+};
+use clap::Parser;
 use tracing::info;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
@@ -16,6 +20,30 @@ fn setup_logging() {
 #[tokio::main]
 async fn main() -> Result<()> {
     setup_logging();
-    info!("Hello, world!");
+    let cli = Cli::parse();
+
+    match cli.command {
+        Commands::Plan {
+            prompt,
+            output_plan,
+        } => {
+            info!(?prompt, ?output_plan, "Running Plan agent");
+            // Placeholder for PlanAgent logic
+        }
+        Commands::Impl {
+            plan,
+            max_retries,
+            auto_commit,
+        } => {
+            info!(
+                ?plan,
+                ?max_retries,
+                ?auto_commit,
+                "Running Impl agent"
+            );
+            // Placeholder for ImplAgent logic
+        }
+    }
+
     Ok(())
 }

@@ -40,6 +40,9 @@ git2 = "0.18.3"
 # A client for interacting with the Google Gemini API.
 gemini_client_rs = "0.1.0"
 
+# For loading .env files
+dotenvy = "0.15.7"
+
 [dev-dependencies]
 # HTTP mocking for testing API interactions deterministically.
 wiremock = "0.6.0"
