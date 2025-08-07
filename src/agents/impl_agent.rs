@@ -1,6 +1,6 @@
 use crate::{
     agents::{
-        state::{ImplementationPlan, Task, TaskResult, TaskStatus},
+        state::{ImplementationPlan, PlanPrompt, Task, TaskResult, TaskStatus},
         Agent,
     },
     error::{Error, Result},
@@ -10,8 +10,8 @@ use crate::{
 };
 use async_trait::async_trait;
 use gemini_client_rs::types::{
-    Content, ContentPart, FunctionCall, FunctionDeclaration, FunctionParameters,
-    GenerateContentResponse, PartResponse, Role,
+    Content, ContentPart, FunctionCall, FunctionDeclaration, GenerateContentResponse, PartResponse,
+    Role,
 };
 use serde::Deserialize;
 use serde_json::json;
@@ -106,7 +106,7 @@ impl ImplAgent {
     fn create_user_prompt(
         &self,
         task: &Task,
-        plan: &ImplementationPlan,
+        original_prompt: &PlanPrompt,
         file_contents: &[(PathBuf, String)],
         error_context: &Option<String>,
     ) -> String {
@@ -146,7 +146,7 @@ impl ImplAgent {
 Implement the task by calling the `edit_file` or `create_file` functions.
 "#,
             task_description = task.description,
-            coding_conventions = plan.original_prompt.coding_conventions,
+            coding_conventions = original_prompt.coding_conventions,
             file_context = file_context,
             error_prompt = error_prompt,
         )
@@ -240,116 +240,128 @@ impl Agent for ImplAgent {
         let plan_content = std::fs::read_to_string(&plan_path)?;
         let mut plan: ImplementationPlan = serde_json::from_str(&plan_content)?;
 
-        for task in &mut plan.tasks {
-            if task.status == TaskStatus::Success {
-                info!(description = %task.description, "Skipping completed task");
-                continue;
-            }
+        for i in 0..plan.tasks.len() {
+            let task_succeeded = {
+                let task = &mut plan.tasks[i];
 
-            info!(description = %task.description, "Starting task");
-            task.status = TaskStatus::Pending;
-
-            let mut last_error: Option<String> = None;
-            for attempt in 0..self.max_retries {
-                task.attempts = attempt + 1;
-                info!(
-                    description = %task.description,
-                    attempt = task.attempts,
-                    max_retries = self.max_retries,
-                    "Attempting task"
-                );
-
-                let workdir = Path::new(".");
-                let files_in_scope = files::get_filtered_files(workdir, &task.file_scoping)?;
-                let mut file_contents = Vec::new();
-                for path in &files_in_scope {
-                    let content = std::fs::read_to_string(path)?;
-                    file_contents.push((path.clone(), content));
+                if task.status == TaskStatus::Success {
+                    info!(description = %task.description, "Skipping completed task");
+                    continue;
                 }
 
-                let tools = self.create_file_tools();
-                let system_prompt = self.create_system_prompt();
-                let user_prompt =
-                    self.create_user_prompt(task, &plan, &file_contents, &last_error);
+                info!(description = %task.description, "Starting task");
+                task.status = TaskStatus::Pending;
 
-                let contents = vec![
-                    Content {
-                        role: Role::User,
-                        parts: vec![ContentPart::Text(system_prompt)],
-                    },
-                    Content {
-                        role: Role::Model,
-                        parts: vec![ContentPart::Text(
-                            "Understood. I am ready to implement the task.".to_string(),
-                        )],
-                    },
-                    Content {
-                        role: Role::User,
-                        parts: vec![ContentPart::Text(user_prompt)],
-                    },
-                ];
+                let mut last_error: Option<String> = None;
+                let mut succeeded = false;
+                for attempt in 0..self.max_retries {
+                    task.attempts = attempt + 1;
+                    info!(
+                        description = %task.description,
+                        attempt = task.attempts,
+                        max_retries = self.max_retries,
+                        "Attempting task"
+                    );
 
-                let response = self.gemini.generate_content(contents, Some(tools)).await?;
-                let agent_tips = self.process_response(&response)?;
+                    let workdir = Path::new(".");
+                    let files_in_scope = files::get_filtered_files(workdir, &task.file_scoping)?;
+                    let mut file_contents = Vec::new();
+                    for path in &files_in_scope {
+                        let content = std::fs::read_to_string(path)?;
+                        file_contents.push((path.clone(), content));
+                    }
 
-                let mut formatter_error: Option<String> = None;
-                if let Some(formatter_cmd) = &plan.original_prompt.formatter_command {
-                    info!(command = %formatter_cmd, "Running formatter");
-                    match run_command(formatter_cmd) {
-                        Ok((code, output)) => {
-                            if code != 0 {
+                    let tools = self.create_file_tools();
+                    let system_prompt = self.create_system_prompt();
+                    let user_prompt = self.create_user_prompt(
+                        task,
+                        &plan.original_prompt,
+                        &file_contents,
+                        &last_error,
+                    );
+
+                    let contents = vec![
+                        Content {
+                            role: Role::User,
+                            parts: vec![ContentPart::Text(system_prompt)],
+                        },
+                        Content {
+                            role: Role::Model,
+                            parts: vec![ContentPart::Text(
+                                "Understood. I am ready to implement the task.".to_string(),
+                            )],
+                        },
+                        Content {
+                            role: Role::User,
+                            parts: vec![ContentPart::Text(user_prompt)],
+                        },
+                    ];
+
+                    let response = self.gemini.generate_content(contents, Some(tools)).await?;
+                    let agent_tips = self.process_response(&response)?;
+
+                    let mut formatter_error: Option<String> = None;
+                    if let Some(formatter_cmd) = &plan.original_prompt.formatter_command {
+                        info!(command = %formatter_cmd, "Running formatter");
+                        match run_command(formatter_cmd) {
+                            Ok((code, output)) => {
+                                if code != 0 {
+                                    let error_msg = format!(
+                                        "Formatter command `{}` failed with exit code {}.\nOutput:\n{}",
+                                        formatter_cmd, code, output
+                                    );
+                                    error!("{}", error_msg);
+                                    formatter_error = Some(error_msg);
+                                }
+                            }
+                            Err(e) => {
                                 let error_msg = format!(
-                                    "Formatter command `{}` failed with exit code {}.\nOutput:\n{}",
-                                    formatter_cmd, code, output
+                                    "Failed to execute formatter command `{}`: {}",
+                                    formatter_cmd, e
                                 );
                                 error!("{}", error_msg);
                                 formatter_error = Some(error_msg);
                             }
                         }
+                    }
+
+                    let validation_result = if let Some(e) = formatter_error {
+                        Err(e)
+                    } else {
+                        self.run_validation(task)
+                    };
+
+                    match validation_result {
+                        Ok(_) => {
+                            info!(description = %task.description, "Task completed successfully");
+                            task.status = TaskStatus::Success;
+                            task.result = Some(TaskResult {
+                                success: true,
+                                agent_tips,
+                            });
+                            succeeded = true;
+                            break;
+                        }
                         Err(e) => {
-                            let error_msg = format!(
-                                "Failed to execute formatter command `{}`: {}",
-                                formatter_cmd, e
-                            );
-                            error!("{}", error_msg);
-                            formatter_error = Some(error_msg);
+                            warn!(description = %task.description, "Task attempt failed");
+                            last_error = Some(e);
                         }
                     }
                 }
+                succeeded
+            };
 
-                let validation_result = if let Some(e) = formatter_error {
-                    Err(e)
-                } else {
-                    self.run_validation(task)
-                };
-
-                match validation_result {
-                    Ok(_) => {
-                        info!(description = %task.description, "Task completed successfully");
-                        task.status = TaskStatus::Success;
-                        task.result = Some(TaskResult {
-                            success: true,
-                            agent_tips,
-                        });
-                        let plan_json = serde_json::to_string_pretty(&plan)?;
-                        std::fs::write(&plan_path, plan_json)?;
-                        break;
-                    }
-                    Err(e) => {
-                        warn!(description = %task.description, "Task attempt failed");
-                        last_error = Some(e);
-                    }
-                }
-            }
-
-            if task.status != TaskStatus::Success {
-                error!(description = %task.description, "Task failed after all retries");
-                task.status = TaskStatus::Failed;
+            if task_succeeded {
+                let plan_json = serde_json::to_string_pretty(&plan)?;
+                std::fs::write(&plan_path, plan_json)?;
+            } else {
+                plan.tasks[i].status = TaskStatus::Failed;
+                error!(description = %plan.tasks[i].description, "Task failed after all retries");
                 let plan_json = serde_json::to_string_pretty(&plan)?;
                 std::fs::write(&plan_path, plan_json)?;
                 return Err(Error::Config(format!(
                     "Task '{}' failed after {} attempts.",
-                    task.description, self.max_retries
+                    plan.tasks[i].description, self.max_retries
                 )));
             }
         }
