@@ -32,9 +32,11 @@ version = "0.1.0"
 dependencies = [
  "assert_cmd",
  "clap",
+ "dotenvy",
  "gemini_client_rs",
  "git2",
  "glob",
+ "globset",
  "ignore",
  "serde",
  "serde_json",
