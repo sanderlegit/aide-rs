@@ -11,7 +11,7 @@ use crate::{
 use async_trait::async_trait;
 use gemini_client_rs::types::{
     Content, ContentPart, FunctionCall, FunctionDeclaration, GenerateContentResponse, PartResponse,
-    Role, ToolConfig, ToolConfigFunctionDeclaration,
+    Role,
 };
 use serde::Deserialize;
 use serde_json::json;
@@ -35,7 +35,7 @@ async fn summarize_error(error_output: &str) -> Result<String> {
         parts: vec![ContentPart::Text(prompt)],
     }];
 
-    let response = gemini.generate_content(contents, None).await?;
+    let response = gemini.generate_content::<()>(contents, None).await?;
 
     let candidate = response
         .candidates
@@ -334,11 +334,9 @@ impl Agent for ImplAgent {
                         },
                     ];
 
-                    let tool_config = vec![ToolConfig::FunctionDeclaration(
-                        ToolConfigFunctionDeclaration {
-                            function_declarations: tools,
-                        },
-                    )];
+                    let tool_config = json!([{
+                        "functionDeclarations": tools
+                    }]);
                     let response = self
                         .gemini
                         .generate_content(contents, Some(tool_config))
