@@ -71,64 +71,69 @@ Generate a detailed implementation plan by calling the `create_implementation_pl
     }
 
     fn create_implementation_plan_tool(&self) -> FunctionDeclaration {
-        FunctionDeclaration {
-            name: "create_implementation_plan".to_string(),
-            description: "Creates a structured implementation plan with a list of tasks.".to_string(),
-            parameters: Some(json!({
-                "type": "OBJECT",
-                "properties": {
-                    "tasks": {
-                        "type": "ARRAY",
-                        "description": "The list of tasks to be executed.",
-                        "items": {
-                            "type": "OBJECT",
-                            "properties": {
-                                "description": {
-                                    "type": "STRING",
-                                    "description": "A detailed description of the task."
+        let params_json = json!({
+            "type": "OBJECT",
+            "properties": {
+                "tasks": {
+                    "type": "ARRAY",
+                    "description": "The list of tasks to be executed.",
+                    "items": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "description": {
+                                "type": "STRING",
+                                "description": "A detailed description of the task."
+                            },
+                            "file_scoping": {
+                                "type": "OBJECT",
+                                "description": "The files relevant to this task.",
+                                "properties": {
+                                    "include": {
+                                        "type": "ARRAY",
+                                        "description": "Glob patterns for files to include.",
+                                        "items": { "type": "STRING" }
+                                    },
+                                    "exclude": {
+                                        "type": "ARRAY",
+                                        "description": "Glob patterns for files to exclude.",
+                                        "items": { "type": "STRING" }
+                                    }
                                 },
-                                "file_scoping": {
+                                "required": ["include"]
+                            },
+                            "validation_steps": {
+                                "type": "ARRAY",
+                                "description": "Commands to validate the task's completion.",
+                                "items": {
                                     "type": "OBJECT",
-                                    "description": "The files relevant to this task.",
                                     "properties": {
-                                        "include": {
-                                            "type": "ARRAY",
-                                            "description": "Glob patterns for files to include.",
-                                            "items": { "type": "STRING" }
+                                        "command": {
+                                            "type": "STRING",
+                                            "description": "The validation command to run."
                                         },
-                                        "exclude": {
-                                            "type": "ARRAY",
-                                            "description": "Glob patterns for files to exclude.",
-                                            "items": { "type": "STRING" }
+                                        "expected_exit_code": {
+                                            "type": "NUMBER",
+                                            "description": "The expected exit code for the command."
                                         }
                                     },
-                                    "required": ["include"]
-                                },
-                                "validation_steps": {
-                                    "type": "ARRAY",
-                                    "description": "Commands to validate the task's completion.",
-                                    "items": {
-                                        "type": "OBJECT",
-                                        "properties": {
-                                            "command": {
-                                                "type": "STRING",
-                                                "description": "The validation command to run."
-                                            },
-                                            "expected_exit_code": {
-                                                "type": "NUMBER",
-                                                "description": "The expected exit code for the command."
-                                            }
-                                        },
-                                        "required": ["command", "expected_exit_code"]
-                                    }
+                                    "required": ["command", "expected_exit_code"]
                                 }
-                            },
-                            "required": ["description", "file_scoping", "validation_steps"]
-                        }
+                            }
+                        },
+                        "required": ["description", "file_scoping", "validation_steps"]
                     }
-                },
-                "required": ["tasks"]
-            })),
+                }
+            },
+            "required": ["tasks"]
+        });
+        let parameters: FunctionParameters = serde_json::from_value(params_json)
+            .expect("Internal error: static schema for create_implementation_plan is invalid");
+
+        FunctionDeclaration {
+            name: "create_implementation_plan".to_string(),
+            description: "Creates a structured implementation plan with a list of tasks."
+                .to_string(),
+            parameters: Some(parameters),
         }
     }
 
@@ -149,9 +154,12 @@ Generate a detailed implementation plan by calling the `create_implementation_pl
             .next()
             .ok_or_else(|| Error::Config("No parts in candidate".to_string()))?;
 
-        if let PartResponse::FunctionCall(FunctionCall { name, args }) = part {
+        if let PartResponse::FunctionCall(FunctionCall { name, arguments }) = part {
             if name == "create_implementation_plan" {
-                info!(?args, "Received function call to create implementation plan");
+                info!(
+                    ?arguments,
+                    "Received function call to create implementation plan"
+                );
 
                 #[derive(Deserialize)]
                 struct PlanArgs {
@@ -164,7 +172,7 @@ Generate a detailed implementation plan by calling the `create_implementation_pl
                     validation_steps: Vec<ValidationStep>,
                 }
 
-                let plan_args: PlanArgs = serde_json::from_value(args)?;
+                let plan_args: PlanArgs = serde_json::from_value(arguments)?;
 
                 let tasks = plan_args
                     .tasks
