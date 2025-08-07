@@ -60,7 +60,7 @@ impl GeminiClientWrapper {
             "Sending request to Gemini model '{}' at '{}'.",
             self.model_name, self.base_url
         );
-        debug!(request = ?request_body, "Gemini request body");
+        debug!(request = %serde_json::to_string_pretty(&request_body).unwrap_or_else(|_| "Failed to format request body".to_string()), "Gemini request body");
 
         let url = format!(
             "{}/{}:generateContent?key={}",
@@ -80,8 +80,11 @@ impl GeminiClientWrapper {
             )));
         }
 
-        let response: GenerateContentResponse = response.json().await?;
-        debug!(?response, "Gemini response received");
+        let response_text = response.text().await?;
+        debug!(response_text = %response_text, "Raw Gemini response body");
+
+        let response: GenerateContentResponse = serde_json::from_str(&response_text)?;
+        debug!(response = %serde_json::to_string_pretty(&response).unwrap_or_else(|_| "Failed to format response body".to_string()), "Gemini response received");
 
         // Log text parts of response at info level for visibility
         if let Some(candidates) = &response.candidates {
