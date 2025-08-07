@@ -33,6 +33,15 @@ This tells the agent which files it is allowed to read and modify. It's a critic
 -   **`exclude`**: A list of glob patterns to exclude from the scope. This is useful for protecting sensitive files or parts of the codebase you don't want the agent to touch.
 -   **Principle of Least Privilege**: Only give the agent access to the files it absolutely needs to complete the objective.
 
+### `use_google_search_for_deps`
+
+An optional boolean flag (`true` or `false`) that instructs the `PlanAgent` to perform a preliminary step using Google Search to find the best and most up-to-date libraries for your objective.
+
+-   **Default**: `false`
+-   **When to use**: Set this to `true` when you are starting a new project or are unsure about the best libraries to use. The agent will use the search results to inform its plan, potentially suggesting newer or more suitable crates than what was in its training data.
+
+**Example**: `use_google_search_for_deps = true`
+
 ### `coding_conventions`
 
 This is where you enforce your project's standards. The agent is designed to follow these instructions strictly.

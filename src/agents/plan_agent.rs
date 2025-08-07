@@ -9,8 +9,9 @@ use crate::{
 };
 use async_trait::async_trait;
 use gemini_client_rs::types::{
-    Content, ContentPart, FunctionCall, FunctionDeclaration, FunctionParameters,
-    GenerateContentResponse, PartResponse, Role,
+    Content, ContentPart, DynamicRetrieval, DynamicRetrievalConfig, FunctionCall,
+    FunctionDeclaration, FunctionParameters, GenerateContentResponse, PartResponse, Role,
+    ToolConfig, ToolConfigFunctionDeclaration,
 };
 use serde::Deserialize;
 use serde_json::json;
@@ -144,6 +145,47 @@ Generate a detailed implementation plan by calling the `create_implementation_pl
         }
     }
 
+    fn create_dependency_research_prompt(&self, prompt: &PlanPrompt) -> String {
+        format!(
+            "Based on the following objective, please use Google Search to find the best and most up-to-date Rust crates (libraries) to accomplish the task. Provide their names and latest versions.
+
+Objective: {}
+
+Focus on libraries that are well-maintained, popular, and fit the requirements. List them clearly.",
+            prompt.objective
+        )
+    }
+
+    fn create_google_search_tool(&self) -> ToolConfig {
+        ToolConfig::DynamicRetieval {
+            google_search_retrieval: DynamicRetrieval {
+                dynamic_retrieval_config: Some(DynamicRetrievalConfig {
+                    mode: "MODE_DYNAMIC".to_string(),
+                    dynamic_threshold: Some(0.5),
+                }),
+            },
+        }
+    }
+
+    fn process_search_response(&self, response: &GenerateContentResponse) -> Result<String> {
+        let candidate = response
+            .candidates
+            .as_ref()
+            .and_then(|c| c.first())
+            .ok_or_else(|| Error::Config("No candidates in search response".to_string()))?;
+
+        if let Some(part) = candidate.content.parts.first() {
+            if let PartResponse::Text(text) = part {
+                info!(search_result = %text, "Successfully got search result");
+                return Ok(text.clone());
+            }
+        }
+
+        Err(Error::Config(
+            "Expected a text part in the search response".to_string(),
+        ))
+    }
+
     fn process_response(
         &self,
         response: GenerateContentResponse,
@@ -216,8 +258,30 @@ impl Agent for PlanAgent {
         let files = files::get_filtered_files(Path::new("."), &prompt.file_scoping)?;
         info!(?files, "Found files for planning context");
 
+        let mut user_prompt = self.create_user_prompt(&prompt, &files);
+
+        if prompt.use_google_search_for_deps {
+            info!("Using Google Search to find up-to-date libraries.");
+            let search_prompt = self.create_dependency_research_prompt(&prompt);
+            let search_contents = vec![Content {
+                role: Role::User,
+                parts: vec![ContentPart::Text(search_prompt)],
+            }];
+            let search_tools = vec![self.create_google_search_tool()];
+
+            let search_response = self
+                .gemini
+                .generate_content(search_contents, Some(search_tools))
+                .await?;
+
+            let search_result_text = self.process_search_response(&search_response)?;
+            user_prompt = format!(
+                "{}\n\n**Suggested Libraries (from Google Search):**\n{}",
+                user_prompt, search_result_text
+            );
+        }
+
         let system_prompt = self.create_system_prompt();
-        let user_prompt = self.create_user_prompt(&prompt, &files);
 
         let contents = vec![
             Content {
@@ -238,8 +302,13 @@ impl Agent for PlanAgent {
         ];
 
         let tools = vec![self.create_implementation_plan_tool()];
+        let tool_config = vec![ToolConfig::FunctionDeclaration(
+            ToolConfigFunctionDeclaration {
+                function_declarations: tools,
+            },
+        )];
 
-        let response = self.gemini.generate_content(contents, Some(tools)).await?;
+        let response = self.gemini.generate_content(contents, Some(tool_config)).await?;
 
         let plan = self.process_response(response, prompt)?;
 

@@ -52,19 +52,11 @@ impl GeminiClientWrapper {
     pub async fn generate_content(
         &self,
         contents: Vec<Content>,
-        tools: Option<Vec<FunctionDeclaration>>,
+        tools: Option<Vec<ToolConfig>>,
     ) -> Result<GenerateContentResponse> {
-        let tool_config = tools.map(|function_declarations| {
-            vec![ToolConfig::FunctionDeclaration(
-                ToolConfigFunctionDeclaration {
-                    function_declarations,
-                },
-            )]
-        });
-
         let request = GenerateContentRequest {
             contents,
-            tools: tool_config,
+            tools,
         };
 
         info!(

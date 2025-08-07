@@ -3,7 +3,7 @@ use assert_cmd::Command;
 use git2::Repository;
 use serde_json::json;
 use std::fs;
-use wiremock::matchers::{method, path_regex};
+use wiremock::matchers::{body_string_contains, method, path_regex};
 use wiremock::{Mock, ResponseTemplate};
 
 mod common;
@@ -216,6 +216,76 @@ async fn test_impl_workflow_with_auto_commit() {
     let commit_message = head.message().unwrap();
     assert!(commit_message.contains("AI-generated changes for:"));
     assert!(commit_message.contains("- Add a print statement"));
+}
+
+#[tokio::test]
+async fn test_plan_workflow_with_google_search() {
+    let env = TestEnv::new().await;
+
+    // 1. Create a sample prompt file with the search flag enabled
+    let prompt_content = r#"
+objective = "Create a web server"
+use_google_search_for_deps = true
+file_scoping.include = ["src/**/*.rs"]
+coding_conventions = "Use snake_case"
+validation_commands = []
+"#;
+    env.create_file("search_prompt.toml", prompt_content);
+
+    // 2. Mock the Gemini API response for the dependency search
+    let search_response = json!({
+        "candidates": [{
+            "content": { "parts": [{ "text": "Use `axum` and `tokio`." }] }
+        }]
+    });
+    Mock::given(method("POST"))
+        .and(path_regex(r"/gemini-2.5-flash:generateContent.*"))
+        .and(body_string_contains("please use Google Search"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(search_response))
+        .expect(1)
+        .mount(&env.mock_server)
+        .await;
+
+    // 3. Mock the Gemini API response for the planning step
+    let plan_response = json!({
+        "candidates": [{
+            "content": {
+                "parts": [{
+                    "functionCall": {
+                        "name": "create_implementation_plan",
+                        "args": { "tasks": [{ "description": "Add axum to Cargo.toml", "file_scoping": { "include": ["Cargo.toml"] }, "validation_steps": [] }] }
+                    }
+                }]
+            }
+        }]
+    });
+    Mock::given(method("POST"))
+        .and(path_regex(r"/gemini-2.5-flash:generateContent.*"))
+        .and(body_string_contains("Suggested Libraries (from Google Search)"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(plan_response))
+        .expect(1)
+        .mount(&env.mock_server)
+        .await;
+
+    // 4. Run the `aide plan` command
+    get_aide_cmd()
+        .current_dir(env.path())
+        .arg("plan")
+        .arg("--prompt")
+        .arg("search_prompt.toml")
+        .assert()
+        .success();
+
+    // 5. Assert that the plan file was created correctly
+    let plan_path = env.full_path(".ai/implementation_plan.json");
+    assert!(plan_path.exists());
+    let plan_content: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(plan_path).unwrap()).unwrap();
+
+    assert_eq!(
+        plan_content["tasks"][0]["description"],
+        "Add axum to Cargo.toml"
+    );
 }
 
 #[tokio::test]

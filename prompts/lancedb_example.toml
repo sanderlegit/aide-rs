@@ -16,6 +16,9 @@ Key Crates to Use:
 - `tracing`: For logging.
 """
 
+# Use Google Search to find the latest versions of the crates.
+use_google_search_for_deps = true
+
 # Define the files the agent should look at for context and modify.
 # For a new project, we start with just the core files.
 [file_scoping]
