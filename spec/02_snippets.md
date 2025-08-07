@@ -215,17 +215,20 @@ use globset::{Glob, GlobSetBuilder};
 use ignore::WalkBuilder;
 use std::path::{Path, PathBuf};
 
+use globset::{Glob, GlobSetBuilder};
+use ignore::{gitignore::GitignoreBuilder, WalkBuilder};
+use std::path::{Path, PathBuf};
+
 fn get_filtered_files(base_dir: &Path, scope: &FileScope) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
-    // We must canonicalize the base directory to handle cases where it's a symlink
-    // (e.g., /var on macOS), which ensures `strip_prefix` works correctly.
     let canonical_base_dir = base_dir.canonicalize()?;
     let mut files = Vec::new();
-    let mut builder = WalkBuilder::new(&canonical_base_dir);
 
-    // Respect .gitignore by default and do not ignore hidden files.
-    builder.hidden(false);
+    // 1. Manually build a gitignore matcher that respects parent directories.
+    let mut gitignore_builder = GitignoreBuilder::new(&canonical_base_dir);
+    gitignore_builder.add_parents(&canonical_base_dir);
+    let gitignore = gitignore_builder.build()?;
 
-    // Build glob matchers for include and exclude patterns.
+    // 2. Build glob matchers for the user-defined scope.
     let mut include_builder = GlobSetBuilder::new();
     for pattern in &scope.include {
         include_builder.add(Glob::new(pattern)?);
@@ -238,12 +241,19 @@ fn get_filtered_files(base_dir: &Path, scope: &FileScope) -> Result<Vec<PathBuf>
     }
     let excludes = exclude_builder.build()?;
 
-    // Walk the directory, respecting .gitignore, and then filter results.
-    for result in builder.build() {
+    // 3. Walk the directory and apply filters.
+    let mut walk_builder = WalkBuilder::new(&canonical_base_dir);
+    walk_builder.hidden(false); // Don't ignore hidden files by default.
+
+    for result in walk_builder.build() {
         let entry = result?;
         if entry.file_type().map_or(false, |ft| ft.is_file()) {
             let path = entry.path();
-            // Globs are relative, so we match against the path relative to the base directory.
+            // First, check against .gitignore rules.
+            if gitignore.matched(path, false).is_ignore() {
+                continue;
+            }
+            // Then, check against the user's scope.
             if let Ok(relative_path) = path.strip_prefix(&canonical_base_dir) {
                 if includes.is_match(relative_path) && !excludes.is_match(relative_path) {
                     files.push(entry.into_path());

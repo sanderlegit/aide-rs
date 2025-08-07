@@ -1,16 +1,18 @@
 use crate::{agents::state::FileScope, error::Result};
 use globset::{Glob, GlobSetBuilder};
-use ignore::WalkBuilder;
+use ignore::{gitignore::GitignoreBuilder, WalkBuilder};
 use std::path::{Path, PathBuf};
 
 pub fn get_filtered_files(base_dir: &Path, scope: &FileScope) -> Result<Vec<PathBuf>> {
     let canonical_base_dir = base_dir.canonicalize()?;
     let mut files = Vec::new();
-    let mut builder = WalkBuilder::new(&canonical_base_dir);
 
-    // We respect .gitignore by default and do not ignore hidden files.
-    builder.hidden(false);
+    // Manually build a gitignore matcher to ensure it's always respected.
+    let mut gitignore_builder = GitignoreBuilder::new(&canonical_base_dir);
+    gitignore_builder.add_parents(&canonical_base_dir);
+    let gitignore = gitignore_builder.build()?;
 
+    // Build glob matchers for our include/exclude scope.
     let mut include_builder = GlobSetBuilder::new();
     for pattern in &scope.include {
         include_builder.add(Glob::new(pattern)?);
@@ -23,11 +25,22 @@ pub fn get_filtered_files(base_dir: &Path, scope: &FileScope) -> Result<Vec<Path
     }
     let excludes = exclude_builder.build()?;
 
-    for result in builder.build() {
+    // Walk the directory, but perform all filtering manually.
+    let mut walk_builder = WalkBuilder::new(&canonical_base_dir);
+    walk_builder.hidden(false); // We want to see hidden files unless gitignored.
+
+    for result in walk_builder.build() {
         let entry = result?;
         if entry.file_type().map_or(false, |ft| ft.is_file()) {
             let path = entry.path();
-            // Match against path relative to the canonical_base_dir to handle symlinks.
+            let is_dir = entry.file_type().map_or(false, |ft| ft.is_dir());
+
+            // 1. Check if the file is ignored by .gitignore files.
+            if gitignore.matched(path, is_dir).is_ignore() {
+                continue;
+            }
+
+            // 2. Check if the file matches our include/exclude scope.
             if let Ok(relative_path) = path.strip_prefix(&canonical_base_dir) {
                 if includes.is_match(relative_path) && !excludes.is_match(relative_path) {
                     files.push(entry.into_path());
