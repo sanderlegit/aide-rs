@@ -9,8 +9,8 @@ use crate::{
 };
 use async_trait::async_trait;
 use gemini_client_rs::types::{
-    Content, ContentPart, FunctionCall, FunctionDeclaration, GenerateContentResponse, PartResponse,
-    Role,
+    Content, ContentPart, FunctionCall, FunctionDeclaration, FunctionParameters,
+    GenerateContentResponse, PartResponse, Role,
 };
 use serde::Deserialize;
 use serde_json::json;
