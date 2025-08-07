@@ -4,3 +4,48 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+# Core asynchronous runtime
+tokio = { version = "1.38.0", features = ["full"] }
+
+# Command-line interface parsing
+clap = { version = "4.5.4", features = ["derive"] }
+
+# Serialization and deserialization
+# The `derive` feature is crucial for easily making your structs serializable.
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = "1.0.117" # For handling JSON data.
+toml = "0.8.13" # For parsing the TOML prompt files.
+
+# Error handling
+# A helper for creating custom error types.
+thiserror = "1.0.61"
+
+# Logging and diagnostics
+# The core tracing API for instrumenting your application.
+tracing = "0.1.40"
+# Subscriber for processing and displaying trace data.
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+
+# File system interactions
+# For recursive directory walking and respecting .gitignore files.
+ignore = "0.4.22"
+# For glob pattern matching, used by the 'ignore' crate.
+glob = "0.3.1"
+
+# Version Control System (Git)
+# Provides bindings to libgit2 for Git operations.
+git2 = "0.18.3"
+
+# Google Gemini API Client
+# A client for interacting with the Google Gemini API.
+gemini-client-rs = "0.1.0"
+
+[dev-dependencies]
+# HTTP mocking for testing API interactions deterministically.
+wiremock = "0.6.0"
+
+# Assertion library for command-line application testing.
+assert_cmd = "2.0.14"
+
+# For creating temporary files and directories in tests.
+tempfile = "3.10.1"
