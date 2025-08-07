@@ -15,7 +15,7 @@ pub struct GeminiClientWrapper {
 impl GeminiClientWrapper {
     // Using gemini-2.5-flash for planning as it's fast and capable for generation.
     pub fn new_plan_agent() -> Result<Self> {
-        Self::new("gemini-2.5-flash".to_string())
+        Self::new("gemini-2.5-pro".to_string())
     }
 
     // Using gemini-2.5-flash for summarization as it's fast and cheap.
@@ -33,8 +33,9 @@ impl GeminiClientWrapper {
         let api_key = env::var("GEMINI_API_KEY")
             .map_err(|_| Error::Config("GEMINI_API_KEY must be set".to_string()))?;
 
-        let base_url = env::var("GEMINI_BASE_URL")
-            .unwrap_or_else(|_| "https://generativelanguage.googleapis.com/v1beta/models".to_string());
+        let base_url = env::var("GEMINI_BASE_URL").unwrap_or_else(|_| {
+            "https://generativelanguage.googleapis.com/v1beta/models".to_string()
+        });
 
         let client = Client::new();
 
@@ -75,9 +76,7 @@ impl GeminiClientWrapper {
             let err_msg = format!("API Error: {} - {}", status, text);
             // We'll wrap this in the existing GeminiError type for consistency,
             // even though we are not using the client directly.
-            return Err(Error::Gemini(gemini_client_rs::GeminiError::Api(
-                err_msg,
-            )));
+            return Err(Error::Gemini(gemini_client_rs::GeminiError::Api(err_msg)));
         }
 
         let response_text = response.text().await?;
