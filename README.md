@@ -52,14 +52,16 @@ The agent relies heavily on Gemini's **Function Calling** capabilities to ensure
 
 ### Step 1: Create a Prompt File
 
-First, define your objective in a TOML file. This file tells the agent what you want to achieve, which files it should consider, and how to validate its work.
+First, define your objective in a TOML file. This file tells the agent what you want to achieve, which files it should consider, and how to validate its work. For complex objectives or detailed coding conventions, you can use TOML's multiline strings (`"""..."""`).
 
 Create a file, for example, `prompts/add_feature.toml`:
 
 ```toml
 # prompts/add_feature.toml
 
-objective = "Add a new function `hello_world()` to `src/lib.rs` that prints 'Hello, World!' to the console."
+objective = """
+Add a new function `hello_world()` to `src/lib.rs` that prints 'Hello, World!' to the console.
+"""
 
 # Define the files the agent should look at for context.
 # It uses glob patterns and respects .gitignore.
@@ -68,7 +70,10 @@ include = ["src/**/*.rs"]
 exclude = []
 
 # Provide coding conventions for the agent to follow.
-coding_conventions = "All functions must have a doc comment."
+coding_conventions = """
+All functions must have a doc comment.
+Follow standard Rust formatting (`cargo fmt`).
+"""
 
 # Define commands that must pass for a task to be considered complete.
 [[validation_commands]]

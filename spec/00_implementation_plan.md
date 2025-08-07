@@ -75,9 +75,9 @@ use std::path::PathBuf;
 // Input for the PlanAgent, deserialized from a TOML file.
 #[derive(Serialize, Deserialize)]
 pub struct PlanPrompt {
-    pub objective: String,
+    pub objective: String, // A high-level description of the goal. Can be a multiline string in TOML.
     pub file_scoping: FileScope,
-    pub coding_conventions: String, // e.g., "Use Conventional Commits for all functions."
+    pub coding_conventions: String, // A detailed description of coding standards. Can be a multiline string in TOML.
     pub formatter_command: Option<String>,
     pub validation_commands: Vec<ValidationStep>,
 }
