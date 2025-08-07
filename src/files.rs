@@ -51,6 +51,7 @@ mod tests {
     fn test_get_filtered_files() -> crate::error::Result<()> {
         let dir = tempdir().unwrap();
         let base = dir.path();
+        let canonical_base = base.canonicalize()?;
 
         // Create some files and directories
         fs::create_dir_all(base.join("src/components")).unwrap();
@@ -73,8 +74,8 @@ mod tests {
         };
         let mut files1 = get_filtered_files(base, &scope1)?;
         let mut expected1 = vec![
-            base.join("src/components/button.rs"),
-            base.join("src/lib.rs"),
+            canonical_base.join("src/components/button.rs"),
+            canonical_base.join("src/lib.rs"),
         ];
         files1.sort();
         expected1.sort();
@@ -87,7 +88,7 @@ mod tests {
         };
         let files2 = get_filtered_files(base, &scope2)?;
         // config.toml should be ignored due to .gitignore
-        let expected2 = vec![base.join("README.md")];
+        let expected2 = vec![canonical_base.join("README.md")];
         assert_eq!(files2, expected2);
 
         // Test case 3: Include everything in src, but exclude components
@@ -96,7 +97,10 @@ mod tests {
             exclude: vec!["src/components/**/*".to_string()],
         };
         let mut files3 = get_filtered_files(base, &scope3)?;
-        let mut expected3 = vec![base.join("src/lib.rs"), base.join("src/main.rs")];
+        let mut expected3 = vec![
+            canonical_base.join("src/lib.rs"),
+            canonical_base.join("src/main.rs"),
+        ];
         files3.sort();
         expected3.sort();
         assert_eq!(files3, expected3);
@@ -107,7 +111,7 @@ mod tests {
             exclude: vec![],
         };
         let files4 = get_filtered_files(base, &scope4)?;
-        let expected4 = vec![base.join(".hidden_dir/secret.txt")];
+        let expected4 = vec![canonical_base.join(".hidden_dir/secret.txt")];
         assert_eq!(files4, expected4);
 
         Ok(())
