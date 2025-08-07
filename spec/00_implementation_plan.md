@@ -34,7 +34,7 @@ The application will be a library crate with a binary entry point. State will be
     ├── error.rs                 # Custom application error types (ApiError, FileSystemError, etc.)
     ├── vcs.rs                   # Trait and implementation for Git operations (commit)
     ├── files.rs                 # File discovery using the `ignore` crate
-    ├── gemini.rs                # Wrapper for gemini-client-rs; handles API calls, errors, history
+    ├── gemini.rs                # Wrapper for gemini_client_rs; handles API calls, errors, history
     └── agents/
         ├── mod.rs               # Defines the generic `Agent` trait
         ├── plan_agent.rs        # Implementation of the PlanAgent

@@ -6,12 +6,12 @@ Build the core intelligent components of the application: the `PlanAgent` and `I
 ## Tasks
 1.  **Define Agent Trait**: In `src/agents/mod.rs`, define a generic `Agent` trait to establish a common interface for agents.
 2.  **Implement Gemini Wrapper (`gemini.rs`)**:
-    *   Create `src/gemini.rs` to encapsulate all interactions with the `gemini-client-rs` library.
+    *   Create `src/gemini.rs` to encapsulate all interactions with the `gemini_client_rs` library.
     *   This wrapper will be responsible for:
         *   Initializing the client (e.g., loading the API key from `.env`).
         *   Constructing `GenerateContentRequest` objects, including system prompts, user messages, and tool definitions (function declarations).
         *   Handling responses and extracting function calls or text content.
-        *   Translating `gemini-client-rs` errors into the application's custom `Error` type.
+        *   Translating `gemini_client_rs` errors into the application's custom `Error` type.
 3.  **Implement `PlanAgent` (`agents/plan_agent.rs`)**:
     *   Implement the `Agent` trait for `PlanAgent`.
     *   The agent's main logic will:

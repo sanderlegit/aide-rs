@@ -38,7 +38,7 @@ git2 = "0.18.3"
 
 # Google Gemini API Client
 # A client for interacting with the Google Gemini API. [4]
-gemini-client-rs = "0.1.0"
+gemini_client_rs = "0.1.0"
 ```
 
 ### Development Dependencies (`[dev-dependencies]`)
@@ -66,6 +66,6 @@ tempfile = "3.10.1"
 *   **`tracing`** & **`tracing-subscriber`**: A modern framework for structured logging. It's more powerful than the standard `log` crate, especially for async applications, as it can trace the entire lifecycle of a task.
 *   **`ignore`**: The perfect tool for implementing your `FileScope` logic. It respects `.gitignore` rules by default and provides a fast, parallel directory walker.
 *   **`git2`**: The standard library for programmatic Git operations in Rust, necessary for the `--auto-commit` feature.
-*   **`gemini-client-rs`**: A client library specifically for the Google Gemini API, which is central to your agent's functionality.
+*   **`gemini_client_rs`**: A client library specifically for the Google Gemini API, which is central to your agent's functionality.
 *   **`wiremock`**: Critical for integration testing. It allows you to create a mock HTTP server that can simulate the Gemini API, enabling you to test your agent's logic without making actual API calls, which is faster, cheaper, and more predictable.
 *   **`assert_cmd`** & **`tempfile`**: The go-to combination for end-to-end testing of CLI applications. `assert_cmd` lets you run your compiled binary and make assertions about its output and exit code, while `tempfile` provides a safe way to create temporary project structures and files for your tests to run against.

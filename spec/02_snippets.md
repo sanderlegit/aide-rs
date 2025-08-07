@@ -302,7 +302,7 @@ The `Repository` object and other Git-related structs will release their resourc
 
 ---
 
-### 7. `gemini-client-rs`: Gemini API Interaction
+### 7. `gemini_client_rs`: Gemini API Interaction
 
 This is the core library for communicating with the LLM.
 

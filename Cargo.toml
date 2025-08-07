@@ -38,7 +38,7 @@ git2 = "0.18.3"
 
 # Google Gemini API Client
 # A client for interacting with the Google Gemini API.
-gemini-client-rs = "0.1.0"
+gemini_client_rs = "0.1.0"
 
 [dev-dependencies]
 # HTTP mocking for testing API interactions deterministically.

@@ -1,4 +1,4 @@
-gemini-client-rs
+gemini_client_rs
 
 A Rust client for the Google Gemini API.
 
@@ -22,7 +22,7 @@ Installation
 Add the following to your Cargo.toml file:
 
 [dependencies]
-gemini-client-rs = "0.1.0" # Replace with the actual version
+gemini_client_rs = "0.1.0" # Replace with the actual version
 tokio = { version = "1", features = ["full"] }
 
 Setting up your API Key
@@ -49,7 +49,7 @@ Using .env file (recommended for development):
 
 Examples
 
-Here are some examples demonstrating how to use the gemini-client-rs crate.
+Here are some examples demonstrating how to use the gemini_client_rs crate.
 Basic Text Generation
 
 use gemini_client_rs::{
