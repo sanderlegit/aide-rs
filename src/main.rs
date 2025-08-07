@@ -1,5 +1,5 @@
 use aide_rs::{
-    agents::{plan_agent::PlanAgent, state::PlanPrompt, Agent},
+    agents::{impl_agent::ImplAgent, plan_agent::PlanAgent, state::PlanPrompt, Agent},
     cli::{Cli, Commands},
     error::Result,
 };
@@ -58,7 +58,10 @@ async fn main() -> Result<()> {
                 ?auto_commit,
                 "Running Impl agent"
             );
-            // Placeholder for ImplAgent logic
+            let impl_agent = ImplAgent::new(max_retries, auto_commit)?;
+            impl_agent.run(plan).await?;
+
+            info!("Implementation agent finished successfully.");
         }
     }
 
