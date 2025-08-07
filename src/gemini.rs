@@ -1,8 +1,7 @@
 use crate::error::{Error, Result};
 use dotenvy::dotenv;
 use gemini_client_rs::types::{
-    Content, FunctionDeclaration, GenerateContentRequest, GenerateContentResponse, ToolConfig,
-    ToolConfigFunctionDeclaration,
+    Content, GenerateContentRequest, GenerateContentResponse, ToolConfig,
 };
 use reqwest::Client;
 use std::env;

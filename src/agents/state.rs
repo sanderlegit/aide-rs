@@ -112,6 +112,7 @@ validation_commands = []
                 coding_conventions: "None".to_string(),
                 formatter_command: None,
                 validation_commands: vec![],
+                use_google_search_for_deps: false,
             },
             tasks: vec![Task {
                 description: "Do a thing".to_string(),
