@@ -19,12 +19,6 @@ Key Crates to Use:
 # Use Google Search to find the latest versions of the crates.
 use_google_search_for_deps = true
 
-# Define the files the agent should look at for context and modify.
-# For a new project, we start with just the core files.
-[file_scoping]
-include = ["src/**/*.rs", "Cargo.toml"]
-exclude = []
-
 # Provide detailed coding conventions for the agent to follow.
 coding_conventions = """
 - The project must be a binary crate.
@@ -40,6 +34,12 @@ coding_conventions = """
 
 # The command to run to format the code. This ensures consistency.
 formatter_command = "cargo fmt --all"
+
+# Define the files the agent should look at for context and modify.
+# For a new project, we start with just the core files.
+[file_scoping]
+include = ["src/**/*.rs", "Cargo.toml"]
+exclude = []
 
 # A sequence of commands that must pass for each task to be considered complete.
 # This acts as a CI/CD pipeline for the agent.
