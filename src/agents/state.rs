@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 // Input for the PlanAgent, deserialized from a TOML file.
 #[derive(Serialize, Deserialize, Debug)]

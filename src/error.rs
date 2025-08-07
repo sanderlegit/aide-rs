@@ -16,6 +16,15 @@ pub enum Error {
 
     #[error("TOML serialization error: {0}")]
     TomlSer(#[from] toml::ser::Error),
+
+    #[error("File filtering error: {0}")]
+    Ignore(#[from] ignore::Error),
+
+    #[error("Git error: {0}")]
+    Git(#[from] git2::Error),
+
+    #[error("Path stripping error: {0}")]
+    StripPrefix(#[from] std::path::StripPrefixError),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

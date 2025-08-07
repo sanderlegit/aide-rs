@@ -210,31 +210,36 @@ Create a `WalkBuilder` and configure it with your include and exclude glob patte
 ```rust
 // In src/files.rs
 // use crate::agents::state::FileScope; // Your struct
-use ignore::{WalkBuilder, DirEntry};
+// use crate::error::Result; // Your project's result type
+use ignore::WalkBuilder;
 use std::path::{Path, PathBuf};
-use std::collections::HashSet;
 
-fn get_filtered_files(base_dir: &Path, scope: &FileScope) -> Result<HashSet<PathBuf>, ignore::Error> {
-    let mut files = HashSet::new();
-    let mut walk_builder = WalkBuilder::new(base_dir);
-    
-    // The 'ignore' crate uses "override" patterns. A non-negated glob is a whitelist.
+fn get_filtered_files(base_dir: &Path, scope: &FileScope) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
+    let mut files = Vec::new();
+    let mut builder = WalkBuilder::new(base_dir);
+
+    // Respect .gitignore but not other ignore files (.ignore, .rgignore)
+    // and don't ignore hidden files by default.
+    builder.hidden(false);
+
+    let mut override_builder = ignore::overrides::OverrideBuilder::new(base_dir);
     for pattern in &scope.include {
-        walk_builder.add_custom_ignore_filename(pattern);
+        override_builder.add(pattern)?;
     }
-    
-    // A negated glob (starting with !) is a blacklist.
     for pattern in &scope.exclude {
         let negated_pattern = format!("!{}", pattern);
-        walk_builder.add_custom_ignore_filename(&negated_pattern);
+        override_builder.add(&negated_pattern)?;
     }
-    
-    for result in walk_builder.build().filter_map(Result::ok) {
-        if result.file_type().map_or(false, |ft| ft.is_file()) {
-            files.insert(result.into_path());
+    let overrides = override_builder.build()?;
+    builder.overrides(overrides);
+
+    for result in builder.build() {
+        let entry = result?;
+        if entry.file_type().map_or(false, |ft| ft.is_file()) {
+            files.push(entry.into_path());
         }
     }
-
+    files.sort(); // For deterministic order
     Ok(files)
 }
 ```
