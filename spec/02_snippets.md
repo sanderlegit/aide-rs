@@ -260,25 +260,31 @@ Open the repository from the current working directory.
 
 ```rust
 // In vcs.rs
-use git2::{Repository, Signature, Oid, Commit, Tree};
+use git2::Repository;
 use std::path::Path;
 
-fn open_repository() -> Result<Repository, git2::Error> {
-    Repository::open(".")
+fn open_repository(path: &Path) -> Result<Repository, git2::Error> {
+    Repository::open(path)
 }
 ```
 
 **Usage (Creating a commit)**
 
-This is a multi-step process: find the current `HEAD`, create an index, add files to it, write the index as a tree, and finally, create the commit.
+This is a multi-step process: find the current `HEAD`, create an index, add files to it, write the index as a tree, and finally, create the commit. Note that `git2` requires paths to be relative to the repository's working directory.
 
 ```rust
-fn add_and_commit(repo: &Repository, paths: &[&Path], message: &str) -> Result<Oid, git2::Error> {
+// In vcs.rs
+use git2::{Oid, Repository, Signature};
+use std::path::{Path, PathBuf};
+
+fn add_and_commit(repo: &Repository, paths: &[PathBuf], message: &str) -> Result<Oid, Box<dyn std::error::Error>> {
     let mut index = repo.index()?;
 
-    // 1. Add specified files to the index
+    // 1. Add specified files to the index, ensuring they are relative paths
+    let workdir = repo.workdir().ok_or("Repository has no workdir")?;
     for path in paths {
-        index.add_path(path)?;
+        let relative_path = path.strip_prefix(workdir)?;
+        index.add_path(relative_path)?;
     }
     index.write()?;
     let tree_id = index.write_tree()?;
@@ -298,6 +304,7 @@ fn add_and_commit(repo: &Repository, paths: &[&Path], message: &str) -> Result<O
         &tree,
         &[&head],     // Parents
     )
+    .map_err(Into::into)
 }
 ```
 
