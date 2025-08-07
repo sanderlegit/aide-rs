@@ -48,28 +48,28 @@ impl GeminiClientWrapper {
         })
     }
 
-    pub async fn generate_content(
+    pub async fn generate_content<T: serde::Serialize>(
         &self,
         contents: Vec<Content>,
-        tools: Option<Vec<ToolConfig>>,
+        tools: Option<T>,
     ) -> Result<GenerateContentResponse> {
-        let request = GenerateContentRequest {
-            contents,
-            tools,
-        };
+        let request_body = serde_json::json!({
+            "contents": contents,
+            "tools": tools,
+        });
 
         info!(
             "Sending request to Gemini model '{}' at '{}'.",
             self.model_name, self.base_url
         );
-        debug!(request = ?request, "Gemini request body");
+        debug!(request = ?request_body, "Gemini request body");
 
         let url = format!(
             "{}/{}:generateContent?key={}",
             self.base_url, self.model_name, self.api_key
         );
 
-        let response = self.client.post(&url).json(&request).send().await?;
+        let response = self.client.post(&url).json(&request_body).send().await?;
 
         if !response.status().is_success() {
             let status = response.status();

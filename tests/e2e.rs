@@ -296,6 +296,43 @@ validation_commands = []
 }
 
 #[tokio::test]
+async fn test_plan_lancedb_prompt_sends_correct_schema() {
+    let env = TestEnv::new().await;
+
+    // 1. Copy the prompt file
+    let prompt_content = fs::read_to_string("prompts/lancedb_example.toml").unwrap();
+    env.create_file("lancedb_example.toml", &prompt_content);
+
+    // 2. Mock the Gemini API response for planning
+    let mock_response = json!({
+        "candidates": [{
+            "content": {
+                "role": "model",
+                "parts": [{"functionCall": {"name": "create_implementation_plan", "args": {"tasks": []}}}]
+            }
+        }]
+    });
+
+    Mock::given(method("POST"))
+        .and(path_regex(r"/gemini-2.5-flash:generateContent.*"))
+        // Key part of the test: assert that the "items" field for the array is present in the request body.
+        .and(body_string_contains("\"items\":{\"type\":\"OBJECT\""))
+        .respond_with(ResponseTemplate::new(200).set_body_json(mock_response))
+        .expect(1)
+        .mount(&env.mock_server)
+        .await;
+
+    // 3. Run the `aide plan` command
+    get_aide_cmd()
+        .current_dir(env.path())
+        .arg("plan")
+        .arg("--prompt")
+        .arg("lancedb_example.toml")
+        .assert()
+        .success();
+}
+
+#[tokio::test]
 async fn test_impl_workflow_with_error_summarization() {
     let env = TestEnv::new().await;
 
