@@ -18,11 +18,12 @@ Build the core intelligent components of the application: the `PlanAgent` and `I
     *   Implement the `Agent` trait for `PlanAgent`.
     *   The agent's main logic will:
         1.  Receive a `PlanPrompt`.
-        2.  Use `files.rs` to list scoped files.
-        3.  Construct a detailed prompt for the Gemini API, asking it to call the `create_implementation_plan` function.
-        4.  Call the Gemini API via the `gemini.rs` wrapper.
-        5.  Deserialize the function call arguments into an `ImplementationPlan` struct.
-        6.  Save the plan to a JSON file.
+        2.  If `use_google_search_for_deps` is true, perform a preliminary Gemini API call with Google Search enabled to research suitable libraries. The results are then added to the main prompt.
+        3.  Use `files.rs` to list scoped files.
+        4.  Construct a detailed prompt for the Gemini API, asking it to call the `create_implementation_plan` function.
+        5.  Call the Gemini API via the `gemini.rs` wrapper.
+        6.  Deserialize the function call arguments into an `ImplementationPlan` struct.
+        7.  Save the plan to a JSON file.
 4.  **Implement `ImplAgent` (`agents/impl_agent.rs`)**:
     *   Implement the `Agent` trait for `ImplAgent`.
     *   The agent's main logic will be a loop over the tasks in an `ImplementationPlan`:

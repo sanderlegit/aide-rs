@@ -47,12 +47,13 @@ This abstraction standardizes how agents are invoked.
 -   **Responsibility**: To convert a high-level `PlanPrompt` into a detailed `ImplementationPlan`.
 -   **Flow**:
     1.  Receives the `PlanPrompt`.
-    2.  Uses `files::get_filtered_files` to gather the file context.
-    3.  Constructs a prompt for the Gemini API, instructing it to act as a software architect.
-    4.  Provides a `create_implementation_plan` function declaration to the API.
-    5.  Calls the Gemini API via the `GeminiClientWrapper`.
-    6.  The API returns a function call, which the agent deserializes into a list of `Task`s.
-    7.  The agent assembles the final `ImplementationPlan` and returns it.
+    2.  If `use_google_search_for_deps` is true, it first performs a Google Search-enabled API call to research libraries. The results are injected into the main prompt.
+    3.  Uses `files::get_filtered_files` to gather the file context.
+    4.  Constructs a prompt for the Gemini API, instructing it to act as a software architect.
+    5.  Provides a `create_implementation_plan` function declaration to the API.
+    6.  Calls the Gemini API via the `GeminiClientWrapper`.
+    7.  The API returns a function call, which the agent deserializes into a list of `Task`s.
+    8.  The agent assembles the final `ImplementationPlan` and returns it.
 
 ### 5. The `ImplAgent` (`src/agents/impl_agent.rs`)
 

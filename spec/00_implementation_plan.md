@@ -80,6 +80,7 @@ pub struct PlanPrompt {
     pub coding_conventions: String, // A detailed description of coding standards. Can be a multiline string in TOML.
     pub formatter_command: Option<String>,
     pub validation_commands: Vec<ValidationStep>,
+    pub use_google_search_for_deps: bool, // Optional: Use Google Search to find libraries.
 }
 
 // Defines file include/exclude rules.
