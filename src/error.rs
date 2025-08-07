@@ -31,6 +31,9 @@ pub enum Error {
 
     #[error("Gemini API error: {0}")]
     Gemini(#[from] gemini_client_rs::GeminiError),
+
+    #[error("Reqwest error: {0}")]
+    Reqwest(#[from] reqwest::Error),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

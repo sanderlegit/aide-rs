@@ -48,6 +48,9 @@ dotenvy = "0.15.7"
 # For async traits
 async-trait = "0.1.88"
 
+# For making HTTP requests in the Gemini wrapper
+reqwest = { version = "0.12.5", features = ["json"] }
+
 [dev-dependencies]
 # HTTP mocking for testing API interactions deterministically.
 wiremock = "0.6.0"

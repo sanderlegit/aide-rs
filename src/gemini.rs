@@ -1,18 +1,18 @@
 use crate::error::{Error, Result};
 use dotenvy::dotenv;
-use gemini_client_rs::{
-    types::{
-        Content, FunctionDeclaration, GenerateContentRequest, GenerateContentResponse, ToolConfig,
-        ToolConfigFunctionDeclaration,
-    },
-    GeminiClient,
+use gemini_client_rs::types::{
+    Content, FunctionDeclaration, GenerateContentRequest, GenerateContentResponse, ToolConfig,
+    ToolConfigFunctionDeclaration,
 };
+use reqwest::Client;
 use std::env;
 use tracing::info;
 
 pub struct GeminiClientWrapper {
-    client: GeminiClient,
+    client: Client,
+    api_key: String,
     model_name: String,
+    base_url: String,
 }
 
 impl GeminiClientWrapper {
@@ -31,9 +31,17 @@ impl GeminiClientWrapper {
         let api_key = env::var("GEMINI_API_KEY")
             .map_err(|_| Error::Config("GEMINI_API_KEY must be set".to_string()))?;
 
-        let client = GeminiClient::new(api_key);
+        let base_url = env::var("GEMINI_BASE_URL")
+            .unwrap_or_else(|_| "https://generativelanguage.googleapis.com/v1beta/models".to_string());
 
-        Ok(Self { client, model_name })
+        let client = Client::new();
+
+        Ok(Self {
+            client,
+            api_key,
+            model_name,
+            base_url,
+        })
     }
 
     pub async fn generate_content(
@@ -54,13 +62,29 @@ impl GeminiClientWrapper {
             tools: tool_config,
         };
 
-        info!("Sending request to Gemini model '{}'.", self.model_name);
+        info!(
+            "Sending request to Gemini model '{}' at '{}'.",
+            self.model_name, self.base_url
+        );
 
-        let response = self
-            .client
-            .generate_content(&self.model_name, &request)
-            .await?;
+        let url = format!(
+            "{}/{}:generateContent?key={}",
+            self.base_url, self.model_name, self.api_key
+        );
 
-        Ok(response)
+        let response = self.client.post(&url).json(&request).send().await?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response.text().await?;
+            let err_msg = format!("API Error: {} - {}", status, text);
+            // We'll wrap this in the existing GeminiError type for consistency,
+            // even though we are not using the client directly.
+            return Err(Error::Gemini(gemini_client_rs::GeminiError::ApiError(
+                err_msg,
+            )));
+        }
+
+        Ok(response.json().await?)
     }
 }
