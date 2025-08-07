@@ -30,6 +30,7 @@ validation_commands = [{ command = "cargo check", expected_exit_code = 0 }]
     let mock_response = json!({
         "candidates": [{
             "content": {
+                "role": "model",
                 "parts": [{
                     "functionCall": {
                         "name": "create_implementation_plan",
@@ -102,6 +103,7 @@ async fn test_impl_workflow() {
     let mock_response = json!({
         "candidates": [{
             "content": {
+                "role": "model",
                 "parts": [
                     {
                         "functionCall": {
@@ -182,6 +184,7 @@ async fn test_impl_workflow_with_auto_commit() {
     let mock_response = json!({
         "candidates": [{
             "content": {
+                "role": "model",
                 "parts": [{
                     "functionCall": {
                         "name": "edit_file",
@@ -235,7 +238,10 @@ validation_commands = []
     // 2. Mock the Gemini API response for the dependency search
     let search_response = json!({
         "candidates": [{
-            "content": { "parts": [{ "text": "Use `axum` and `tokio`." }] }
+            "content": {
+                "role": "model",
+                "parts": [{ "text": "Use `axum` and `tokio`." }]
+            }
         }]
     });
     Mock::given(method("POST"))
@@ -250,6 +256,7 @@ validation_commands = []
     let plan_response = json!({
         "candidates": [{
             "content": {
+                "role": "model",
                 "parts": [{
                     "functionCall": {
                         "name": "create_implementation_plan",
@@ -325,7 +332,10 @@ async fn test_impl_workflow_with_error_summarization() {
     // 2. Mock the summarization API response
     let summary_response = json!({
         "candidates": [{
-            "content": { "parts": [{ "text": "Summarized: compile_error!" }] }
+            "content": {
+                "role": "model",
+                "parts": [{ "text": "Summarized: compile_error!" }]
+            }
         }]
     });
     Mock::given(method("POST"))
@@ -338,6 +348,7 @@ async fn test_impl_workflow_with_error_summarization() {
     let impl_response = json!({
         "candidates": [{
             "content": {
+                "role": "model",
                 "parts": [{
                     "functionCall": {
                         "name": "edit_file",
