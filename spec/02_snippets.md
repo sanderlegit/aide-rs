@@ -152,7 +152,7 @@ use tracing_subscriber::{EnvFilter, FmtSubscriber};
 fn setup_logging() {
     let subscriber = FmtSubscriber::builder()
         // Default to "info" level if RUST_LOG is not set.
-        .with_env_filter(EnvFilter::from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
+        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
         .finish();
 
     tracing::subscriber::set_global_default(subscriber)

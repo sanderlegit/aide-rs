@@ -5,7 +5,7 @@ use tracing_subscriber::{EnvFilter, FmtSubscriber};
 fn setup_logging() {
     let subscriber = FmtSubscriber::builder()
         .with_env_filter(
-            EnvFilter::from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
         )
         .finish();
 
