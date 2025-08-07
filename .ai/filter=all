@@ -1,2 +1,7 @@
 #exclude
-.git
+\.ai
+\.git
+\.envrc
+flake.nix
+flake.lock
+Cargo.lock

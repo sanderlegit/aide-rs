@@ -1,7 +1,7 @@
 use crate::{
     agents::{
-        state::{FileScope, ImplementationPlan, PlanPrompt, Task, TaskStatus, ValidationStep},
         Agent,
+        state::{FileScope, ImplementationPlan, PlanPrompt, Task, TaskStatus, ValidationStep},
     },
     error::{Error, Result},
     files,
@@ -59,12 +59,19 @@ Please create an implementation plan for the following objective:
 Generate a detailed implementation plan by calling the `create_implementation_plan` function.
 "#,
             objective = prompt.objective,
-            file_list = if file_list.is_empty() { "No files in scope.".to_string() } else { file_list },
+            file_list = if file_list.is_empty() {
+                "No files in scope.".to_string()
+            } else {
+                file_list
+            },
             coding_conventions = prompt.coding_conventions,
             validation_commands = prompt
                 .validation_commands
                 .iter()
-                .map(|v| format!("- `{}` (expects exit code {})", v.command, v.expected_exit_code))
+                .map(|v| format!(
+                    "- `{}` (expects exit code {})",
+                    v.command, v.expected_exit_code
+                ))
                 .collect::<Vec<_>>()
                 .join("\n")
         )
@@ -133,7 +140,7 @@ Generate a detailed implementation plan by calling the `create_implementation_pl
             name: "create_implementation_plan".to_string(),
             description: "Creates a structured implementation plan with a list of tasks."
                 .to_string(),
-            parameters: Some(parameters),
+            parameters,
         }
     }
 
@@ -219,7 +226,10 @@ impl Agent for PlanAgent {
             },
             Content {
                 role: Role::Model,
-                parts: vec![ContentPart::Text("Understood. I am ready to generate a plan. Please provide the details.".to_string())],
+                parts: vec![ContentPart::Text(
+                    "Understood. I am ready to generate a plan. Please provide the details."
+                        .to_string(),
+                )],
             },
             Content {
                 role: Role::User,
