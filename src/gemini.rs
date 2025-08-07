@@ -80,7 +80,7 @@ impl GeminiClientWrapper {
             let err_msg = format!("API Error: {} - {}", status, text);
             // We'll wrap this in the existing GeminiError type for consistency,
             // even though we are not using the client directly.
-            return Err(Error::Gemini(gemini_client_rs::GeminiError::ApiError(
+            return Err(Error::Gemini(gemini_client_rs::GeminiError::Api(
                 err_msg,
             )));
         }
