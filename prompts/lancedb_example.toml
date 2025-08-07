@@ -14,10 +14,18 @@ Key Crates to Use:
 - `thiserror`: For custom error handling.
 - `tokio`: For the async runtime.
 - `tracing`: For logging.
+    lancedb: v0.21.2
+    clap: v4.5.43
+    hound: v3.5.1
+    rodio: v0.21.1
+    thiserror: v2.0.12
+    tokio: v1.47.1
+    tracing: v0.1.41
 """
 
 # Use Google Search to find the latest versions of the crates.
-use_google_search_for_deps = true
+# # not supported
+use_google_search_for_deps = false
 
 # Provide detailed coding conventions for the agent to follow.
 coding_conventions = """
@@ -38,7 +46,7 @@ formatter_command = "cargo fmt --all"
 # Define the files the agent should look at for context and modify.
 # For a new project, we start with just the core files.
 [file_scoping]
-include = ["src/**/*.rs", "Cargo.toml"]
+include = ["src/**/*.rs", "Cargo.toml", "README.md","docs/*.md", "Makefile"]
 exclude = []
 
 # A sequence of commands that must pass for each task to be considered complete.
