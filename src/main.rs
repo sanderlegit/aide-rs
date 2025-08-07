@@ -1,4 +1,5 @@
 use aide_rs::{
+    agents::{plan_agent::PlanAgent, state::PlanPrompt, Agent},
     cli::{Cli, Commands},
     error::Result,
 };
@@ -28,7 +29,23 @@ async fn main() -> Result<()> {
             output_plan,
         } => {
             info!(?prompt, ?output_plan, "Running Plan agent");
-            // Placeholder for PlanAgent logic
+
+            // 1. Load prompt
+            let prompt_content = std::fs::read_to_string(&prompt)?;
+            let plan_prompt: PlanPrompt = toml::from_str(&prompt_content)?;
+
+            // 2. Create and run agent
+            let plan_agent = PlanAgent::new()?;
+            let implementation_plan = plan_agent.run(plan_prompt).await?;
+
+            // 3. Save plan
+            let plan_json = serde_json::to_string_pretty(&implementation_plan)?;
+            if let Some(parent) = output_plan.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            std::fs::write(&output_plan, plan_json)?;
+
+            info!("Implementation plan saved to {:?}", output_plan);
         }
         Commands::Impl {
             plan,
