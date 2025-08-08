@@ -9,17 +9,22 @@ fn generate_docs(crate_name: &str, current_dir: Option<&Path>) -> Result<PathBuf
         .map(|dir| dir.join("Cargo.toml"))
         .unwrap_or_else(|| PathBuf::from("Cargo.toml"));
 
-    Builder::default()
+    let mut builder = Builder::default();
+    builder
         .package(crate_name)
         .manifest_path(manifest_path)
-        .quiet(true)
-        .build()
-        .map_err(|e| {
-            Error::Config(format!(
-                "Failed to build rustdoc for {}: {}",
-                crate_name, e
-            ))
-        })
+        .quiet(true);
+
+    if let Some(dir) = current_dir {
+        builder.current_dir(dir);
+    }
+
+    builder.build().map_err(|e| {
+        Error::Config(format!(
+            "Failed to build rustdoc for {}: {}",
+            crate_name, e
+        ))
+    })
 }
 
 pub fn get_crate_docs(
