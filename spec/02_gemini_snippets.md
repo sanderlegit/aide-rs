@@ -70,7 +70,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let api_key = std::env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY must be set");
 
     let client = GeminiClient::new(api_key);
-    let model_name = "gemini-1.5-flash"; // Or your desired model
+    let model_name = "gemini-2.5-flash"; // Or your desired model
 
     let mut history: Vec<Content> = vec![Content {
         parts: vec![ContentPart::Text(outline_prompt.clone())],
@@ -218,7 +218,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let api_key = std::env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY must be set");
 
     let client = GeminiClient::new(api_key);
-    let model_name = "gemini-1.5-pro"; // Or your desired model
+    let model_name = "gemini-2.5-pro"; // Or your desired model
 
     let request = GenerateContentRequest {
         contents: vec![Content {
@@ -262,7 +262,7 @@ The crate defines a GeminiError enum to represent various errors that can occur 
 use gemini_client_rs::{GeminiClient, types::GenerateContentRequest, GeminiError};
 
 async fn generate(client: &GeminiClient, request: &GenerateContentRequest) -> Result<(), GeminiError> {
-    let model_name = "gemini-1.5-flash";
+    let model_name = "gemini-2.5-flash";
     match client.generate_content(model_name, request).await {
         Ok(response) => {
             println!("Response received: {:?}", response);
@@ -277,7 +277,7 @@ async fn generate(client: &GeminiClient, request: &GenerateContentRequest) -> Re
 
 Supported Models
 
-The examples use gemini-1.5-flash, gemini-1.5-pro, and gemini-2.0-flash-exp. Refer to the Google Gemini API documentation for the latest list of available models.
+The examples use gemini-2.5-flash, gemini-2.5-pro, and gemini-2.0-flash-exp. Refer to the Google Gemini API documentation for the latest list of available models.
 Contributing
 
 Contributions are welcome! Please feel free to submit pull requests or open issues for bugs or feature requests.

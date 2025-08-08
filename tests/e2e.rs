@@ -41,7 +41,7 @@ validation_commands = [{ command = "cargo check", expected_exit_code = 0 }]
         }]
     });
     Mock::given(method("POST"))
-        .and(path_regex(r"/models/gemini-1.5-flash:generateContent.*"))
+        .and(path_regex(r"/models/gemini-2.5-flash:generateContent.*"))
         .and(body_string_contains("create_task_descriptions"))
         .respond_with(ResponseTemplate::new(200).set_body_json(descriptions_response))
         .expect(1)
@@ -64,7 +64,7 @@ validation_commands = [{ command = "cargo check", expected_exit_code = 0 }]
         }]
     });
     Mock::given(method("POST"))
-        .and(path_regex(r"/models/gemini-1.5-flash:generateContent.*"))
+        .and(path_regex(r"/models/gemini-2.5-flash:generateContent.*"))
         .and(body_string_contains("create_task_details"))
         .respond_with(ResponseTemplate::new(200).set_body_json(details_response))
         .expect(1)
@@ -165,7 +165,7 @@ validation_steps = []
     });
 
     Mock::given(method("POST"))
-        .and(path_regex(r"/models/gemini-1.5-pro:generateContent.*"))
+        .and(path_regex(r"/models/gemini-2.5-pro:generateContent.*"))
         .respond_with(ResponseTemplate::new(200).set_body_json(mock_response))
         .mount(&env.mock_server)
         .await;
@@ -253,7 +253,7 @@ validation_steps = []
         }]
     });
     Mock::given(method("POST"))
-        .and(path_regex(r"/models/gemini-1.5-pro:generateContent.*"))
+        .and(path_regex(r"/models/gemini-2.5-pro:generateContent.*"))
         .respond_with(ResponseTemplate::new(200).set_body_json(mock_response))
         .mount(&env.mock_server)
         .await;
@@ -295,7 +295,7 @@ async fn test_plan_lancedb_prompt_sends_correct_schema() {
         }]
     });
     Mock::given(method("POST"))
-        .and(path_regex(r"/models/gemini-1.5-flash:generateContent.*"))
+        .and(path_regex(r"/models/gemini-2.5-flash:generateContent.*"))
         .and(body_string_contains("create_task_descriptions"))
         .respond_with(ResponseTemplate::new(200).set_body_json(descriptions_response))
         .expect(1)
@@ -314,7 +314,7 @@ async fn test_plan_lancedb_prompt_sends_correct_schema() {
         }]
     });
     Mock::given(method("POST"))
-        .and(path_regex(r"/models/gemini-1.5-flash:generateContent.*"))
+        .and(path_regex(r"/models/gemini-2.5-flash:generateContent.*"))
         // Key part of the test: assert that the "items" field for the array is present in the request body.
         // This is for the `validation_steps` parameter in the `create_task_details` tool.
         .and(body_string_contains("\"items\":{\"properties\""))
@@ -361,7 +361,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0"
-lancedb = { version = "0.21.2", features = ["remote"] }
+lancedb = "0.21.2"
 futures = "0.3"
 "#,
     );
@@ -409,7 +409,7 @@ expected_exit_code = 0
         }]
     });
     Mock::given(method("POST"))
-        .and(path_regex(r"/models/gemini-1.5-pro:generateContent.*"))
+        .and(path_regex(r"/models/gemini-2.5-pro:generateContent.*"))
         .and(body_string_contains("is not an iterator")) // First prompt contains the error
         .respond_with(ResponseTemplate::new(200).set_body_json(doc_request_response))
         .expect(1)
@@ -434,7 +434,7 @@ expected_exit_code = 0
         }]
     });
     Mock::given(method("POST"))
-        .and(path_regex(r"/models/gemini-1.5-pro:generateContent.*"))
+        .and(path_regex(r"/models/gemini-2.5-pro:generateContent.*"))
         .and(body_string_contains("functionResponse")) // Second prompt contains tool result
         .respond_with(ResponseTemplate::new(200).set_body_json(fix_response))
         .expect(1)
@@ -523,7 +523,7 @@ expected_exit_code = 0
     });
 
     Mock::given(method("POST"))
-        .and(path_regex(r"/models/gemini-1.5-pro:generateContent.*"))
+        .and(path_regex(r"/models/gemini-2.5-pro:generateContent.*"))
         .and(body_string_contains(
             "**Current Task:**\\nAdd anyhow dependency to Cargo.toml",
         ))
@@ -551,7 +551,7 @@ expected_exit_code = 0
     });
 
     Mock::given(method("POST"))
-        .and(path_regex(r"/models/gemini-1.5-pro:generateContent.*"))
+        .and(path_regex(r"/models/gemini-2.5-pro:generateContent.*"))
         .and(body_string_contains(
             "**Current Task:**\\nCreate main.rs to print hello world",
         ))
