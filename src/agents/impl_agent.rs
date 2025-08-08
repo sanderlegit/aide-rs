@@ -372,27 +372,18 @@ impl Agent for ImplAgent {
                     let system_prompt = self.create_system_prompt();
                     let user_prompt =
                         self.create_user_prompt(i, &plan, &file_contents, &last_error);
+
+                    let full_prompt = format!("{}\n\n{}", system_prompt, user_prompt);
+
                     info!(
-                        prompt = %format!("\n--- SYSTEM ---\n{}\n--- USER ---\n{}\n---", system_prompt, user_prompt),
+                        prompt = %format!("\n---\n{}\n---", full_prompt),
                         "Sending implementation prompt to Gemini"
                     );
 
-                    let contents = vec![
-                        Content {
-                            role: Role::User,
-                            parts: vec![ContentPart::Text(system_prompt)],
-                        },
-                        Content {
-                            role: Role::Model,
-                            parts: vec![ContentPart::Text(
-                                "Understood. I am ready to implement the task.".to_string(),
-                            )],
-                        },
-                        Content {
-                            role: Role::User,
-                            parts: vec![ContentPart::Text(user_prompt)],
-                        },
-                    ];
+                    let contents = vec![Content {
+                        role: Role::User,
+                        parts: vec![ContentPart::Text(full_prompt)],
+                    }];
 
                     let tool_config = json!([{
                         "functionDeclarations": tools
