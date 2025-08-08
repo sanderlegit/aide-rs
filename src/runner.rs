@@ -59,9 +59,12 @@ impl FlowRunner {
 
                 // The output of `create_task_list` is a `TaskList` struct, which is a JSON object `{"tasks": [...]}`.
                 // We need to get the array from the `tasks` field.
+                // We clone the items to loop over so we don't hold an immutable borrow on `self`
+                // while trying to mutably borrow it in the loop.
                 let items_to_loop = list_data
                     .get("tasks")
                     .and_then(|v| v.as_array())
+                    .cloned()
                     .ok_or_else(|| {
                         Error::Config(format!(
                             "Looping error: output of block '{}' is not a valid TaskList (missing 'tasks' array)",
