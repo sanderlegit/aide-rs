@@ -32,6 +32,9 @@ coding_conventions = """
 # The command to run to format the code. This ensures consistency.
 formatter_command = "cargo fmt --all"
 
+# The maximum number of times the agent should retry a failing task.
+max_task_retries = 5
+
 # Define the files the agent should look at for context and modify.
 # For a new project, we start with just the core files.
 [file_scoping]

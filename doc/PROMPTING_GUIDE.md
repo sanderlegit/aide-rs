@@ -60,6 +60,12 @@ This is the agent's "test suite." It's a list of shell commands that are run aft
     -   `{ command = "cargo build", expected_exit_code = 0 }`
 -   **Think Incrementally**: These commands run for *each task*. This ensures that the project is in a working state at every step of the implementation.
 
+### `max_task_retries`
+
+An optional integer that specifies the maximum number of times the `ImplAgent` should attempt a single task before marking it as failed. If not provided, it defaults to the value passed to the `--max-retries` CLI flag (which is `5` by default).
+
+-   **Example**: `max_task_retries = 3`
+
 ---
 
 ## A Complete Example: The LanceDB Audio Manager

@@ -9,6 +9,8 @@ pub struct PlanPrompt {
     pub coding_conventions: String,
     pub formatter_command: Option<String>,
     pub validation_commands: Vec<ValidationStep>,
+    #[serde(default)]
+    pub max_task_retries: Option<u32>,
 }
 
 // Defines file include/exclude rules.

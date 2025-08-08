@@ -21,6 +21,7 @@ pub enum Commands {
     Impl {
         #[arg(short, long, value_name = "PATH")]
         plan: PathBuf,
+        /// The maximum number of attempts per task. Overridden by `max_task_retries` in the plan file.
         #[arg(long, default_value_t = 5)]
         max_retries: u32,
         #[arg(long)]

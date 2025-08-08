@@ -1,5 +1,10 @@
 use aide_rs::{
-    agents::{impl_agent::ImplAgent, plan_agent::PlanAgent, state::PlanPrompt, Agent},
+    agents::{
+        impl_agent::ImplAgent,
+        plan_agent::PlanAgent,
+        state::{ImplementationPlan, PlanPrompt},
+        Agent,
+    },
     cli::{Cli, Commands},
     error::Result,
     logging::RunLogger,
@@ -75,15 +80,23 @@ async fn run() -> Result<()> {
             auto_commit,
             enrich_errors,
         } => {
+            // Load plan to get settings
+            let plan_content = std::fs::read_to_string(&plan)?;
+            let implementation_plan: ImplementationPlan = toml::from_str(&plan_content)?;
+            let final_max_retries = implementation_plan
+                .original_prompt
+                .max_task_retries
+                .unwrap_or(max_retries);
+
             info!(
                 ?plan,
-                ?max_retries,
+                max_retries = final_max_retries,
                 ?auto_commit,
                 ?enrich_errors,
                 "Running Impl agent"
             );
             let impl_agent =
-                ImplAgent::new(max_retries, auto_commit, enrich_errors, logger.clone())?;
+                ImplAgent::new(final_max_retries, auto_commit, enrich_errors, logger.clone())?;
             impl_agent.run(plan).await?;
 
             info!("Implementation agent finished successfully.");
