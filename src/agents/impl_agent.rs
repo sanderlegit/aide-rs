@@ -1,7 +1,7 @@
 use crate::{
     agents::{
-        state::{ImplementationPlan, Task, TaskResult, TaskStatus},
         Agent,
+        state::{ImplementationPlan, Task, TaskResult, TaskStatus},
     },
     error::{Error, Result},
     files,
@@ -152,7 +152,11 @@ impl ImplAgent {
                     TaskStatus::Pending => "[ ]",
                     TaskStatus::Failed => "[✗]",
                 };
-                let current_marker = if idx == current_task_index { ">>" } else { "  " };
+                let current_marker = if idx == current_task_index {
+                    ">>"
+                } else {
+                    "  "
+                };
                 format!(
                     "{} {} {}. {}",
                     current_marker,
@@ -278,8 +282,10 @@ Implement the current task by calling the `edit_file` or `create_file` functions
                     info!(command = %step.command, "Validation step passed");
                 }
                 Err(e) => {
-                    let error_msg =
-                        format!("Failed to execute validation command `{}`: {}", step.command, e);
+                    let error_msg = format!(
+                        "Failed to execute validation command `{}`: {}",
+                        step.command, e
+                    );
                     error!("{}", error_msg);
                     return Err(error_msg);
                 }
@@ -327,7 +333,10 @@ impl Agent for ImplAgent {
                 let mut last_error: Option<String> = None;
                 if is_first_pending_task {
                     if let Some(initial_error) = initial_error_context.take() {
-                        last_error = Some(format!("The project failed initial validation before starting the first task. Please fix this issue first.\nError:\n{}", initial_error));
+                        last_error = Some(format!(
+                            "The project failed initial validation before starting the first task. Please fix this issue first.\nError:\n{}",
+                            initial_error
+                        ));
                     }
                     is_first_pending_task = false;
                 }
@@ -415,7 +424,7 @@ impl Agent for ImplAgent {
                     let validation_result = if let Some(e) = formatter_error {
                         Err(e)
                     } else {
-                        self.run_validation(task)
+                        self.run_validation(&task)
                     };
 
                     match validation_result {
