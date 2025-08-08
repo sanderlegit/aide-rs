@@ -275,8 +275,7 @@ validation_steps = []
     let repo = Repository::open(env.path()).unwrap();
     let head = repo.head().unwrap().peel_to_commit().unwrap();
     let commit_message = head.message().unwrap();
-    assert!(commit_message.contains("AI-generated changes for:"));
-    assert!(commit_message.contains("- Add a print statement"));
+    assert_eq!(commit_message, "AI: Add a print statement");
 }
 
 #[tokio::test]
@@ -530,6 +529,7 @@ expected_exit_code = 0
         .arg("impl")
         .arg("--plan")
         .arg(plan_path)
+        .arg("--auto-commit")
         .assert()
         .success();
 
@@ -541,10 +541,17 @@ expected_exit_code = 0
 #[tokio::test]
 async fn test_impl_multi_task_workflow() {
     let env = TestEnv::new().await;
+    env.init_git_repo();
     env.create_file(
         "Cargo.toml",
         "[package]\nname = \"test-proj\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
     );
+    add_and_commit(
+        &env.path(),
+        &[env.full_path("Cargo.toml")],
+        "Initial commit",
+    )
+    .unwrap();
 
     // 1. Create a multi-task plan
     let plan_content = r#"
@@ -664,4 +671,21 @@ expected_exit_code = 0
         plan_content["tasks"][1]["status"].as_str(),
         Some("Success")
     );
+
+    // 7. Assert that two new commits were created
+    let repo = Repository::open(env.path()).unwrap();
+    let head = repo.head().unwrap().peel_to_commit().unwrap();
+    assert_eq!(
+        head.message().unwrap(),
+        "AI: Create main.rs to print hello world"
+    );
+
+    let parent = head.parent(0).unwrap();
+    assert_eq!(
+        parent.message().unwrap(),
+        "AI: Add anyhow dependency to Cargo.toml"
+    );
+
+    let grandparent = parent.parent(0).unwrap();
+    assert_eq!(grandparent.message().unwrap(), "Initial commit");
 }

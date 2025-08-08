@@ -480,6 +480,24 @@ impl Agent for ImplAgent {
             };
 
             if task_succeeded {
+                if self.auto_commit {
+                    if let Some(result) = &plan.tasks[i].result {
+                        if !result.modified_files.is_empty() {
+                            let commit_message = format!("AI: {}", plan.tasks[i].description);
+                            let paths_to_commit: Vec<PathBuf> = result
+                                .modified_files
+                                .iter()
+                                .map(PathBuf::from)
+                                .collect();
+                            info!(commit_message = %commit_message, "Committing changes for successful task.");
+                            vcs::add_and_commit(Path::new("."), &paths_to_commit, &commit_message)?;
+                            info!("Changes committed successfully.");
+                        } else {
+                            info!("No files were modified for this task, skipping commit.");
+                        }
+                    }
+                }
+
                 let plan_toml = toml::to_string_pretty(&plan)?;
                 std::fs::write(&plan_path, plan_toml)?;
             } else {
@@ -492,29 +510,6 @@ impl Agent for ImplAgent {
                     "Task '{}' failed after {} attempts.",
                     plan.tasks[i].description, self.max_retries
                 )));
-            }
-        }
-
-        if self.auto_commit {
-            info!("All tasks completed. Committing changes.");
-            let mut commit_message = "AI-generated changes for:\n".to_string();
-            let mut changed_files = BTreeSet::new();
-
-            for task in &plan.tasks {
-                commit_message.push_str(&format!("- {}\n", task.description));
-                if let Some(result) = &task.result {
-                    for file_path_str in &result.modified_files {
-                        changed_files.insert(PathBuf::from(file_path_str));
-                    }
-                }
-            }
-
-            let paths_to_commit: Vec<PathBuf> = changed_files.into_iter().collect();
-            if !paths_to_commit.is_empty() {
-                vcs::add_and_commit(Path::new("."), &paths_to_commit, &commit_message)?;
-                info!("Changes committed successfully.");
-            } else {
-                info!("No files were modified, skipping commit.");
             }
         }
 
