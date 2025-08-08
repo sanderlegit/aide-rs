@@ -134,11 +134,36 @@ impl ImplAgent {
 
     fn create_user_prompt(
         &self,
-        task: &Task,
-        original_prompt: &PlanPrompt,
+        current_task_index: usize,
+        plan: &ImplementationPlan,
         file_contents: &[(PathBuf, String)],
         error_context: &Option<String>,
     ) -> String {
+        let task = &plan.tasks[current_task_index];
+        let original_prompt = &plan.original_prompt;
+
+        let tasks_overview = plan
+            .tasks
+            .iter()
+            .enumerate()
+            .map(|(idx, t)| {
+                let status_marker = match t.status {
+                    TaskStatus::Success => "[✓]",
+                    TaskStatus::Pending => "[ ]",
+                    TaskStatus::Failed => "[✗]",
+                };
+                let current_marker = if idx == current_task_index { ">>" } else { "  " };
+                format!(
+                    "{} {} {}. {}",
+                    current_marker,
+                    status_marker,
+                    idx + 1,
+                    t.description
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
         let file_context = file_contents
             .iter()
             .map(|(path, content)| {
@@ -153,7 +178,7 @@ impl ImplAgent {
 
         let error_prompt = if let Some(error) = error_context {
             format!(
-                "\n**Correction Context:**\nOn the previous attempt, validation failed. The error was:\n```\n{}\n```\nPlease analyze the error, fix the code, and explain the fix.",
+                "\n**Correction Context:**\nThe last attempt failed validation. The error was:\n```\n{}\n```\nPlease analyze the error, fix the code, and explain the fix.",
                 error
             )
         } else {
@@ -162,18 +187,22 @@ impl ImplAgent {
 
         format!(
             r#"
-**Task:**
+**Overall Plan:**
+{tasks_overview}
+
+**Current Task:**
 {task_description}
 
 **Coding Conventions:**
 {coding_conventions}
 
-**File Context:**
+**Project File Context:**
 {file_context}
 {error_prompt}
 
-Implement the task by calling the `edit_file` or `create_file` functions.
+Implement the current task by calling the `edit_file` or `create_file` functions.
 "#,
+            tasks_overview = tasks_overview,
             task_description = task.description,
             coding_conventions = original_prompt.coding_conventions,
             file_context = file_context,
@@ -231,8 +260,11 @@ Implement the task by calling the `edit_file` or `create_file` functions.
         Ok(agent_tips)
     }
 
-    fn run_validation(&self, task: &Task) -> std::result::Result<(), String> {
-        for step in &task.validation_steps {
+    fn run_validation_steps(
+        &self,
+        steps: &[crate::agents::state::ValidationStep],
+    ) -> std::result::Result<(), String> {
+        for step in steps {
             match run_command(&step.command) {
                 Ok((exit_code, output)) => {
                     if exit_code != step.expected_exit_code {
@@ -255,6 +287,10 @@ Implement the task by calling the `edit_file` or `create_file` functions.
         }
         Ok(())
     }
+
+    fn run_validation(&self, task: &Task) -> std::result::Result<(), String> {
+        self.run_validation_steps(&task.validation_steps)
+    }
 }
 
 #[async_trait]
@@ -265,6 +301,15 @@ impl Agent for ImplAgent {
     async fn run(&self, plan_path: Self::Input) -> Result<Self::Output> {
         let plan_content = std::fs::read_to_string(&plan_path)?;
         let mut plan: ImplementationPlan = serde_json::from_str(&plan_content)?;
+
+        let mut initial_error_context: Option<String> = None;
+        info!("Running initial validation of the current project state...");
+        if let Err(e) = self.run_validation_steps(&plan.original_prompt.validation_commands) {
+            warn!(error = %e, "Initial validation failed. This error will be added to the first task's context.");
+            initial_error_context = Some(e);
+        }
+
+        let mut is_first_pending_task = true;
 
         for i in 0..plan.tasks.len() {
             let task_succeeded = {
@@ -280,6 +325,13 @@ impl Agent for ImplAgent {
                 info!(status = ?task.status, "Task status updated");
 
                 let mut last_error: Option<String> = None;
+                if is_first_pending_task {
+                    if let Some(initial_error) = initial_error_context.take() {
+                        last_error = Some(format!("The project failed initial validation before starting the first task. Please fix this issue first.\nError:\n{}", initial_error));
+                    }
+                    is_first_pending_task = false;
+                }
+
                 let mut succeeded = false;
                 for attempt in 0..self.max_retries {
                     task.attempts = attempt + 1;
@@ -291,7 +343,9 @@ impl Agent for ImplAgent {
                     );
 
                     let workdir = Path::new(".");
-                    let files_in_scope = files::get_filtered_files(workdir, &task.file_scoping)?;
+                    // Use the overall plan's file scoping for broader context
+                    let files_in_scope =
+                        files::get_filtered_files(workdir, &plan.original_prompt.file_scoping)?;
                     let mut file_contents = Vec::new();
                     for path in &files_in_scope {
                         let content = std::fs::read_to_string(path)?;
@@ -300,12 +354,8 @@ impl Agent for ImplAgent {
 
                     let tools = self.create_file_tools();
                     let system_prompt = self.create_system_prompt();
-                    let user_prompt = self.create_user_prompt(
-                        task,
-                        &plan.original_prompt,
-                        &file_contents,
-                        &last_error,
-                    );
+                    let user_prompt =
+                        self.create_user_prompt(i, &plan, &file_contents, &last_error);
                     info!(
                         prompt = %format!("\n--- SYSTEM ---\n{}\n--- USER ---\n{}\n---", system_prompt, user_prompt),
                         "Sending implementation prompt to Gemini"
