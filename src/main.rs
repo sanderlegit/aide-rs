@@ -8,9 +8,10 @@ use tracing::info;
 use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter, FmtSubscriber};
 
 fn setup_logging() {
+    let is_test_mode = std::env::var("AIDE_RS_TEST_MODE").is_ok();
     let subscriber = FmtSubscriber::builder()
         // Disable ANSI colors when running tests, as they can interfere with test output parsing.
-        .with_ansi(cfg!(not(test)))
+        .with_ansi(!(cfg!(test) || is_test_mode))
         .with_writer(std::io::stderr)
         .with_env_filter(
             EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),

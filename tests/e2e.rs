@@ -340,12 +340,14 @@ async fn test_impl_workflow_with_doc_retriever() {
     env.init_git_repo();
 
     // 1. Create a project with a file that will cause a validation error
-    // This simulates the lancedb example where `.query()` is not an iterator.
+    // This simulates an error where a type is not an iterator.
     let initial_content = r#"
 use anyhow::Result;
+use std::time::Duration;
+
 fn main() -> Result<()> {
-    let query = lancedb::query::Query::new();
-    for _item in query {
+    let d = Duration::new(1, 0);
+    for _item in d {
         // this will fail to compile
     }
     Ok(())
@@ -361,8 +363,6 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0"
-lancedb = "0.21.2"
-futures = "0.3"
 "#,
     );
 
@@ -400,8 +400,8 @@ expected_exit_code = 0
                         "name": "doc_retriever",
                         "args": {
                             "subcommand": "type",
-                            "crate_name": "lancedb",
-                            "path": "lancedb::query::Query"
+                            "crate_name": "std",
+                            "path": "std::time::Duration"
                         }
                     }
                 }]
@@ -426,7 +426,7 @@ expected_exit_code = 0
                         "name": "edit_file",
                         "args": {
                             "path": "src/main.rs",
-                            "new_content": "use anyhow::Result;\nuse futures::stream::StreamExt;\n\nfn main() -> Result<()> {\n    let query = lancedb::query::Query::new();\n    // Fixed: must execute the query\n    // let mut stream = query.execute().await?;\n    // while let Some(batch) = stream.next().await {}\n    Ok(())\n}\n"
+                            "new_content": "use anyhow::Result;\nuse std::time::Duration;\n\nfn main() -> Result<()> {\n    let d = Duration::new(1, 0);\n    // Fixed: Duration is not an iterator.\n    println!(\"Duration is {:?}\", d);\n    Ok(())\n}\n"
                         }
                     }
                 }]
@@ -454,7 +454,7 @@ expected_exit_code = 0
 
     // 5. Assert file was fixed
     let new_content = fs::read_to_string(env.full_path("src/main.rs")).unwrap();
-    assert!(new_content.contains("Fixed: must execute the query"));
+    assert!(new_content.contains("Fixed: Duration is not an iterator."));
 }
 
 #[tokio::test]

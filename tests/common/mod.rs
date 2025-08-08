@@ -22,6 +22,8 @@ impl TestEnv {
             std::env::set_var("GEMINI_BASE_URL", &mock_server.uri());
             // Set a dummy API key
             std::env::set_var("GEMINI_API_KEY", "test-key");
+            // Disable ANSI colors in the binary for test output readability.
+            std::env::set_var("AIDE_RS_TEST_MODE", "1");
         }
 
         Self {
