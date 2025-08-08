@@ -218,6 +218,8 @@ Implement the current task by calling the `edit_file` or `create_file` functions
     }
 
     fn process_response(&self, response: &GenerateContentResponse) -> Result<String> {
+        use std::io::Write;
+
         #[derive(Deserialize)]
         struct EditFileArgs {
             path: String,
@@ -253,7 +255,9 @@ Implement the current task by calling the `edit_file` or `create_file` functions
                         if let Some(parent) = path.parent() {
                             std::fs::create_dir_all(parent)?;
                         }
-                        std::fs::write(&path, &args.content)?;
+                        let mut file = std::fs::File::create(&path)?;
+                        file.write_all(args.content.as_bytes())?;
+                        file.sync_all()?;
                         info!(path = %args.path, "Created file");
                     }
                     _ => warn!(?name, "Unknown function call"),

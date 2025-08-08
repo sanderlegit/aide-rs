@@ -13,7 +13,6 @@ fn setup_logging() {
             EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
         )
         .with_span_events(FmtSpan::CLOSE)
-        .pretty()
         .finish();
 
     tracing::subscriber::set_global_default(subscriber)
