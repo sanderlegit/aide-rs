@@ -3,7 +3,7 @@ use assert_cmd::Command;
 use git2::Repository;
 use serde_json::json;
 use std::fs;
-use wiremock::matchers::{body_string_contains, method, path_regex};
+use wiremock::matchers::{body_string_contains, method, not, path_regex};
 use wiremock::{Mock, ResponseTemplate};
 
 mod common;
@@ -411,6 +411,7 @@ expected_exit_code = 0
     Mock::given(method("POST"))
         .and(path_regex(r"/models/gemini-2.5-pro:generateContent.*"))
         .and(body_string_contains("is not an iterator")) // First prompt contains the error
+        .and(not(body_string_contains("functionResponse"))) // And does NOT contain a tool response yet
         .respond_with(ResponseTemplate::new(200).set_body_json(doc_request_response))
         .expect(1)
         .mount(&env.mock_server)
