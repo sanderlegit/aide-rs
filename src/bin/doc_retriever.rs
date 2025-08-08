@@ -3,7 +3,7 @@ use clap::{Parser, Subcommand};
 use rustdoc_json::Builder;
 use rustdoc_types::{Crate, Id, Item, ItemEnum, Module, Struct, Type};
 use serde_json::json;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Parser, Debug)]
 #[command(
@@ -40,11 +40,10 @@ enum Commands {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    let workdir = std::env::current_dir()?;
     let result = match cli.command {
-        Commands::Crate { name } => get_crate_docs(&name, &workdir),
-        Commands::Module { crate_name, path } => get_module_docs(&crate_name, &path, &workdir),
-        Commands::Type { crate_name, path } => get_type_docs(&crate_name, &path, &workdir),
+        Commands::Crate { name } => get_crate_docs(&name),
+        Commands::Module { crate_name, path } => get_module_docs(&crate_name, &path),
+        Commands::Type { crate_name, path } => get_type_docs(&crate_name, &path),
     };
 
     match result {
@@ -63,12 +62,11 @@ fn main() -> Result<()> {
     }
 }
 
-fn generate_docs(crate_name: &str, workdir: &Path) -> Result<PathBuf> {
+fn generate_docs(crate_name: &str) -> Result<PathBuf> {
     Builder::default()
         .toolchain("nightly")
         .package(crate_name)
-        .manifest_path(workdir.join("Cargo.toml"))
-        .current_dir(workdir)
+        .manifest_path("Cargo.toml")
         .quiet(true)
         .build()
         .map_err(|e| {
@@ -79,8 +77,8 @@ fn generate_docs(crate_name: &str, workdir: &Path) -> Result<PathBuf> {
         })
 }
 
-fn get_crate_docs(crate_name: &str, workdir: &Path) -> Result<serde_json::Value> {
-    let json_path = generate_docs(crate_name, workdir)?;
+fn get_crate_docs(crate_name: &str) -> Result<serde_json::Value> {
+    let json_path = generate_docs(crate_name)?;
     let krate: Crate = serde_json::from_reader(std::fs::File::open(json_path)?)?;
 
     let root_module = krate
@@ -123,8 +121,8 @@ fn find_item_by_path<'a>(krate: &'a Crate, path: &str) -> Result<&'a Item> {
         .ok_or_else(|| Error::Config(format!("Path not found in crate: {}", path)))
 }
 
-fn get_module_docs(crate_name: &str, path: &str, workdir: &Path) -> Result<serde_json::Value> {
-    let json_path = generate_docs(crate_name, workdir)?;
+fn get_module_docs(crate_name: &str, path: &str) -> Result<serde_json::Value> {
+    let json_path = generate_docs(crate_name)?;
     let krate: Crate = serde_json::from_reader(std::fs::File::open(json_path)?)?;
 
     let item = find_item_by_path(&krate, path)?;
@@ -144,8 +142,8 @@ fn get_module_docs(crate_name: &str, path: &str, workdir: &Path) -> Result<serde
     }
 }
 
-fn get_type_docs(crate_name: &str, path: &str, workdir: &Path) -> Result<serde_json::Value> {
-    let json_path = generate_docs(crate_name, workdir)?;
+fn get_type_docs(crate_name: &str, path: &str) -> Result<serde_json::Value> {
+    let json_path = generate_docs(crate_name)?;
     let krate: Crate = serde_json::from_reader(std::fs::File::open(json_path)?)?;
 
     let item = find_item_by_path(&krate, path)?;
@@ -327,8 +325,11 @@ pub mod my_module {
     #[test]
     fn test_get_crate_docs() {
         let (_dir, crate_root) = setup_test_crate();
+        let original_dir = std::env::current_dir().unwrap();
+        std::env::set_current_dir(&crate_root).unwrap();
 
-        let result = get_crate_docs("test_crate", &crate_root).unwrap();
+        let result = get_crate_docs("test_crate").unwrap();
+        std::env::set_current_dir(original_dir).unwrap();
 
         assert_eq!(result["type"], "crate");
         assert_eq!(result["name"], "test_crate");
@@ -340,8 +341,11 @@ pub mod my_module {
     #[test]
     fn test_get_module_docs() {
         let (_dir, crate_root) = setup_test_crate();
+        let original_dir = std::env::current_dir().unwrap();
+        std::env::set_current_dir(&crate_root).unwrap();
 
-        let result = get_module_docs("test_crate", "test_crate::my_module", &crate_root).unwrap();
+        let result = get_module_docs("test_crate", "test_crate::my_module").unwrap();
+        std::env::set_current_dir(original_dir).unwrap();
 
         assert_eq!(result["type"], "module");
         assert_eq!(result["crate"], "test_crate");
@@ -355,9 +359,11 @@ pub mod my_module {
     #[test]
     fn test_get_type_docs_struct() {
         let (_dir, crate_root) = setup_test_crate();
+        let original_dir = std::env::current_dir().unwrap();
+        std::env::set_current_dir(&crate_root).unwrap();
 
-        let result =
-            get_type_docs("test_crate", "test_crate::my_module::MyStruct", &crate_root).unwrap();
+        let result = get_type_docs("test_crate", "test_crate::my_module::MyStruct").unwrap();
+        std::env::set_current_dir(original_dir).unwrap();
 
         assert_eq!(result["type"], "struct");
         assert_eq!(result["crate"], "test_crate");
