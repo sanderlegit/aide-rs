@@ -1,8 +1,6 @@
-use crate::{
-    error::{Error, Result},
-    gemini_types::{Content, GenerateContentResponse},
-};
+use crate::error::{Error, Result};
 use dotenvy::dotenv;
+use gemini_client_rs::types::{Content, GenerateContentResponse, PartResponse};
 use reqwest::Client;
 use std::env;
 use tracing::{debug, error, info};
@@ -101,7 +99,7 @@ impl GeminiClientWrapper {
         if let Some(candidates) = &response.candidates {
             for candidate in candidates {
                 for part in &candidate.content.parts {
-                    if let Some(text) = &part.text {
+                    if let PartResponse::Text(text) = part {
                         if !text.trim().is_empty() {
                             info!(
                                 response_text = %format!("\n---\n{}\n---", text.trim()),

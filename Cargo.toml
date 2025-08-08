@@ -40,7 +40,7 @@ git2 = "0.18.3"
 
 # Google Gemini API Client
 # A client for interacting with the Google Gemini API.
-gemini_client_rs = "0.1.0"
+gemini_client_rs = "0.6.0"
 
 # For loading .env files
 dotenvy = "0.15.7"
