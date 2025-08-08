@@ -551,7 +551,7 @@ async fn test_impl_multi_task_workflow() {
     Mock::given(method("POST"))
         .and(path_regex(r"/models/gemini-2.5-pro:generateContent.*"))
         .and(body_string_contains(
-            "**Current Task:**\nAdd anyhow dependency to Cargo.toml",
+            "**Current Task:**\\nAdd anyhow dependency to Cargo.toml",
         ))
         .respond_with(ResponseTemplate::new(200).set_body_json(mock_response_task1))
         .expect(1)
@@ -579,7 +579,7 @@ async fn test_impl_multi_task_workflow() {
     Mock::given(method("POST"))
         .and(path_regex(r"/models/gemini-2.5-pro:generateContent.*"))
         .and(body_string_contains(
-            "**Current Task:**\nCreate main.rs to print hello world",
+            "**Current Task:**\\nCreate main.rs to print hello world",
         ))
         .respond_with(ResponseTemplate::new(200).set_body_json(mock_response_task2))
         .expect(1)
