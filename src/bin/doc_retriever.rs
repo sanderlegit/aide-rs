@@ -3,7 +3,6 @@ use clap::{Parser, Subcommand};
 use rustdoc_json::Builder;
 use rustdoc_types::{Crate, Id, Item, ItemEnum, Module, Struct, Type};
 use serde_json::json;
-use std::collections::HashMap;
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
@@ -25,15 +24,15 @@ enum Commands {
     },
     /// Get module-level documentation.
     Module {
-        #[arg(long)]
-        crate: String,
+        #[arg(long = "crate")]
+        crate_name: String,
         #[arg(long)]
         path: String,
     },
     /// Get type-level documentation (struct or enum).
     Type {
-        #[arg(long)]
-        crate: String,
+        #[arg(long = "crate")]
+        crate_name: String,
         #[arg(long)]
         path: String,
     },
@@ -43,8 +42,8 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
     let result = match cli.command {
         Commands::Crate { name } => get_crate_docs(&name),
-        Commands::Module { crate: c, path } => get_module_docs(&c, &path),
-        Commands::Type { crate: c, path } => get_type_docs(&c, &path),
+        Commands::Module { crate_name, path } => get_module_docs(&crate_name, &path),
+        Commands::Type { crate_name, path } => get_type_docs(&crate_name, &path),
     };
 
     match result {
@@ -66,7 +65,7 @@ fn main() -> Result<()> {
 fn generate_docs(crate_name: &str) -> Result<PathBuf> {
     Builder::default()
         .package(crate_name)
-        .quiet()
+        .quiet(true)
         .build()
         .map_err(|e| Error::Config(format!("Failed to build rustdoc for {}: {}", crate_name, e)))
 }
@@ -206,7 +205,7 @@ fn get_methods<T: HasItems>(krate: &Crate, item_with_impls: &T) -> Vec<serde_jso
                         if let ItemEnum::Function(func) = &method_item.inner {
                             methods.push(json!({
                                 "name": method_item.name.clone().unwrap_or_default(),
-                                "signature": clean_fn_signature(&func.decl.output, &func.decl.inputs, method_item.name.as_deref().unwrap_or("")),
+                                "signature": clean_fn_signature(&func.sig.decl.output, &func.sig.decl.inputs, method_item.name.as_deref().unwrap_or("")),
                                 "documentation": method_item.docs.clone().unwrap_or_default(),
                             }));
                         }
@@ -224,9 +223,9 @@ fn get_impls(krate: &Crate, item_id: &Id) -> Vec<String> {
         .values()
         .filter_map(|item| match &item.inner {
             ItemEnum::Impl(imp) => {
-                if let Some(Type::ResolvedPath { id, .. }) = &imp.for_ {
-                    if id == item_id {
-                        return imp.trait_.as_ref().map(|t| t.name.clone());
+                if let Type::ResolvedPath(path) = &imp.for_ {
+                    if &path.id == item_id {
+                        return imp.trait_.as_ref().map(|t| t.path.join("::"));
                     }
                 }
                 None
