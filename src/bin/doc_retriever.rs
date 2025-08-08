@@ -3,7 +3,7 @@ use clap::{Parser, Subcommand};
 use rustdoc_json::Builder;
 use rustdoc_types::{Crate, Id, Item, ItemEnum, Module, Struct, Type};
 use serde_json::json;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
 #[command(
@@ -68,6 +68,7 @@ fn generate_docs(crate_name: &str) -> Result<PathBuf> {
         .package(crate_name)
         .manifest_path("Cargo.toml")
         .quiet(true)
+        .build_args(&["--offline"])
         .build()
         .map_err(|e| {
             Error::Config(format!(
@@ -278,6 +279,7 @@ fn clean_type(ty: &Type) -> String {
 mod tests {
     use super::*;
     use std::fs;
+    use std::path::Path;
     use tempfile::tempdir;
 
     fn setup_test_crate() -> (tempfile::TempDir, PathBuf) {
