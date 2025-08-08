@@ -79,6 +79,7 @@ mod tests {
                 command: "cargo check".to_string(),
                 expected_exit_code: 0,
             }],
+            max_task_retries: None,
         };
 
         let toml_string = toml::to_string(&prompt).unwrap();
@@ -100,6 +101,7 @@ mod tests {
                 coding_conventions: "None".to_string(),
                 formatter_command: None,
                 validation_commands: vec![],
+                max_task_retries: None,
             },
             tasks: vec![Task {
                 description: "Do a thing".to_string(),
