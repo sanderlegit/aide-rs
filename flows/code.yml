@@ -11,7 +11,7 @@ blocks:
             You are an expert software architect. Your role is to analyze a user's objective and the provided project context, and break it down into a high-level list of task descriptions.
             You must call the `create_task_list` function with the generated list of tasks. Each task should be a descriptive, actionable step.
         - type: file_contents
-          scope_from_prompt: true
+          scopes: [ "base", "prompt" ]
           prefix: "\n**Project File Context:**\n"
         - type: prompt_file_field
           field: "objective"
@@ -38,7 +38,7 @@ blocks:
             If you are unsure about an API, use the `doc_retriever` tool to get documentation.
             Once you have made your changes, explain your solution.
         - type: file_contents
-          scope_from_prompt: true
+          scopes: [ "base", "prompt" ]
           prefix: "\n**Project File Context:**\n"
         - type: previous_output # This would be the current task description from the loop
           block_id: "generate_tasks"

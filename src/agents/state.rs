@@ -1,4 +1,6 @@
+use crate::error::Result;
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 
 /// Defines a complete, end-to-end workflow.
 /// Parsed from a `flows/*.yml` file.
@@ -37,9 +39,7 @@ pub enum PromptPart {
     #[serde(rename = "file_contents")]
     FileContents {
         #[serde(default)]
-        scope: FileScope,
-        #[serde(default)]
-        scope_from_prompt: bool,
+        scopes: Vec<String>, // Names of scope files in `ctx/` dir, e.g., ["base", "ai"]. "prompt" is a special name for the scope from the user's prompt file.
         #[serde(default)]
         prefix: String,
     },
@@ -92,8 +92,30 @@ pub enum VerificationStrategy {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
 #[serde(default)]
 pub struct FileScope {
+    #[serde(default)]
+    pub description: Option<String>,
     pub include: Vec<String>, // Glob patterns
     pub exclude: Vec<String>, // Glob patterns
+}
+
+impl FileScope {
+    /// Loads a FileScope from a YAML file.
+    pub fn from_yaml_file(path: &Path) -> Result<Self> {
+        let content = std::fs::read_to_string(path)?;
+        serde_yaml::from_str(&content).map_err(Into::into)
+    }
+
+    /// Merges another FileScope into this one, deduplicating patterns.
+    /// The description from `other` is ignored.
+    pub fn merge(&mut self, other: Self) {
+        self.include.extend(other.include);
+        self.include.sort();
+        self.include.dedup();
+
+        self.exclude.extend(other.exclude);
+        self.exclude.sort();
+        self.exclude.dedup();
+    }
 }
 
 /// How much of the conversation history to include.

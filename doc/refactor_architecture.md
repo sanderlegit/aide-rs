@@ -80,9 +80,8 @@ The `prompt` object defines the components that will be assembled into the final
 -   `composition` (array): A list of parts to concatenate. Each part is an object with a `type`:
     -   `type: static_text`: Simply includes a hardcoded string.
         -   `content`: The string to include.
-    -   `type: file_contents`: Includes the content of files.
-        -   `scope`: An inline `FileScope` object (`{ include: [...], exclude: [...] }`).
-        -   `scope_from_prompt: true`: A boolean to indicate that the `file_scoping` from the user's initial prompt file should be used.
+    -   `type: file_contents`: Includes the content of files by merging a list of named scopes.
+        -   `scopes`: A list of scope names. For each name, the runner loads `ctx/<name>.yaml`. The special name `"prompt"` refers to the `[file_scoping]` table from the user's initial `.toml` prompt file. Scopes are merged in order, with later scopes overriding earlier ones.
         -   `prefix`: A string to prepend to the file context.
     -   `type: prompt_file_field`: Includes a specific field from the user's initial prompt file.
         -   `field`: The name of the field (e.g., `objective`).
@@ -105,6 +104,12 @@ Annotations control the "runtime" behavior of a block.
     -   `google_search`: Enables grounding with Google Search.
     -   `task_creator`: A tool to define a structured list of tasks.
 -   `structured_output_schema` (string, optional): The name of a Rust struct that the LLM's output (likely from a tool call) should be deserialized into. This enables strongly-typed outputs.
+
+#### 3.3.1. Tool Constraints
+
+To ensure predictable behavior, the `FlowRunner` enforces constraints on which tools can be used together in a single block. These are mutually exclusive and will cause a validation error if combined:
+
+-   **Research vs. Modification**: A block cannot have both `google_search` and `file_system` tools enabled. Research is for information gathering, while file system operations are for implementation. This separation prevents the agent from making file changes based on potentially unverified web content in the same step. If file changes are needed after research, they should be done in a subsequent block.
 
 ### 3.4. Verification (`verification` object)
 

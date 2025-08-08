@@ -1,0 +1,12 @@
+description: "Base scope for most operations. Includes source code, docs, and core config."
+include:
+  - "src/**/*.rs"
+  - "Cargo.toml"
+  - "README.md"
+  - "docs/**/*.md"
+  - "flows/**/*.yml"
+  - "Makefile"
+exclude:
+  - ".git"
+  - "target"
+  - ".ai/logs"
