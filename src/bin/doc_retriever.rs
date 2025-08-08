@@ -295,6 +295,17 @@ edition = "2021"
 "#;
         fs::write(crate_root.join("Cargo.toml"), cargo_toml).unwrap();
 
+        // Add a .cargo/config.toml to explicitly set the target directory
+        // for this temporary crate, preventing interference from the parent
+        // project's workspace and target directory.
+        let cargo_config_dir = crate_root.join(".cargo");
+        fs::create_dir(&cargo_config_dir).unwrap();
+        fs::write(
+            cargo_config_dir.join("config.toml"),
+            "[build]\ntarget-dir = \"target\"\n",
+        )
+        .unwrap();
+
         let lib_rs = r#"
 //! Crate documentation.
 
@@ -329,8 +340,6 @@ pub mod my_module {
         let (_dir, crate_root) = setup_test_crate();
         let original_dir = std::env::current_dir().unwrap();
         std::env::set_current_dir(&crate_root).unwrap();
-        // Unset CARGO_TARGET_DIR to prevent cargo from using the parent project's target dir
-        std::env::remove_var("CARGO_TARGET_DIR");
 
         let result = get_crate_docs("test_crate").unwrap();
         std::env::set_current_dir(original_dir).unwrap();
@@ -347,8 +356,6 @@ pub mod my_module {
         let (_dir, crate_root) = setup_test_crate();
         let original_dir = std::env::current_dir().unwrap();
         std::env::set_current_dir(&crate_root).unwrap();
-        // Unset CARGO_TARGET_DIR to prevent cargo from using the parent project's target dir
-        std::env::remove_var("CARGO_TARGET_DIR");
 
         let result = get_module_docs("test_crate", "test_crate::my_module").unwrap();
         std::env::set_current_dir(original_dir).unwrap();
@@ -367,8 +374,6 @@ pub mod my_module {
         let (_dir, crate_root) = setup_test_crate();
         let original_dir = std::env::current_dir().unwrap();
         std::env::set_current_dir(&crate_root).unwrap();
-        // Unset CARGO_TARGET_DIR to prevent cargo from using the parent project's target dir
-        std::env::remove_var("CARGO_TARGET_DIR");
 
         let result = get_type_docs("test_crate", "test_crate::my_module::MyStruct").unwrap();
         std::env::set_current_dir(original_dir).unwrap();
