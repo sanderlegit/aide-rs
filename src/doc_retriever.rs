@@ -297,7 +297,12 @@ pub mod my_module {
     #[test]
     fn test_get_crate_docs() {
         let (_dir, crate_root) = setup_test_crate();
-        let result = get_crate_docs("test_crate", Some(&crate_root)).unwrap();
+        let original_dir = std::env::current_dir().unwrap();
+        std::env::set_current_dir(&crate_root).unwrap();
+
+        let result = get_crate_docs("test_crate", None).unwrap();
+
+        std::env::set_current_dir(original_dir).unwrap();
 
         assert_eq!(result["type"], "crate");
         assert_eq!(result["name"], "test_crate");
@@ -309,8 +314,13 @@ pub mod my_module {
     #[test]
     fn test_get_module_docs() {
         let (_dir, crate_root) = setup_test_crate();
+        let original_dir = std::env::current_dir().unwrap();
+        std::env::set_current_dir(&crate_root).unwrap();
+
         let result =
-            get_module_docs("test_crate", "test_crate::my_module", Some(&crate_root)).unwrap();
+            get_module_docs("test_crate", "test_crate::my_module", None).unwrap();
+
+        std::env::set_current_dir(original_dir).unwrap();
 
         assert_eq!(result["type"], "module");
         assert_eq!(result["crate"], "test_crate");
@@ -324,9 +334,14 @@ pub mod my_module {
     #[test]
     fn test_get_type_docs_struct() {
         let (_dir, crate_root) = setup_test_crate();
+        let original_dir = std::env::current_dir().unwrap();
+        std::env::set_current_dir(&crate_root).unwrap();
+
         let result =
-            get_type_docs("test_crate", "test_crate::my_module::MyStruct", Some(&crate_root))
+            get_type_docs("test_crate", "test_crate::my_module::MyStruct", None)
                 .unwrap();
+
+        std::env::set_current_dir(original_dir).unwrap();
 
         assert_eq!(result["type"], "struct");
         assert_eq!(result["crate"], "test_crate");
