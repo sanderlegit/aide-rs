@@ -2,7 +2,7 @@ use assert_cmd::Command;
 use serde_json::json;
 use std::fs;
 use std::path::PathBuf;
-use wiremock::matchers::{body_string_contains, method, path_regex};
+use wiremock::matchers::{body_string_contains, method, path_regex, not};
 use wiremock::{Mock, ResponseTemplate};
 
 mod common;
@@ -124,6 +124,15 @@ async fn test_e2e_code_flow_single_task() {
         include = ["src/lib.rs"]
         "#,
     );
+    // Need Cargo.toml for cargo check to work
+    env.create_file(
+        "Cargo.toml",
+        r#"[package]
+name = "test-project"
+version = "0.1.0"
+edition = "2021"
+"#,
+    );
     env.create_file("src/lib.rs", "// Initial content\n");
 
     // 3. Mock API calls
@@ -141,6 +150,7 @@ async fn test_e2e_code_flow_single_task() {
             r"/v1beta/models/gemini-2.5-flash-latest:generateContent",
         ))
         .and(body_string_contains("create a detailed, human-readable implementation plan"))
+        .and(not(body_string_contains("Current Task"))) // Differentiates from implement_tasks
         .and(body_string_contains("Add a hello world function")) // From objective
         .respond_with(ResponseTemplate::new(200).set_body_json(markdown_plan_response))
         .mount(&env.mock_server)
@@ -272,6 +282,7 @@ edition = "2021"
             r"/v1beta/models/gemini-2.5-flash-latest:generateContent",
         ))
         .and(body_string_contains("create a detailed, human-readable implementation plan"))
+        .and(not(body_string_contains("Current Task"))) // Differentiates from implement_tasks
         .and(body_string_contains("Add a public function `go()` to lib.rs"))
         .respond_with(ResponseTemplate::new(200).set_body_json(markdown_plan_response))
         .mount(&env.mock_server)
