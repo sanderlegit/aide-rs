@@ -103,6 +103,7 @@ impl PromptBuilder {
                     content.push('\n');
                 }
 
+                let canonical_base = base_dir.canonicalize()?;
                 for file_path in files {
                     let file_content = match tokio::fs::read_to_string(&file_path).await {
                         Ok(c) => c,
@@ -112,9 +113,10 @@ impl PromptBuilder {
                             continue;
                         }
                     };
+                    let display_path = file_path.strip_prefix(&canonical_base).unwrap_or(&file_path);
                     content.push_str(&format!(
-                        "--- FILE: {} ---\n{}\n\n",
-                        file_path.display(),
+                        "--- FILE: ./{} ---\n{}\n\n",
+                        display_path.display(),
                         file_content
                     ));
                 }
