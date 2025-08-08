@@ -133,6 +133,7 @@ pub struct PartResponse {
 #[serde(rename_all = "camelCase")]
 pub struct FunctionCall {
     pub name: String,
+    #[serde(rename = "args")]
     pub arguments: serde_json::Value,
 }
 
