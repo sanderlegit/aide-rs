@@ -1,3 +1,4 @@
+use assert_cmd::Command;
 use std::fs;
 use std::path::PathBuf;
 
@@ -9,6 +10,7 @@ use wiremock::MockServer;
 pub struct TestEnv {
     pub temp_dir: TempDir,
     pub mock_server: MockServer,
+    env_vars: Vec<(String, String)>,
 }
 
 #[allow(dead_code)]
@@ -17,20 +19,23 @@ impl TestEnv {
         let temp_dir = tempdir().unwrap();
         let mock_server = MockServer::start().await;
 
-        // Set the env var for the Gemini client to use the mock server.
-        // This is unsafe because setting environment variables is not thread-safe.
-        // In the context of tests that might run in parallel, this can cause data races.
-        unsafe {
-            std::env::set_var("GEMINI_BASE_URL", &mock_server.uri());
-            // Set a dummy API key
-            std::env::set_var("GEMINI_API_KEY", "test-key");
-            // Disable ANSI colors in the binary for test output readability.
-            std::env::set_var("AIDE_RS_TEST_MODE", "1");
-        }
+        // Store env vars to be applied per-command, avoiding race conditions from global state.
+        let env_vars = vec![
+            ("GEMINI_BASE_URL".to_string(), mock_server.uri()),
+            ("GEMINI_API_KEY".to_string(), "test-key".to_string()),
+            ("AIDE_RS_TEST_MODE".to_string(), "1".to_string()),
+        ];
 
         Self {
             temp_dir,
             mock_server,
+            env_vars,
+        }
+    }
+
+    pub fn apply_env(&self, cmd: &mut Command) {
+        for (key, val) in &self.env_vars {
+            cmd.env(key, val);
         }
     }
 

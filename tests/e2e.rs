@@ -80,6 +80,7 @@ async fn test_e2e_plan_flow() {
 
     // 5. Run the command
     let mut cmd = get_aide_cmd();
+    env.apply_env(&mut cmd);
     cmd.current_dir(env.path());
     cmd.arg("run")
         .arg("plan")
@@ -196,12 +197,14 @@ async fn test_e2e_code_flow_single_task() {
         ))
         .and(body_string_contains("You are an expert pair programmer."))
         .and(body_string_contains("Current Task")) // From implement_tasks prompt
+        .and(body_string_contains("Add hello_world function to src/lib.rs"))
         .respond_with(ResponseTemplate::new(200).set_body_json(impl_response))
         .mount(&env.mock_server)
         .await;
 
     // 4. Run the command
     let mut cmd = get_aide_cmd();
+    env.apply_env(&mut cmd);
     cmd.current_dir(env.path());
     cmd.arg("run")
         .arg("code")
@@ -269,6 +272,7 @@ edition = "2021"
             r"/v1beta/models/gemini-2.5-flash-latest:generateContent",
         ))
         .and(body_string_contains("create a detailed, human-readable implementation plan"))
+        .and(body_string_contains("Add a public function `go()` to lib.rs"))
         .respond_with(ResponseTemplate::new(200).set_body_json(markdown_plan_response))
         .mount(&env.mock_server)
         .await;
@@ -323,6 +327,7 @@ edition = "2021"
         ))
         .and(body_string_contains("You are an expert pair programmer."))
         .and(body_string_contains("Current Task"))
+        .and(body_string_contains("Add a public function `go()` to lib.rs"))
         .respond_with(ResponseTemplate::new(200).set_body_json(impl_response_fail))
         .mount(&env.mock_server)
         .await;
@@ -356,6 +361,7 @@ edition = "2021"
 
     // 4. Run the command
     let mut cmd = get_aide_cmd();
+    env.apply_env(&mut cmd);
     cmd.current_dir(env.path());
     cmd.arg("run")
         .arg("code")
