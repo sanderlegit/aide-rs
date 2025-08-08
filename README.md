@@ -14,7 +14,6 @@ The agent relies heavily on Gemini's **Function Calling** capabilities to ensure
 ## Features
 
 -   **Two-Agent System**: A `PlanAgent` for high-level strategy and an `ImplAgent` for tactical execution.
--   **Dependency Research**: Can use Google Search to find the best and most up-to-date libraries for a given objective.
 -   **Structured Interaction**: Uses Gemini Function Calling for all file modifications, ensuring robustness.
 -   **Self-Correction**: Can analyze validation failures, summarize errors, and retry tasks.
 -   **Git Integration**: Automatically commits the work upon successful completion of all tasks.

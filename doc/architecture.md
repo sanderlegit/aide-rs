@@ -47,12 +47,11 @@ This abstraction standardizes how agents are invoked.
 -   **Responsibility**: To convert a high-level `PlanPrompt` into a detailed `ImplementationPlan`.
 -   **Flow**:
     1.  Receives the `PlanPrompt`.
-    2.  If `use_google_search_for_deps` is true, it first performs a Google Search-enabled API call to research libraries. The results are injected into the main prompt.
-    3.  Uses `files::get_filtered_files` to gather the file context.
-    4.  **Step 1: Generate Task Descriptions**: It constructs a prompt asking the Gemini API to act as an architect and break the objective into a high-level list of task descriptions. It provides a `create_task_descriptions` function declaration.
-    5.  **Step 2: Detail Each Task**: It iterates through the descriptions from the previous step. For each description, it constructs a new prompt asking the API to define the specific `validation_steps` for that task. It provides a `create_task_details` function declaration.
-    6.  The agent calls the Gemini API for each step, deserializing the function call arguments.
-    7.  The agent assembles the final `ImplementationPlan` from the collected details and returns it.
+    2.  Uses `files::get_filtered_files` to gather the file context.
+    3.  **Step 1: Generate Task Descriptions**: It constructs a prompt asking the Gemini API to act as an architect and break the objective into a high-level list of task descriptions. It provides a `create_task_descriptions` function declaration.
+    4.  **Step 2: Detail Each Task**: It iterates through the descriptions from the previous step. For each description, it constructs a new prompt asking the API to define the specific `validation_steps` for that task. It provides a `create_task_details` function declaration.
+    5.  The agent calls the Gemini API for each step, deserializing the function call arguments.
+    6.  The agent assembles the final `ImplementationPlan` from the collected details and returns it.
 
 ### 5. The `ImplAgent` (`src/agents/impl_agent.rs`)
 

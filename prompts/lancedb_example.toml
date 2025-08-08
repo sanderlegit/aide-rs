@@ -16,11 +16,6 @@ Key Crates to Use:
 - `tracing`: For logging.
 """
 
-# The `use_google_search_for_deps` feature has been removed.
-# The agent now relies on the `doc-retriever` tool for error fixing rather than
-# upfront dependency research.
-# use_google_search_for_deps = false
-
 # Provide detailed coding conventions for the agent to follow.
 coding_conventions = """
 - The project must be a binary crate.
