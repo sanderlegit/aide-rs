@@ -270,9 +270,7 @@ impl FlowRunner {
                         let tool_response_part = ContentPart {
                             function_response: Some(crate::gemini_types::FunctionResponse {
                                 name: call.name,
-                                response: crate::gemini_types::FunctionResponsePayload {
-                                    content: tool_output,
-                                },
+                                response: tool_output,
                             }),
                             ..Default::default()
                         };

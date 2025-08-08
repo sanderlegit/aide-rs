@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "camelCase")]
 pub enum Role {
     User,
-    System,
     Model,
+    #[serde(rename = "function")]
     Tool,
 }
 
@@ -111,11 +111,6 @@ pub struct FunctionCall {
 #[serde(rename_all = "camelCase")]
 pub struct FunctionResponse {
     pub name: String,
-    pub response: FunctionResponsePayload,
+    pub response: serde_json::Value,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct FunctionResponsePayload {
-    pub content: serde_json::Value,
-}
