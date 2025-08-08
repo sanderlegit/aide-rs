@@ -6,7 +6,7 @@ An AI-powered software development agent that automates coding tasks by generati
 
 `aide-rs` is a command-line tool that uses Google's Gemini models to understand a software development objective, create a step-by-step plan, and then implement that plan by editing files. It operates in a two-phase process:
 
-1.  **Plan Phase (`aide-rs plan`)**: An expert "architect" agent analyzes your objective, the existing code, and your coding conventions to produce a structured JSON implementation plan.
+1.  **Plan Phase (`aide-rs plan`)**: An expert "architect" agent analyzes your objective, the existing code, and your coding conventions to produce a structured TOML implementation plan.
 2.  **Implement Phase (`aide-rs impl`)**: An expert "pair programmer" agent executes the plan task by task. It edits code, runs validation commands (like tests or linters), and can even summarize compiler errors to self-correct on failure.
 
 The agent relies heavily on Gemini's **Function Calling** capabilities to ensure structured and reliable operations, rather than parsing unpredictable text.
@@ -95,15 +95,15 @@ Run the `plan` command to have the AI architect create a plan.
 /path/to/aide-rs plan --prompt prompts/add_feature.toml
 ```
 
-This will generate a file at `.ai/implementation_plan.json`. This file contains the sequence of tasks the agent will perform. You can review this file before proceeding.
+This will generate a uniquely named plan file in the `.ai/` directory, such as `.ai/plan_add_feature_1678886400.toml`. This file contains the sequence of tasks the agent will perform. You can review this file before proceeding.
 
 ### Step 3: Execute the Plan
 
-Now, run the `impl` command to have the AI programmer execute the plan.
+Now, run the `impl` command to have the AI programmer execute the plan. You can pass the path to the generated plan file.
 
 ```bash
 # This will execute the plan, edit files, and run validation.
-/path/to/aide-rs impl --plan .ai/implementation_plan.json
+/path/to/aide-rs impl --plan .ai/plan_add_feature_1678886400.toml
 ```
 
 If all tasks are completed successfully, the changes will be applied to your files.
@@ -113,7 +113,7 @@ If all tasks are completed successfully, the changes will be applied to your fil
 To have the agent automatically create a Git commit after all tasks succeed, use the `--auto-commit` flag.
 
 ```bash
-/path/to/aide-rs impl --plan .ai/implementation_plan.json --auto-commit
+/path/to/aide-rs impl --plan .ai/plan_add_feature_1678886400.toml --auto-commit
 ```
 This will create a single commit with a message summarizing the completed tasks.
 
