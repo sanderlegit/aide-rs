@@ -6,5 +6,7 @@ pub mod flows;
 pub mod gemini;
 pub mod gemini_types;
 pub mod logging;
+pub mod prompt;
 pub mod runner;
+pub mod tools;
 pub mod vcs;

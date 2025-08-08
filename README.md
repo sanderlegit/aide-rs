@@ -4,20 +4,17 @@ An AI-powered software development agent that automates coding tasks by generati
 
 ## Overview
 
-`aide-rs` is a command-line tool that uses Google's Gemini models to understand a software development objective, create a step-by-step plan, and then implement that plan by editing files. It operates in a two-phase process:
+`aide-rs` is a command-line tool that uses Google's Gemini models to understand a software development objective, create a step-by-step plan, and then implement that plan by editing files. It operates using a flexible, flow-based architecture.
 
-1.  **Plan Phase (`aide-rs plan`)**: An expert "architect" agent analyzes your objective, the existing code, and your coding conventions to produce a structured TOML implementation plan.
-2.  **Implement Phase (`aide-rs impl`)**: An expert "pair programmer" agent executes the plan task by task. It edits code, runs validation commands (like tests or linters), and can even summarize compiler errors to self-correct on failure.
-
-The agent relies heavily on Gemini's **Function Calling** capabilities to ensure structured and reliable operations, rather than parsing unpredictable text.
+A "Flow" is a declarative YAML file that defines a sequence of prompt-driven steps, allowing for complex workflows like planning, coding, and self-correction to be easily defined and customized.
 
 ## Features
 
--   **Two-Agent System**: A `PlanAgent` for high-level strategy and an `ImplAgent` for tactical execution.
--   **Structured Interaction**: Uses Gemini Function Calling for all file modifications, ensuring robustness.
--   **Self-Correction**: Can analyze validation failures, summarize errors, and retry tasks.
--   **Git Integration**: Automatically commits the work upon successful completion of all tasks.
--   **Scoped Context**: Uses glob patterns and `.gitignore` to provide the agent with only the relevant file context.
+-   **Declarative Workflows**: Define agent behavior in simple YAML files instead of hardcoding it.
+-   **Self-Correction**: Flows can define verification steps (like running `cargo check`) and retry logic on failure.
+-   **Structured Tool Use**: Relies on Gemini's Function Calling capabilities for reliable operations like file modifications and task generation.
+-   **Scoped Context**: Uses a system of mergeable YAML files (`ctx/*.yml`) and `.gitignore` to provide the agent with precise file context.
+-   **Extensible**: Easily create new flows and tools to automate any development task.
 
 ## Prerequisites
 

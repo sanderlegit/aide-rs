@@ -75,7 +75,7 @@ pub struct GenerateContentResponse {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Candidate {
-    pub content: ContentResponse,
+    pub content: Content,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub finish_reason: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -102,26 +102,6 @@ pub struct UsageMetadata {
     pub total_token_count: u32,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct ContentResponse {
-    pub parts: Vec<PartResponse>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub role: Option<Role>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct PartResponse {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub text: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub function_call: Option<FunctionCall>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub function_response: Option<FunctionResponse>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub thought_signature: Option<String>,
-}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]

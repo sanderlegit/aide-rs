@@ -1,4 +1,4 @@
-use crate::{agents::state::FileScope, error::Result};
+use crate::{error::Result, flows::types::FileScope};
 use globset::{Glob, GlobSetBuilder};
 use ignore::{gitignore::GitignoreBuilder, WalkBuilder};
 use std::path::{Path, PathBuf};

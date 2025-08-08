@@ -29,32 +29,10 @@ coding_conventions = """
 - The code should be well-structured. Consider creating separate modules for CLI, database logic, and audio handling if the complexity grows.
 """
 
-# The command to run to format the code. This ensures consistency.
-formatter_command = "cargo fmt --all"
-
-# The maximum number of times the agent should retry a failing task.
-max_task_retries = 5
-
 # Define the files the agent should look at for context and modify.
 # For a new project, we start with just the core files.
 [file_scoping]
 include = ["src/**/*.rs", "Cargo.toml", "README.md","docs/*.md", "Makefile"]
 exclude = []
 
-# A sequence of commands that must pass for each task to be considered complete.
-# This acts as a CI/CD pipeline for the agent.
-[[validation_commands]]
-command = "cargo check"
-expected_exit_code = 0
-
-[[validation_commands]]
-command = "cargo clippy -- -D warnings"
-expected_exit_code = 0
-
-[[validation_commands]]
-command = "cargo test"
-expected_exit_code = 0
-
-[[validation_commands]]
-command = "cargo build"
-expected_exit_code = 0
+# Validation commands are now defined within the flow YAML files, not here.

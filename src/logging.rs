@@ -15,7 +15,7 @@ struct LogEntry<T> {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct PromptLog {
-    pub agent_type: String,
+    pub model_name: String,
     pub system_prompt: String,
     pub user_prompt: String,
     pub tools: serde_json::Value,
@@ -24,7 +24,7 @@ pub struct PromptLog {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ResponseLog {
-    pub agent_type: String,
+    pub model_name: String,
     pub response: crate::gemini_types::GenerateContentResponse,
     pub time_taken_ms: u128,
 }
@@ -133,7 +133,7 @@ impl RunLogger {
         self.log_summary(&format!(
             "[{}] PROMPT to {}:\n--- SYSTEM ---\n{}\n--- USER ---\n{}\n---\n",
             Utc::now().to_rfc3339(),
-            log.agent_type,
+            log.model_name,
             log.system_prompt,
             log.user_prompt
         ));
@@ -161,7 +161,7 @@ impl RunLogger {
         self.log_summary(&format!(
             "[{}] RESPONSE from {} ({}ms):\n--- TEXT ---\n{}\n--- CALLS ---\n{}\n---\n",
             Utc::now().to_rfc3339(),
-            log.agent_type,
+            log.model_name,
             log.time_taken_ms,
             if text_parts.trim().is_empty() {
                 "None"

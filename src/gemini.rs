@@ -16,17 +16,7 @@ pub struct GeminiClientWrapper {
 }
 
 impl GeminiClientWrapper {
-    // Using gemini-2.5-flash for planning as it's fast and capable for generation.
-    pub fn new_plan_agent(logger: RunLogger) -> Result<Self> {
-        Self::new("gemini-2.5-flash".to_string(), logger)
-    }
-
-    // Using gemini-2.5-pro for implementation as it's more powerful for complex reasoning.
-    pub fn new_impl_agent(logger: RunLogger) -> Result<Self> {
-        Self::new("gemini-2.5-pro".to_string(), logger)
-    }
-
-    fn new(model_name: String, logger: RunLogger) -> Result<Self> {
+    pub fn new(model_name: String, logger: RunLogger) -> Result<Self> {
         dotenv().ok();
         let api_key = env::var("GEMINI_API_KEY")
             .map_err(|_| Error::Config("GEMINI_API_KEY must be set".to_string()))?;
