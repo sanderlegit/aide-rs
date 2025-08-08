@@ -11,6 +11,7 @@ use std::path::PathBuf;
 mod common;
 // use common::TestEnv;
 
+#[allow(dead_code)]
 fn get_aide_cmd() -> Command {
     let mut cmd = Command::cargo_bin("aide-rs").unwrap();
     let program_path = PathBuf::from(cmd.get_program());

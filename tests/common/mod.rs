@@ -5,11 +5,13 @@ use git2::{Repository, Signature};
 use tempfile::{tempdir, TempDir};
 use wiremock::MockServer;
 
+#[allow(dead_code)]
 pub struct TestEnv {
     pub temp_dir: TempDir,
     pub mock_server: MockServer,
 }
 
+#[allow(dead_code)]
 impl TestEnv {
     pub async fn new() -> Self {
         let temp_dir = tempdir().unwrap();

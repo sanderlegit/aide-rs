@@ -46,7 +46,7 @@ async fn run() -> Result<()> {
             let flow_content = fs::read_to_string(&flow_path)?;
             let flow: Flow = serde_yaml::from_str(&flow_content)?;
 
-            let runner = FlowRunner::new(logger)?;
+            let mut runner = FlowRunner::new(logger)?;
             runner.run(&flow, &prompt).await?;
         }
         Commands::List => {

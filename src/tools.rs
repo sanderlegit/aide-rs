@@ -1,7 +1,9 @@
 use crate::error::Result;
 use crate::gemini_types::{FunctionCall, FunctionDeclaration};
+use async_trait::async_trait;
 
 /// A trait for any tool that can be executed by the agent.
+#[async_trait]
 pub trait Tool {
     /// Returns the name of the tool.
     fn name(&self) -> String;

@@ -278,7 +278,6 @@ fn clean_type(ty: &Type) -> String {
 mod tests {
     use super::*;
     use std::fs;
-    use std::path::Path;
     use tempfile::tempdir;
 
     fn setup_test_crate() -> (tempfile::TempDir, PathBuf) {
