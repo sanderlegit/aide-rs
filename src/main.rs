@@ -2,6 +2,7 @@ use aide_rs::{
     agents::{impl_agent::ImplAgent, plan_agent::PlanAgent, state::PlanPrompt, Agent},
     cli::{Cli, Commands},
     error::Result,
+    logging::RunLogger,
 };
 use clap::Parser;
 use tracing::info;
@@ -24,6 +25,7 @@ fn setup_logging() {
 }
 
 async fn run() -> Result<()> {
+    let logger = RunLogger::new()?;
     let cli = Cli::parse();
 
     info!(command = ?cli.command, "Executing command");
@@ -55,7 +57,7 @@ async fn run() -> Result<()> {
             let plan_prompt: PlanPrompt = toml::from_str(&prompt_content)?;
 
             // 2. Create and run agent
-            let plan_agent = PlanAgent::new()?;
+            let plan_agent = PlanAgent::new(logger.clone())?;
             let implementation_plan = plan_agent.run(plan_prompt).await?;
 
             // 3. Save plan
@@ -80,7 +82,8 @@ async fn run() -> Result<()> {
                 ?enrich_errors,
                 "Running Impl agent"
             );
-            let impl_agent = ImplAgent::new(max_retries, auto_commit, enrich_errors)?;
+            let impl_agent =
+                ImplAgent::new(max_retries, auto_commit, enrich_errors, logger.clone())?;
             impl_agent.run(plan).await?;
 
             info!("Implementation agent finished successfully.");

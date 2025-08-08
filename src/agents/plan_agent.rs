@@ -7,6 +7,7 @@ use crate::{
     files,
     gemini::GeminiClientWrapper,
     gemini_types::{Content, ContentPart, FunctionCall, GenerateContentResponse, Role},
+    logging::{PromptLog, RunLogger},
 };
 use async_trait::async_trait;
 use serde::Deserialize;
@@ -26,12 +27,13 @@ struct TaskDetails {
 
 pub struct PlanAgent {
     gemini: GeminiClientWrapper,
+    logger: RunLogger,
 }
 
 impl PlanAgent {
-    pub fn new() -> Result<Self> {
-        let gemini = GeminiClientWrapper::new_plan_agent()?;
-        Ok(Self { gemini })
+    pub fn new(logger: RunLogger) -> Result<Self> {
+        let gemini = GeminiClientWrapper::new_plan_agent(logger.clone())?;
+        Ok(Self { gemini, logger })
     }
 
     // STEP 1: Get task descriptions
@@ -256,10 +258,14 @@ impl Agent for PlanAgent {
         // STEP 1: Get task descriptions
         info!("Step 1: Generating task descriptions...");
         let system_prompt = self.create_description_generation_system_prompt();
-        info!(
-            prompt = %format!("\n--- SYSTEM ---\n{}\n--- USER ---\n{}\n---", system_prompt, user_prompt_for_descriptions),
-            "Sending description generation prompt to Gemini"
-        );
+        let function_declarations = vec![self.create_task_descriptions_tool()];
+
+        self.logger.log_prompt(PromptLog {
+            agent_type: "PlanAgent (Descriptions)".to_string(),
+            system_prompt: system_prompt.clone(),
+            user_prompt: user_prompt_for_descriptions.clone(),
+            tools: json!(function_declarations),
+        });
 
         let contents = vec![
             Content {
@@ -278,7 +284,6 @@ impl Agent for PlanAgent {
             },
         ];
 
-        let function_declarations = vec![self.create_task_descriptions_tool()];
         let tool_config = json!([{
             "functionDeclarations": function_declarations
         }]);
@@ -300,10 +305,14 @@ impl Agent for PlanAgent {
             let system_prompt = self.create_task_detailing_system_prompt();
             let user_prompt =
                 self.create_task_detailing_user_prompt(&prompt, &files, description);
-            info!(
-                prompt = %format!("\n--- SYSTEM ---\n{}\n--- USER ---\n{}\n---", system_prompt, user_prompt),
-                "Sending task detailing prompt to Gemini"
-            );
+            let function_declarations = vec![self.create_task_details_tool()];
+
+            self.logger.log_prompt(PromptLog {
+                agent_type: "PlanAgent (Details)".to_string(),
+                system_prompt: system_prompt.clone(),
+                user_prompt: user_prompt.clone(),
+                tools: json!(function_declarations),
+            });
 
             let contents = vec![
                 Content {
@@ -322,7 +331,6 @@ impl Agent for PlanAgent {
                 },
             ];
 
-            let function_declarations = vec![self.create_task_details_tool()];
             let tool_config = json!([{
                 "functionDeclarations": function_declarations
             }]);

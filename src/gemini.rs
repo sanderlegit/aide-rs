@@ -1,8 +1,10 @@
 use crate::error::{Error, Result};
 use crate::gemini_types::{Content, GenerateContentResponse};
+use crate::logging::{ResponseLog, RunLogger};
 use dotenvy::dotenv;
 use reqwest::Client;
 use std::env;
+use std::time::Instant;
 use tracing::{debug, error, info};
 
 pub struct GeminiClientWrapper {
@@ -10,20 +12,21 @@ pub struct GeminiClientWrapper {
     api_key: String,
     model_name: String,
     base_url: String,
+    logger: RunLogger,
 }
 
 impl GeminiClientWrapper {
     // Using gemini-2.5-flash for planning as it's fast and capable for generation.
-    pub fn new_plan_agent() -> Result<Self> {
-        Self::new("gemini-2.5-flash".to_string())
+    pub fn new_plan_agent(logger: RunLogger) -> Result<Self> {
+        Self::new("gemini-2.5-flash".to_string(), logger)
     }
 
     // Using gemini-2.5-pro for implementation as it's more powerful for complex reasoning.
-    pub fn new_impl_agent() -> Result<Self> {
-        Self::new("gemini-2.5-pro".to_string())
+    pub fn new_impl_agent(logger: RunLogger) -> Result<Self> {
+        Self::new("gemini-2.5-pro".to_string(), logger)
     }
 
-    fn new(model_name: String) -> Result<Self> {
+    fn new(model_name: String, logger: RunLogger) -> Result<Self> {
         dotenv().ok();
         let api_key = env::var("GEMINI_API_KEY")
             .map_err(|_| Error::Config("GEMINI_API_KEY must be set".to_string()))?;
@@ -38,6 +41,7 @@ impl GeminiClientWrapper {
             api_key,
             model_name,
             base_url,
+            logger,
         })
     }
 
@@ -46,6 +50,7 @@ impl GeminiClientWrapper {
         contents: Vec<Content>,
         tools: Option<T>,
     ) -> Result<GenerateContentResponse> {
+        let start_time = Instant::now();
         let request_body = serde_json::json!({
             "contents": contents,
             "tools": tools,
@@ -86,6 +91,13 @@ impl GeminiClientWrapper {
             }
         };
         debug!(response = %serde_json::to_string_pretty(&response).unwrap_or_else(|_| "Failed to format response body".to_string()), "Gemini response received");
+
+        let time_taken = start_time.elapsed();
+        self.logger.log_response(ResponseLog {
+            agent_type: self.model_name.clone(),
+            response: response.clone(),
+            time_taken_ms: time_taken.as_millis(),
+        });
 
         // Log text parts of response at info level for visibility
         if let Some(candidates) = &response.candidates {

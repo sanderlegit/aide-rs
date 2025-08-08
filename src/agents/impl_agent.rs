@@ -10,6 +10,7 @@ use crate::{
     gemini_types::{
         Content, ContentPart, FunctionCall, FunctionDeclaration, FunctionResponse, Role,
     },
+    logging::{PromptLog, RunLogger, ToolCallLog, ToolResultLog, ValidationLog},
     vcs,
 };
 use async_trait::async_trait;
@@ -19,6 +20,7 @@ use similar::{ChangeTag, TextDiff};
 use std::{
     path::{Path, PathBuf},
     process::Command,
+    time::Instant,
 };
 use tracing::{error, info, warn};
 
@@ -29,6 +31,7 @@ pub struct ImplAgent {
     max_retries: u32,
     auto_commit: bool,
     enrich_errors: bool,
+    logger: RunLogger,
 }
 
 fn run_command(command_str: &str) -> Result<(i32, String, String)> {
@@ -51,13 +54,19 @@ fn run_command(command_str: &str) -> Result<(i32, String, String)> {
 }
 
 impl ImplAgent {
-    pub fn new(max_retries: u32, auto_commit: bool, enrich_errors: bool) -> Result<Self> {
-        let gemini = GeminiClientWrapper::new_impl_agent()?;
+    pub fn new(
+        max_retries: u32,
+        auto_commit: bool,
+        enrich_errors: bool,
+        logger: RunLogger,
+    ) -> Result<Self> {
+        let gemini = GeminiClientWrapper::new_impl_agent(logger.clone())?;
         Ok(Self {
             gemini,
             max_retries,
             auto_commit,
             enrich_errors,
+            logger,
         })
     }
 
@@ -237,9 +246,23 @@ Implement the current task by calling the `edit_file` or `create_file` functions
         steps: &[crate::agents::state::ValidationStep],
     ) -> std::result::Result<(), String> {
         for step in steps {
-            match run_command(&step.command) {
+            let start_time = Instant::now();
+            let result = run_command(&step.command);
+            let time_taken = start_time.elapsed();
+
+            match result {
                 Ok((exit_code, stdout, stderr)) => {
-                    if exit_code != step.expected_exit_code {
+                    let success = exit_code == step.expected_exit_code;
+                    self.logger.log_validation(ValidationLog {
+                        command: step.command.clone(),
+                        exit_code,
+                        stdout: stdout.clone(),
+                        stderr: stderr.clone(),
+                        success,
+                        time_taken_ms: time_taken.as_millis(),
+                    });
+
+                    if !success {
                         let full_output = format!("STDOUT:\n{}\nSTDERR:\n{}", stdout, stderr);
                         let error_msg = format!(
                             "Validation failed for command `{}`. Expected exit code {}, but got {}.\nOutput:\n{}",
@@ -274,8 +297,9 @@ Implement the current task by calling the `edit_file` or `create_file` functions
     ) -> Result<(bool, ContentPart)> {
         use std::io::Write;
         info!(name = %fc.name, "Processing function call");
+        let start_time = Instant::now();
 
-        let (stop_conversation, response_payload) = match fc.name.as_str() {
+        let (stop_conversation, response_payload, tool_result) = match fc.name.as_str() {
             "edit_file" => {
                 #[derive(Deserialize)]
                 struct Args {
@@ -302,7 +326,16 @@ Implement the current task by calling the `edit_file` or `create_file` functions
 
                 info!(path = %args.path, "Edited file");
                 modified_files.push(path);
-                (true, json!({"status": "success"}))
+                (
+                    true,
+                    json!({"status": "success"}),
+                    ToolResultLog {
+                        success: true,
+                        stdout: "File edited successfully.".to_string(),
+                        stderr: "".to_string(),
+                        output_json: json!({}),
+                    },
+                )
             }
             "create_file" => {
                 #[derive(Deserialize)]
@@ -327,7 +360,16 @@ Implement the current task by calling the `edit_file` or `create_file` functions
 
                 info!(path = %args.path, "Created file");
                 modified_files.push(path);
-                (true, json!({"status": "success"}))
+                (
+                    true,
+                    json!({"status": "success"}),
+                    ToolResultLog {
+                        success: true,
+                        stdout: "File created successfully.".to_string(),
+                        stderr: "".to_string(),
+                        output_json: json!({}),
+                    },
+                )
             }
             "doc_retriever" => {
                 #[derive(Deserialize)]
@@ -345,21 +387,49 @@ Implement the current task by calling the `edit_file` or `create_file` functions
                 let cmd = format!("cargo run --bin doc-retriever -- {}", cmd_args.join(" "));
 
                 let (exit_code, stdout, stderr) = run_command(&cmd)?;
-                if exit_code == 0 {
+                let success = exit_code == 0;
+                let (response_payload, output_json) = if success {
                     let doc_json: serde_json::Value = serde_json::from_str(&stdout)?;
-                    (false, doc_json)
+                    (doc_json.clone(), doc_json)
                 } else {
-                    (false, json!({ "success": false, "error": stderr }))
-                }
+                    let err_json = json!({ "success": false, "error": stderr });
+                    (err_json.clone(), err_json)
+                };
+
+                (
+                    false,
+                    response_payload,
+                    ToolResultLog {
+                        success,
+                        stdout,
+                        stderr,
+                        output_json,
+                    },
+                )
             }
             _ => {
                 warn!(name = %fc.name, "Unknown function call");
+                let err_json = json!({"success": false, "error": "Unknown function call"});
                 (
                     false,
-                    json!({"success": false, "error": "Unknown function call"}),
+                    err_json.clone(),
+                    ToolResultLog {
+                        success: false,
+                        stdout: "".to_string(),
+                        stderr: "Unknown function call".to_string(),
+                        output_json: err_json,
+                    },
                 )
             }
         };
+
+        let time_taken = start_time.elapsed();
+        self.logger.log_tool_call(ToolCallLog {
+            tool_name: fc.name.clone(),
+            tool_args: fc.arguments.clone(),
+            result: tool_result,
+            time_taken_ms: time_taken.as_millis(),
+        });
 
         Ok((
             stop_conversation,
@@ -459,18 +529,13 @@ impl Agent for ImplAgent {
                         }
                     });
 
-                    let log_user_prompt = self.create_user_prompt_with_context(
-                        i,
-                        &plan,
-                        &file_names_for_log,
-                        &last_error_for_log,
-                    );
-                    let log_full_prompt = format!("{}\n\n{}", system_prompt, log_user_prompt);
-
-                    info!(
-                        prompt = %format!("\n---\n{}\n---", log_full_prompt),
-                        "Sending implementation prompt to Gemini"
-                    );
+                    let tools = self.create_file_tools();
+                    self.logger.log_prompt(PromptLog {
+                        agent_type: "ImplAgent".to_string(),
+                        system_prompt: system_prompt.clone(),
+                        user_prompt: user_prompt.clone(),
+                        tools: json!(tools),
+                    });
 
                     let mut conversation_history = vec![Content {
                         role: Role::User,

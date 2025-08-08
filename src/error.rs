@@ -34,6 +34,9 @@ pub enum Error {
 
     #[error("Reqwest error: {0}")]
     Reqwest(#[from] reqwest::Error),
+
+    #[error("Logging error: {0}")]
+    Logging(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

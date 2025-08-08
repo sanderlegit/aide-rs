@@ -53,7 +53,7 @@ pub struct FunctionDeclaration {
     pub parameters: serde_json::Value, // Using Value for flexibility
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct GenerateContentResponse {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -62,7 +62,7 @@ pub struct GenerateContentResponse {
     pub usage_metadata: Option<UsageMetadata>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Candidate {
     pub content: ContentResponse,
@@ -74,14 +74,14 @@ pub struct Candidate {
     pub safety_ratings: Vec<SafetyRating>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SafetyRating {
     pub category: String,
     pub probability: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct UsageMetadata {
     #[serde(default)]
@@ -92,7 +92,7 @@ pub struct UsageMetadata {
     pub total_token_count: u32,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ContentResponse {
     pub parts: Vec<PartResponse>,
@@ -100,7 +100,7 @@ pub struct ContentResponse {
     pub role: Option<Role>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct PartResponse {
     #[serde(default, skip_serializing_if = "Option::is_none")]
