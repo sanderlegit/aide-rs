@@ -5,7 +5,12 @@ use serde_json::json;
 use std::path::{Path, PathBuf};
 
 fn generate_docs(crate_name: &str, current_dir: Option<&Path>) -> Result<PathBuf> {
-    let manifest_path = current_dir
+    // On some platforms (like macOS), temp directories can be under symlinked paths.
+    // Canonicalizing the path ensures that cargo can find its working directory.
+    let canonical_dir = current_dir.map(|p| p.canonicalize()).transpose()?;
+
+    let manifest_path = canonical_dir
+        .as_deref()
         .map(|d| d.join("Cargo.toml"))
         .unwrap_or_else(|| PathBuf::from("Cargo.toml"));
 
@@ -14,7 +19,7 @@ fn generate_docs(crate_name: &str, current_dir: Option<&Path>) -> Result<PathBuf
         .manifest_path(&manifest_path)
         .quiet(true);
 
-    if let Some(dir) = current_dir {
+    if let Some(dir) = &canonical_dir {
         builder = builder.target_dir(dir.join("target"));
     }
 
@@ -297,12 +302,7 @@ pub mod my_module {
     #[test]
     fn test_get_crate_docs() {
         let (_dir, crate_root) = setup_test_crate();
-        let original_dir = std::env::current_dir().unwrap();
-        std::env::set_current_dir(&crate_root).unwrap();
-
-        let result = get_crate_docs("test_crate", None).unwrap();
-
-        std::env::set_current_dir(original_dir).unwrap();
+        let result = get_crate_docs("test_crate", Some(&crate_root)).unwrap();
 
         assert_eq!(result["type"], "crate");
         assert_eq!(result["name"], "test_crate");
@@ -314,13 +314,8 @@ pub mod my_module {
     #[test]
     fn test_get_module_docs() {
         let (_dir, crate_root) = setup_test_crate();
-        let original_dir = std::env::current_dir().unwrap();
-        std::env::set_current_dir(&crate_root).unwrap();
-
         let result =
-            get_module_docs("test_crate", "test_crate::my_module", None).unwrap();
-
-        std::env::set_current_dir(original_dir).unwrap();
+            get_module_docs("test_crate", "test_crate::my_module", Some(&crate_root)).unwrap();
 
         assert_eq!(result["type"], "module");
         assert_eq!(result["crate"], "test_crate");
@@ -334,14 +329,9 @@ pub mod my_module {
     #[test]
     fn test_get_type_docs_struct() {
         let (_dir, crate_root) = setup_test_crate();
-        let original_dir = std::env::current_dir().unwrap();
-        std::env::set_current_dir(&crate_root).unwrap();
-
         let result =
-            get_type_docs("test_crate", "test_crate::my_module::MyStruct", None)
+            get_type_docs("test_crate", "test_crate::my_module::MyStruct", Some(&crate_root))
                 .unwrap();
-
-        std::env::set_current_dir(original_dir).unwrap();
 
         assert_eq!(result["type"], "struct");
         assert_eq!(result["crate"], "test_crate");
