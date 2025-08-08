@@ -5,24 +5,22 @@ use serde_json::json;
 use std::path::{Path, PathBuf};
 
 fn generate_docs(crate_name: &str, current_dir: Option<&Path>) -> Result<PathBuf> {
-    let mut builder = Builder::default();
-
     let manifest_path = current_dir
         .map(|dir| dir.join("Cargo.toml"))
         .unwrap_or_else(|| PathBuf::from("Cargo.toml"));
 
-    builder
+    Builder::default()
         .toolchain("nightly")
         .package(crate_name)
         .manifest_path(manifest_path)
-        .quiet(true);
-
-    builder.build().map_err(|e| {
-        Error::Config(format!(
-            "Failed to build rustdoc for {}: {}",
-            crate_name, e
-        ))
-    })
+        .quiet(true)
+        .build()
+        .map_err(|e| {
+            Error::Config(format!(
+                "Failed to build rustdoc for {}: {}",
+                crate_name, e
+            ))
+        })
 }
 
 pub fn get_crate_docs(
