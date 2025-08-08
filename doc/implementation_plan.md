@@ -44,7 +44,7 @@ This phase implements the more complex features of the architecture, such as loo
         -   Execute the shell command.
         -   Check the exit code.
         -   On failure, construct the `on_failure_prompt` and re-run the block.
-    -   **[ ]** Implement the `prompt` verification strategy.
+    -   **[X]** Implement the `prompt` verification strategy.
 
 -   **[X] Task 2.2: Implement Looping for Task Lists**
     -   Add special handling in the `FlowRunner` for blocks that operate on a list output from a previous block (e.g., implementing a `TaskList`).
@@ -70,7 +70,7 @@ This phase ensures the new system is working correctly end-to-end.
         -   Run `aide-rs run plan --prompt ...`.
         -   Mock the API call.
         -   Assert that the correct structured `TaskList` is produced.
-    -   **[ ] Test Case: `code` flow (single task)**:
+    -   **[X] Test Case: `code` flow (single task)**:
         -   Run `aide-rs run code --prompt ...`.
         -   Mock the sequence of API calls (plan, implement, verify).
         -   Assert that the target file is modified correctly.

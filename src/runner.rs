@@ -292,7 +292,9 @@ impl FlowRunner {
 
             // 4. Run verification logic
             if let Some(verification) = &block.verification {
-                let result = self.run_verification(&verification.strategy).await?;
+                let result = self
+                    .run_verification(&verification.strategy, prompt_path)
+                    .await?;
                 if result.success {
                     // Success, break the retry loop
                     break;
@@ -326,6 +328,7 @@ impl FlowRunner {
     async fn run_verification(
         &mut self,
         strategy: &VerificationStrategy,
+        prompt_path: &Path,
     ) -> Result<VerificationResult> {
         match strategy {
             VerificationStrategy::Command {
@@ -363,13 +366,65 @@ impl FlowRunner {
                     }),
                 })
             }
-            VerificationStrategy::Prompt { .. } => {
-                warn!("Prompt-based verification is not yet implemented.");
-                // For now, we'll just assume it passes.
-                Ok(VerificationResult {
-                    success: true,
-                    output: json!({}),
-                })
+            VerificationStrategy::Prompt {
+                prompt,
+                success_condition,
+            } => {
+                warn!("Prompt-based verification is experimental.");
+
+                // 1. Build the prompt.
+                let prompt_string = self
+                    .prompt_builder
+                    .build(prompt, prompt_path, &self.block_outputs, "", &None)
+                    .await?;
+
+                // 2. Call the LLM with a special tool for verification.
+                let mut success = false;
+                let mut output = json!({});
+
+                if let Some(tool_name) = success_condition.strip_prefix("function_call:") {
+                    let verification_tool = crate::gemini_types::FunctionDeclaration {
+                        name: tool_name.to_string(),
+                        description: "Call this function if the verification is successful."
+                            .to_string(),
+                        parameters: serde_json::from_str(r#"{"type": "object", "properties": {}}"#)
+                            .unwrap(),
+                    };
+                    let tools_config =
+                        Some(vec![crate::gemini_types::ToolConfig::FunctionDeclaration(
+                            crate::gemini_types::ToolConfigFunctionDeclaration {
+                                function_declarations: vec![verification_tool],
+                            },
+                        )]);
+
+                    let user_content = Content {
+                        role: Role::User,
+                        parts: vec![ContentPart::new_text(prompt_string)],
+                    };
+
+                    // Verification prompts are ephemeral and not part of the main history.
+                    let response = self
+                        .gemini_client
+                        .generate_content(vec![user_content], tools_config)
+                        .await?;
+
+                    // 3. Check for success condition.
+                    if let Some(candidate) = response.candidates.as_ref().and_then(|c| c.first()) {
+                        for part in &candidate.content.parts {
+                            if let Some(call) = &part.function_call {
+                                if call.name == tool_name {
+                                    success = true;
+                                    break;
+                                }
+                            }
+                        }
+                        output = serde_json::to_value(candidate.content.clone())?;
+                    }
+                } else {
+                    warn!("Unsupported success_condition: {}", success_condition);
+                }
+
+                Ok(VerificationResult { success, output })
             }
         }
     }

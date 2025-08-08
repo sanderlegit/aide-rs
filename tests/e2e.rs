@@ -26,10 +26,14 @@ async fn test_e2e_plan_flow() {
     let env = TestEnv::new().await;
     env.init_git_repo();
 
-    // 1. Create the flow file
+    // 1. Create the flow and context files
     fs::create_dir_all(env.full_path("flows")).unwrap();
     let flow_content = fs::read_to_string("flows/plan.yml").unwrap();
     env.create_file("flows/plan.yml", &flow_content);
+
+    fs::create_dir_all(env.full_path("ctx")).unwrap();
+    let base_scope_content = fs::read_to_string("ctx/base.yaml").unwrap();
+    env.create_file("ctx/base.yaml", &base_scope_content);
 
     // 2. Create the prompt file
     env.create_file(
@@ -94,4 +98,102 @@ async fn test_e2e_plan_flow() {
     assert!(stderr.contains("Flow 'plan' finished."));
     assert!(stderr.contains("Executing block: 'generate_tasks'..."));
     assert!(stderr.contains("TOOL CALL: create_task_list"));
+}
+
+#[tokio::test]
+async fn test_e2e_code_flow_single_task() {
+    let env = TestEnv::new().await;
+    env.init_git_repo();
+
+    // 1. Create flow and context files
+    fs::create_dir_all(env.full_path("flows")).unwrap();
+    let code_flow_content = fs::read_to_string("flows/code.yml").unwrap();
+    env.create_file("flows/code.yml", &code_flow_content);
+
+    fs::create_dir_all(env.full_path("ctx")).unwrap();
+    let base_scope_content = fs::read_to_string("ctx/base.yaml").unwrap();
+    env.create_file("ctx/base.yaml", &base_scope_content);
+
+    // 2. Create prompt and initial project files
+    env.create_file(
+        "my_code_prompt.toml",
+        r#"
+        objective = "Add a hello world function to lib.rs"
+        [file_scoping]
+        include = ["src/lib.rs"]
+        "#,
+    );
+    env.create_file("src/lib.rs", "// Initial content\n");
+
+    // 3. Mock API calls
+    // Mock 1: The 'generate_tasks' block
+    let plan_response = json!({
+        "candidates": [{
+            "content": {
+                "parts": [{
+                    "functionCall": {
+                        "name": "create_task_list",
+                        "args": {
+                            "tasks": [
+                                { "id": "add-hello", "description": "Add hello_world function to src/lib.rs" }
+                            ]
+                        }
+                    }
+                }],
+                "role": "model"
+            }
+        }]
+    });
+    Mock::given(method("POST"))
+        .and(body_string_contains("Add a hello world function")) // From objective
+        .and(body_string_contains("create_task_list")) // From prompt
+        .respond_with(ResponseTemplate::new(200).set_body_json(plan_response))
+        .mount(&env.mock_server)
+        .await;
+
+    // Mock 2: The 'implement_tasks' block
+    let impl_response = json!({
+        "candidates": [{
+            "content": {
+                "parts": [{
+                    "functionCall": {
+                        "name": "edit_file",
+                        "args": {
+                            "path": "src/lib.rs",
+                            "content": "pub fn hello_world() { println!(\"Hello, world!\"); }"
+                        }
+                    }
+                }],
+                "role": "model"
+            }
+        }]
+    });
+    Mock::given(method("POST"))
+        .and(body_string_contains("Current Task")) // From implement_tasks prompt
+        .and(body_string_contains("Add hello_world function")) // From task description
+        .respond_with(ResponseTemplate::new(200).set_body_json(impl_response))
+        .mount(&env.mock_server)
+        .await;
+
+    // 4. Run the command
+    let mut cmd = get_aide_cmd();
+    cmd.current_dir(env.path());
+    cmd.arg("run")
+        .arg("code")
+        .arg("--prompt")
+        .arg("my_code_prompt.toml");
+
+    // 5. Assert success and file modification
+    let output = cmd.output().unwrap();
+    assert!(
+        output.status.success(),
+        "Command failed. Stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.contains("Flow 'code' finished."));
+
+    let final_content = fs::read_to_string(env.full_path("src/lib.rs")).unwrap();
+    assert!(final_content.contains("pub fn hello_world"));
 }
