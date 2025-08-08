@@ -1,19 +1,94 @@
 use serde::{Deserialize, Serialize};
 
-// Input for the PlanAgent, deserialized from a TOML file.
-#[derive(Serialize, Deserialize, Debug)]
-pub struct PlanPrompt {
-    pub objective: String,
-    #[serde(default)]
-    pub file_scoping: FileScope,
-    pub coding_conventions: String,
-    pub formatter_command: Option<String>,
-    pub validation_commands: Vec<ValidationStep>,
-    #[serde(default)]
-    pub max_task_retries: Option<u32>,
+/// Defines a complete, end-to-end workflow.
+/// Parsed from a `flows/*.yml` file.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Flow {
+    pub id: String,
+    pub description: String,
+    pub blocks: Vec<Block>,
 }
 
-// Defines file include/exclude rules.
+/// A single, atomic step within a Flow.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Block {
+    pub id: String,
+    #[serde(default)]
+    pub description: String,
+    pub prompt: Prompt,
+    #[serde(default)]
+    pub annotations: Annotations,
+    #[serde(default)]
+    pub verification: Option<Verification>,
+}
+
+/// Defines how to construct a prompt for the LLM.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Prompt {
+    pub composition: Vec<PromptPart>,
+}
+
+/// A component of a prompt.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum PromptPart {
+    #[serde(rename = "static_text")]
+    StaticText { content: String },
+    #[serde(rename = "file_contents")]
+    FileContents {
+        #[serde(default)]
+        scope: FileScope,
+        #[serde(default)]
+        scope_from_prompt: bool,
+        #[serde(default)]
+        prefix: String,
+    },
+    #[serde(rename = "prompt_file_field")]
+    PromptFileField { field: String, prefix: String },
+    #[serde(rename = "previous_output")]
+    PreviousOutput { block_id: String, prefix: String },
+}
+
+/// Modifies the execution behavior of a block.
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct Annotations {
+    #[serde(default)]
+    pub history: History,
+    #[serde(default)]
+    pub tools: Vec<String>,
+    #[serde(default)]
+    pub structured_output_schema: Option<String>,
+}
+
+/// Defines how to validate a block's output and whether to loop on failure.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Verification {
+    #[serde(default = "default_max_retries")]
+    pub max_retries: u32,
+    pub strategy: VerificationStrategy,
+}
+
+fn default_max_retries() -> u32 {
+    5
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum VerificationStrategy {
+    #[serde(rename = "command")]
+    Command {
+        command: String,
+        expected_exit_code: i32,
+        on_failure_prompt: Prompt,
+    },
+    #[serde(rename = "prompt")]
+    Prompt {
+        prompt: Prompt,
+        success_condition: String, // e.g., "function_call:verification_passed"
+    },
+}
+
+/// Defines file include/exclude rules.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
 #[serde(default)]
 pub struct FileScope {
@@ -21,105 +96,23 @@ pub struct FileScope {
     pub exclude: Vec<String>, // Glob patterns
 }
 
-// The primary state file for a workflow.
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ImplementationPlan {
-    pub original_prompt: PlanPrompt,
-    pub tasks: Vec<Task>,
+/// How much of the conversation history to include.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum History {
+    Mode(HistoryMode),
+    LastN { last_n: u32 },
 }
 
-// A single, executable task within a plan.
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Task {
-    pub description: String,
-    pub validation_steps: Vec<ValidationStep>,
-    pub status: TaskStatus,
-    pub attempts: u32,
-    pub result: Option<TaskResult>,
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum HistoryMode {
+    Full,
+    None,
 }
 
-// The outcome of a successfully completed task.
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct TaskResult {
-    pub success: bool,
-    pub agent_tips: String,
-    #[serde(default)]
-    pub modified_files: Vec<String>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub enum TaskStatus {
-    Pending,
-    Success,
-    Failed,
-}
-
-// A command to be run for validation.
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ValidationStep {
-    pub command: String,
-    pub expected_exit_code: i32,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_plan_prompt_toml_serialization() {
-        let prompt = PlanPrompt {
-            objective: "Test objective".to_string(),
-            file_scoping: FileScope {
-                include: vec!["src/**/*.rs".to_string()],
-                exclude: vec!["src/main.rs".to_string()],
-            },
-            coding_conventions: "Use snake_case".to_string(),
-            formatter_command: Some("cargo fmt".to_string()),
-            validation_commands: vec![ValidationStep {
-                command: "cargo check".to_string(),
-                expected_exit_code: 0,
-            }],
-            max_task_retries: None,
-        };
-
-        let toml_string = toml::to_string(&prompt).unwrap();
-        let deserialized: PlanPrompt = toml::from_str(&toml_string).unwrap();
-
-        assert_eq!(deserialized.objective, prompt.objective);
-        assert_eq!(
-            deserialized.file_scoping.include,
-            prompt.file_scoping.include
-        );
-    }
-
-    #[test]
-    fn test_implementation_plan_json_serialization() {
-        let plan = ImplementationPlan {
-            original_prompt: PlanPrompt {
-                objective: "Test objective".to_string(),
-                file_scoping: FileScope::default(),
-                coding_conventions: "None".to_string(),
-                formatter_command: None,
-                validation_commands: vec![],
-                max_task_retries: None,
-            },
-            tasks: vec![Task {
-                description: "Do a thing".to_string(),
-                validation_steps: vec![ValidationStep {
-                    command: "cargo test".to_string(),
-                    expected_exit_code: 0,
-                }],
-                status: TaskStatus::Pending,
-                attempts: 0,
-                result: None,
-            }],
-        };
-
-        let json_string = serde_json::to_string_pretty(&plan).unwrap();
-        let deserialized: ImplementationPlan = serde_json::from_str(&json_string).unwrap();
-
-        assert_eq!(deserialized.tasks.len(), 1);
-        assert_eq!(deserialized.tasks[0].description, "Do a thing");
-        assert_eq!(deserialized.tasks[0].status, TaskStatus::Pending);
+impl Default for History {
+    fn default() -> Self {
+        History::Mode(HistoryMode::Full)
     }
 }

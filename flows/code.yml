@@ -1,0 +1,61 @@
+id: "code"
+description: "Analyzes an objective, creates a plan, and implements it."
+
+blocks:
+  - id: "generate_tasks"
+    description: "Generate a high-level list of task descriptions."
+    prompt:
+      composition:
+        - type: static_text
+          content: |
+            You are an expert software architect. Your role is to analyze a user's objective and the provided project context, and break it down into a high-level list of task descriptions.
+            You must call the `create_task_list` function with the generated list of tasks. Each task should be a descriptive, actionable step.
+        - type: file_contents
+          scope_from_prompt: true
+          prefix: "\n**Project File Context:**\n"
+        - type: prompt_file_field
+          field: "objective"
+          prefix: "\n**Objective:**\n"
+        - type: prompt_file_field
+          field: "coding_conventions"
+          prefix: "\n**Coding Conventions:**\n"
+    annotations:
+      history: none
+      tools: [ "task_creator" ]
+      structured_output_schema: "TaskList"
+
+  - id: "implement_tasks"
+    description: "Iterate through the generated tasks and implement them."
+    # This block would be handled by special logic in the FlowRunner
+    # to loop over the `TaskList` from the previous block.
+    # For each task, it would run a sub-flow similar to this:
+    prompt:
+      composition:
+        - type: static_text
+          content: |
+            You are an expert pair programmer. Your goal is to implement the current task.
+            Analyze the task description and the provided code. Use the available tools to modify files.
+            If you are unsure about an API, use the `doc_retriever` tool to get documentation.
+            Once you have made your changes, explain your solution.
+        - type: file_contents
+          scope_from_prompt: true
+          prefix: "\n**Project File Context:**\n"
+        - type: previous_output # This would be the current task description from the loop
+          block_id: "generate_tasks"
+          prefix: "\n**Current Task:**\n"
+    annotations:
+      history: full
+      tools: [ "file_system", "doc_retriever" ]
+    verification:
+      max_retries: 3
+      strategy:
+        type: command
+        command: "cargo check"
+        expected_exit_code: 0
+        on_failure_prompt:
+          composition:
+            - type: static_text
+              content: "The last attempt failed validation. Please analyze the error, fix the code, and explain the fix."
+            - type: previous_output # This would be the output of the failed `cargo check`
+              block_id: "implement_tasks" # Special reference to the verification output
+              prefix: "\n**Validation Error:**\n"

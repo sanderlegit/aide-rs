@@ -1,10 +1,4 @@
 use aide_rs::{
-    agents::{
-        impl_agent::ImplAgent,
-        plan_agent::PlanAgent,
-        state::{ImplementationPlan, PlanPrompt},
-        Agent,
-    },
     cli::{Cli, Commands},
     error::Result,
     logging::RunLogger,
@@ -30,76 +24,31 @@ fn setup_logging() {
 }
 
 async fn run() -> Result<()> {
-    let logger = RunLogger::new()?;
+    let _logger = RunLogger::new()?;
     let cli = Cli::parse();
 
     info!(command = ?cli.command, "Executing command");
 
     match cli.command {
-        Commands::Plan {
-            prompt,
-            output_plan,
-        } => {
-            let output_plan = output_plan.unwrap_or_else(|| {
-                let now_timestamp = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map(|d| d.as_secs())
-                    .unwrap_or(0);
-                let prompt_name = prompt
-                    .file_stem()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("prompt");
-                std::path::PathBuf::from(format!(
-                    ".ai/plan_{}_{}.toml",
-                    prompt_name, now_timestamp
-                ))
-            });
-
-            info!(?prompt, output_plan = ?output_plan, "Running Plan agent");
-
-            // 1. Load prompt
-            let prompt_content = std::fs::read_to_string(&prompt)?;
-            let plan_prompt: PlanPrompt = toml::from_str(&prompt_content)?;
-
-            // 2. Create and run agent
-            let plan_agent = PlanAgent::new(logger.clone())?;
-            let implementation_plan = plan_agent.run(plan_prompt).await?;
-
-            // 3. Save plan
-            let plan_toml = toml::to_string_pretty(&implementation_plan)?;
-            if let Some(parent) = output_plan.parent() {
-                std::fs::create_dir_all(parent)?;
-            }
-            std::fs::write(&output_plan, plan_toml)?;
-
-            info!("Implementation plan saved to {:?}", output_plan);
-        }
-        Commands::Impl {
-            plan,
-            max_retries,
-            auto_commit,
-            enrich_errors,
-        } => {
-            // Load plan to get settings
-            let plan_content = std::fs::read_to_string(&plan)?;
-            let implementation_plan: ImplementationPlan = toml::from_str(&plan_content)?;
-            let final_max_retries = implementation_plan
-                .original_prompt
-                .max_task_retries
-                .unwrap_or(max_retries);
-
-            info!(
-                ?plan,
-                max_retries = final_max_retries,
-                ?auto_commit,
-                ?enrich_errors,
-                "Running Impl agent"
+        Commands::Run { flow_name, prompt } => {
+            info!(%flow_name, ?prompt, "Running flow");
+            // TODO: Implement the FlowRunner logic
+            // 1. Find and parse `flows/{flow_name}.yml`
+            // 2. Parse the `--prompt` file
+            // 3. Create a FlowRunner instance
+            // 4. Execute the flow
+            println!(
+                "Executing flow '{}' with prompt '{}'",
+                flow_name,
+                prompt.display()
             );
-            let impl_agent =
-                ImplAgent::new(final_max_retries, auto_commit, enrich_errors, logger.clone())?;
-            impl_agent.run(plan).await?;
-
-            info!("Implementation agent finished successfully.");
+            println!("(Flow runner not yet implemented)");
+        }
+        Commands::List => {
+            info!("Listing available flows");
+            // TODO: Implement logic to find and list all `*.yml` files in `flows/`
+            println!("Available flows:");
+            println!("(Flow listing not yet implemented)");
         }
     }
 
