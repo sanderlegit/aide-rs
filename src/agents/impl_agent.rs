@@ -7,7 +7,8 @@ use crate::{
     files,
     gemini::GeminiClientWrapper,
     gemini_types::{
-        Content, ContentPart, FunctionCall, FunctionDeclaration, GenerateContentResponse, Role,
+        Content, ContentPart, FunctionCall, FunctionDeclaration, GenerateContentResponse,
+        PartResponse, Role,
     },
     vcs,
 };
