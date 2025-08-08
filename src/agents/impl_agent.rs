@@ -135,11 +135,11 @@ impl ImplAgent {
         "You are an expert pair programmer. Implement the user's request by calling the provided file manipulation functions. Adhere strictly to the coding conventions provided. After your final edit, run the formatter if one is specified. Finally, explain the problem and your solution.".to_string()
     }
 
-    fn create_user_prompt(
+    fn create_user_prompt_with_context(
         &self,
         current_task_index: usize,
         plan: &ImplementationPlan,
-        file_contents: &[(PathBuf, String)],
+        file_context: &str,
         error_context: &Option<String>,
     ) -> String {
         let task = &plan.tasks[current_task_index];
@@ -170,18 +170,6 @@ impl ImplAgent {
             })
             .collect::<Vec<_>>()
             .join("\n");
-
-        let file_context = file_contents
-            .iter()
-            .map(|(path, content)| {
-                format!(
-                    "--- FILE: {} ---\n```\n{}\n```",
-                    path.to_string_lossy(),
-                    content
-                )
-            })
-            .collect::<Vec<_>>()
-            .join("\n\n");
 
         let error_prompt = if let Some(error) = error_context {
             format!(
@@ -214,6 +202,33 @@ Implement the current task by calling the `edit_file` or `create_file` functions
             coding_conventions = original_prompt.coding_conventions,
             file_context = file_context,
             error_prompt = error_prompt,
+        )
+    }
+
+    fn create_user_prompt(
+        &self,
+        current_task_index: usize,
+        plan: &ImplementationPlan,
+        file_contents: &[(PathBuf, String)],
+        error_context: &Option<String>,
+    ) -> String {
+        let file_context = file_contents
+            .iter()
+            .map(|(path, content)| {
+                format!(
+                    "--- FILE: {} ---\n```\n{}\n```",
+                    path.to_string_lossy(),
+                    content
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n\n");
+
+        self.create_user_prompt_with_context(
+            current_task_index,
+            plan,
+            &file_context,
+            error_context,
         )
     }
 
@@ -387,8 +402,22 @@ impl Agent for ImplAgent {
 
                     let full_prompt = format!("{}\n\n{}", system_prompt, user_prompt);
 
+                    let file_names_for_log = file_contents
+                        .iter()
+                        .map(|(path, _)| path.to_string_lossy().to_string())
+                        .collect::<Vec<_>>()
+                        .join("\n");
+
+                    let log_user_prompt = self.create_user_prompt_with_context(
+                        i,
+                        &plan,
+                        &file_names_for_log,
+                        &last_error,
+                    );
+                    let log_full_prompt = format!("{}\n\n{}", system_prompt, log_user_prompt);
+
                     info!(
-                        prompt = %format!("\n---\n{}\n---", full_prompt),
+                        prompt = %format!("\n---\n{}\n---", log_full_prompt),
                         "Sending implementation prompt to Gemini"
                     );
 
