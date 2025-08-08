@@ -14,13 +14,7 @@ pub enum Role {
 pub struct GenerateContentRequest {
     pub contents: Vec<Content>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tools: Option<Vec<ToolConfig>>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum ToolConfig {
-    FunctionDeclaration(ToolConfigFunctionDeclaration),
+    pub tools: Option<Vec<Tool>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -52,7 +46,7 @@ impl ContentPart {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ToolConfigFunctionDeclaration {
+pub struct Tool {
     pub function_declarations: Vec<FunctionDeclaration>,
 }
 

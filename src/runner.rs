@@ -201,11 +201,9 @@ impl FlowRunner {
             let tools_config = if tool_schemas.is_empty() {
                 None
             } else {
-                Some(vec![crate::gemini_types::ToolConfig::FunctionDeclaration(
-                    crate::gemini_types::ToolConfigFunctionDeclaration {
-                        function_declarations: tool_schemas,
-                    },
-                )])
+                Some(vec![crate::gemini_types::Tool {
+                    function_declarations: tool_schemas,
+                }])
             };
 
             self.logger.log_prompt(PromptLog {

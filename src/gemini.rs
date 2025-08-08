@@ -1,5 +1,5 @@
 use crate::error::{Error, Result};
-use crate::gemini_types::{Content, GenerateContentRequest, GenerateContentResponse, ToolConfig};
+use crate::gemini_types::{Content, GenerateContentRequest, GenerateContentResponse, Tool};
 use crate::logging::{ResponseLog, RunLogger};
 use dotenvy::dotenv;
 use reqwest::Client;
@@ -42,7 +42,7 @@ impl GeminiClientWrapper {
     pub async fn generate_content(
         &self,
         contents: Vec<Content>,
-        tools: Option<Vec<ToolConfig>>,
+        tools: Option<Vec<Tool>>,
     ) -> Result<GenerateContentResponse> {
         let start_time = Instant::now();
         let request_body = GenerateContentRequest {
