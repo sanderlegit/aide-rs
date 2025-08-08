@@ -388,7 +388,7 @@ async fn test_plan_lancedb_prompt_sends_correct_schema() {
         .and(path_regex(r"/gemini-2.5-flash:generateContent.*"))
         // Key part of the test: assert that the "items" field for the array is present in the request body.
         // This is for the `validation_steps` parameter in the `create_task_details` tool.
-        .and(body_string_contains("\"items\":{\"type\":\"OBJECT\""))
+        .and(body_string_contains("\"items\":{\"properties\""))
         .respond_with(ResponseTemplate::new(200).set_body_json(details_response))
         .expect(1)
         .mount(&env.mock_server)
