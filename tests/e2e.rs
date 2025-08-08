@@ -71,7 +71,7 @@ async fn test_e2e_plan_flow() {
 
     Mock::given(method("POST"))
         .and(path_regex(
-            r"/v1beta/models/gemini-2.5-flash-latest:generateContent",
+            r"/v1beta/models/gemini-1.5-flash-latest:generateContent",
         ))
         .and(body_string_contains("Create a hello world app"))
         .and(body_string_contains("fn main() {}"))
@@ -148,7 +148,7 @@ edition = "2021"
     });
     Mock::given(method("POST"))
         .and(path_regex(
-            r"/v1beta/models/gemini-2.5-flash-latest:generateContent",
+            r"/v1beta/models/gemini-1.5-flash-latest:generateContent",
         ))
         .and(body_string_contains(
             "create a detailed, human-readable implementation plan",
@@ -179,7 +179,7 @@ edition = "2021"
     });
     Mock::given(method("POST"))
         .and(path_regex(
-            r"/v1beta/models/gemini-2.5-flash-latest:generateContent",
+            r"/v1beta/models/gemini-1.5-flash-latest:generateContent",
         ))
         .and(body_string_contains("convert the provided markdown plan"))
         .and(body_string_contains(
@@ -208,7 +208,7 @@ edition = "2021"
     });
     Mock::given(method("POST"))
         .and(path_regex(
-            r"/v1beta/models/gemini-2.5-flash-latest:generateContent",
+            r"/v1beta/models/gemini-1.5-flash-latest:generateContent",
         ))
         .and(body_string_contains("You are an expert pair programmer."))
         .and(body_string_contains("Current Task")) // From implement_tasks prompt
@@ -286,7 +286,7 @@ edition = "2021"
     });
     Mock::given(method("POST"))
         .and(path_regex(
-            r"/v1beta/models/gemini-2.5-flash-latest:generateContent",
+            r"/v1beta/models/gemini-1.5-flash-latest:generateContent",
         ))
         .and(body_string_contains(
             "create a detailed, human-readable implementation plan",
@@ -319,7 +319,7 @@ edition = "2021"
     });
     Mock::given(method("POST"))
         .and(path_regex(
-            r"/v1beta/models/gemini-2.5-flash-latest:generateContent",
+            r"/v1beta/models/gemini-1.5-flash-latest:generateContent",
         ))
         .and(body_string_contains("convert the provided markdown plan"))
         .respond_with(ResponseTemplate::new(200).set_body_json(structured_task_response))
@@ -345,7 +345,7 @@ edition = "2021"
     });
     Mock::given(method("POST"))
         .and(path_regex(
-            r"/v1beta/models/gemini-2.5-flash-latest:generateContent",
+            r"/v1beta/models/gemini-1.5-flash-latest:generateContent",
         ))
         .and(body_string_contains("You are an expert pair programmer."))
         .and(body_string_contains("Current Task"))
@@ -375,7 +375,7 @@ edition = "2021"
     });
     Mock::given(method("POST"))
         .and(path_regex(
-            r"/v1beta/models/gemini-2.5-flash-latest:generateContent",
+            r"/v1beta/models/gemini-1.5-flash-latest:generateContent",
         ))
         .and(body_string_contains("The last attempt failed validation.")) // From on_failure_prompt
         .and(body_string_contains("expected `;`")) // From cargo check stderr

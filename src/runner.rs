@@ -30,7 +30,7 @@ impl FlowRunner {
     pub fn new(logger: RunLogger) -> Result<Self> {
         // TODO: The model should probably be configurable per-flow or per-block
         let gemini_client =
-            GeminiClientWrapper::new("gemini-2.5-flash-latest".to_string(), logger.clone())?;
+            GeminiClientWrapper::new("gemini-1.5-flash-latest".to_string(), logger.clone())?;
         Ok(Self {
             logger,
             prompt_builder: PromptBuilder::new(),
