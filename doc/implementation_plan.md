@@ -74,7 +74,7 @@ This phase ensures the new system is working correctly end-to-end.
         -   Run `aide-rs run code --prompt ...`.
         -   Mock the sequence of API calls (plan, implement, verify).
         -   Assert that the target file is modified correctly.
-    -   **[ ] Test Case: `code` flow with verification failure and retry**:
+    -   **[X] Test Case: `code` flow with verification failure and retry**:
         -   Mock an initial implementation that fails `cargo check`.
         -   Mock the follow-up API call that includes the error message.
         -   Mock the final, correct implementation.
