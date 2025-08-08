@@ -417,3 +417,119 @@ async fn test_impl_workflow_with_error_summarization() {
     let new_content = fs::read_to_string(env.full_path("src/main.rs")).unwrap();
     assert!(new_content.contains("Fixed!"));
 }
+
+#[tokio::test]
+async fn test_impl_multi_task_workflow() {
+    let env = TestEnv::new().await;
+    env.create_file(
+        "Cargo.toml",
+        "[package]\nname = \"test-proj\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+    );
+
+    // 1. Create a multi-task plan
+    let plan_content = json!({
+        "original_prompt": {
+            "objective": "Create a hello world app using anyhow",
+            "file_scoping": { "include": ["src/**/*.rs", "Cargo.toml"] },
+            "coding_conventions": "",
+            "validation_commands": [{ "command": "cargo check", "expected_exit_code": 0 }]
+        },
+        "tasks": [
+            {
+                "description": "Add anyhow dependency to Cargo.toml",
+                "file_scoping": { "include": ["Cargo.toml"] },
+                "validation_steps": [], // No validation for this step, just apply
+                "status": "Pending",
+                "attempts": 0,
+                "result": null
+            },
+            {
+                "description": "Create main.rs to print hello world",
+                "file_scoping": { "include": ["src/main.rs", "Cargo.toml"] },
+                "validation_steps": [{ "command": "cargo check", "expected_exit_code": 0 }],
+                "status": "Pending",
+                "attempts": 0,
+                "result": null
+            }
+        ]
+    });
+    env.create_file(
+        ".ai/implementation_plan.json",
+        &plan_content.to_string(),
+    );
+
+    // 2. Mock API response for Task 1 (edit Cargo.toml)
+    let mock_response_task1 = json!({
+        "candidates": [{
+            "content": {
+                "role": "model",
+                "parts": [{
+                    "functionCall": {
+                        "name": "edit_file",
+                        "args": {
+                            "path": "Cargo.toml",
+                            "new_content": "[package]\nname = \"test-proj\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n[dependencies]\nanyhow = \"1.0\""
+                        }
+                    }
+                }]
+            }
+        }]
+    });
+
+    Mock::given(method("POST"))
+        .and(path_regex(r"/gemini-2.5-pro:generateContent.*"))
+        .and(body_string_contains("Add anyhow dependency"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(mock_response_task1))
+        .expect(1)
+        .mount(&env.mock_server)
+        .await;
+
+    // 3. Mock API response for Task 2 (create main.rs)
+    let mock_response_task2 = json!({
+        "candidates": [{
+            "content": {
+                "role": "model",
+                "parts": [{
+                    "functionCall": {
+                        "name": "create_file",
+                        "args": {
+                            "path": "src/main.rs",
+                            "new_content": "fn main() -> anyhow::Result<()> {\n    println!(\"Hello, world!\");\n    Ok(())\n}\n"
+                        }
+                    }
+                }]
+            }
+        }]
+    });
+
+    Mock::given(method("POST"))
+        .and(path_regex(r"/gemini-2.5-pro:generateContent.*"))
+        .and(body_string_contains("Create main.rs to print hello world"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(mock_response_task2))
+        .expect(1)
+        .mount(&env.mock_server)
+        .await;
+
+    // 4. Run `aide impl`
+    get_aide_cmd()
+        .current_dir(env.path())
+        .arg("impl")
+        .arg("--plan")
+        .arg(".ai/implementation_plan.json")
+        .assert()
+        .success();
+
+    // 5. Assert file changes
+    let cargo_toml_content = fs::read_to_string(env.full_path("Cargo.toml")).unwrap();
+    assert!(cargo_toml_content.contains("anyhow = \"1.0\""));
+
+    let main_rs_content = fs::read_to_string(env.full_path("src/main.rs")).unwrap();
+    assert!(main_rs_content.contains("anyhow::Result<()>"));
+
+    // 6. Assert plan status
+    let plan_content: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(env.full_path(".ai/implementation_plan.json")).unwrap())
+            .unwrap();
+    assert_eq!(plan_content["tasks"][0]["status"], "Success");
+    assert_eq!(plan_content["tasks"][1]["status"], "Success");
+}
