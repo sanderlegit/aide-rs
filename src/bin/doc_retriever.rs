@@ -290,8 +290,6 @@ mod tests {
 name = "test_crate"
 version = "0.1.0"
 edition = "2021"
-
-[workspace]
 "#;
         fs::write(crate_root.join("Cargo.toml"), cargo_toml).unwrap();
 
