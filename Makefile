@@ -47,6 +47,6 @@ run:
 clean:
 	$(CARGO) clean
 
-# `make isntall`: Installs the program
+# `make install`: Installs the program and its tools
 install:
-	$(CARGO) build --release && cp ./target/release/aide-rs ~/.local/bin/
+	$(CARGO) build --release && cp ./target/release/aide-rs ~/.local/bin/ && cp ./target/release/doc-retriever ~/.local/bin/

@@ -40,11 +40,17 @@ The agent relies heavily on Gemini's **Function Calling** capabilities to ensure
     ```
     The application will load this variable automatically.
 
-3.  **Build the project:**
+3.  **Build and install the project:**
+    ```bash
+    make install
+    ```
+    This will build the project in release mode and copy the `aide-rs` and `doc-retriever` binaries to `~/.local/bin/`. Make sure this directory is in your `PATH`.
+
+    Alternatively, you can build manually:
     ```bash
     cargo build --release
     ```
-    The compiled binary will be available at `target/release/aide-rs`. You can copy this to a location in your `PATH` for easier access.
+    The compiled binaries will be available at `target/release/aide-rs` and `target/release/doc-retriever`. You should copy both to a location in your `PATH`.
 
 ## Usage
 

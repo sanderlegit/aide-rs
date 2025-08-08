@@ -384,7 +384,7 @@ Implement the current task by calling the `edit_file` or `create_file` functions
                     cmd_args.push("--path".to_string());
                     cmd_args.push(p);
                 }
-                let cmd = format!("cargo run --bin doc-retriever -- {}", cmd_args.join(" "));
+                let cmd = format!("doc-retriever {}", cmd_args.join(" "));
 
                 let (exit_code, stdout, stderr) = run_command(&cmd)?;
                 let success = exit_code == 0;

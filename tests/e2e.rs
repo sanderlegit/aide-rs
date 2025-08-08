@@ -3,6 +3,7 @@ use assert_cmd::Command;
 use git2::Repository;
 use serde_json::json;
 use std::fs;
+use std::path::PathBuf;
 use wiremock::matchers::{body_string_contains, method, path_regex};
 use wiremock_logical_matchers::not;
 use wiremock::{Mock, ResponseTemplate};
@@ -11,7 +12,16 @@ mod common;
 use common::TestEnv;
 
 fn get_aide_cmd() -> Command {
-    Command::cargo_bin("aide-rs").unwrap()
+    let mut cmd = Command::cargo_bin("aide-rs").unwrap();
+    let program_path = PathBuf::from(cmd.get_program());
+    if let Some(bin_dir) = program_path.parent() {
+        let path_var = std::env::var_os("PATH").unwrap_or_default();
+        let mut paths = std::env::split_paths(&path_var).collect::<Vec<_>>();
+        paths.insert(0, bin_dir.to_path_buf());
+        let new_path = std::env::join_paths(paths).unwrap();
+        cmd.env("PATH", new_path);
+    }
+    cmd
 }
 
 #[tokio::test]
