@@ -125,6 +125,14 @@ The verification step runs after a block completes, enabling loops and self-corr
         -   `prompt`: A `prompt` object to construct the verification prompt.
         -   `success_condition`: A condition for breaking the loop, e.g., a specific function call like `verification_passed()`.
 
+### 3.5. Looping Strategy (`looping` object)
+
+For blocks that need to iterate over a list of items (e.g., implementing a list of tasks), you can define a `looping` strategy. This is handled by special logic in the `FlowRunner`.
+
+-   `over` (string, required): The `id` of a previous block whose output is a list (e.g., a `TaskList`).
+-   `as` (string, required): The key to use when making the current item from the list available to the prompt composition system. For example, if `as: "current_task"`, you could use a `previous_output` part with `block_id: "current_task"`.
+-   `clear_history_on_iteration` (boolean, default: false): If `true`, the conversation history is cleared at the beginning of each loop iteration. This is useful for long-running tasks to prevent the context from growing too large and to keep the agent focused on the current item.
+
 ## 4. Core Component Refactoring
 
 This new architecture requires significant changes to the codebase.

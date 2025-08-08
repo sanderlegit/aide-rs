@@ -6,7 +6,7 @@ This document outlines the remaining tasks to complete the transition to the dec
 
 This phase focuses on building out the core components of the `FlowRunner` so that it can execute a simple, single-block flow from start to finish.
 
--   **[ ] Task 1.1: Implement Prompt Construction (`src/prompt.rs`)**
+-   **[X] Task 1.1: Implement Prompt Construction (`src/prompt.rs`)**
     -   Create a `PromptBuilder` struct.
     -   Implement logic to process a `Prompt` definition from `types.rs`.
     -   Handle `static_text`, `prompt_file_field`, and `previous_output` composition types.
@@ -17,14 +17,14 @@ This phase focuses on building out the core components of the `FlowRunner` so th
         -   Read file contents and format them into a single string.
     -   **Unit Tests**: Add tests for each composition type and for scope merging.
 
--   **[ ] Task 1.2: Implement Tool Handling (`src/tools.rs`)**
+-   **[X] Task 1.2: Implement Tool Handling (`src/tools.rs`)**
     -   Define a `Tool` trait and a `ToolExecutor` struct.
     -   Create concrete tool structs (e.g., `FileSystemTool`, `DocRetrieverTool`, `TaskCreatorTool`).
     -   Implement logic to generate `FunctionDeclaration` schemas for enabled tools.
     -   Implement logic to parse a `FunctionCall` from the Gemini API and dispatch it to the correct tool.
     -   **Unit Tests**: Test schema generation and tool dispatch.
 
--   **[ ] Task 1.3: Flesh out the `FlowRunner` (`src/runner.rs`)**
+-   **[X] Task 1.3: Flesh out the `FlowRunner` (`src/runner.rs`)**
     -   Integrate `PromptBuilder` and `ToolExecutor`.
     -   Implement the main loop to iterate through `blocks` in a `Flow`.
     -   For each block:

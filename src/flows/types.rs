@@ -22,6 +22,8 @@ pub struct Block {
     pub annotations: Annotations,
     #[serde(default)]
     pub verification: Option<Verification>,
+    #[serde(default)]
+    pub looping: Option<LoopingStrategy>,
 }
 
 /// Defines how to construct a prompt for the LLM.
@@ -169,4 +171,17 @@ pub struct DetailedTaskPlan {
 pub struct ValidationStep {
     pub command: String,
     pub expected_exit_code: i32,
+}
+
+/// Defines looping behavior for a block.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LoopingStrategy {
+    /// The ID of the block whose output (which should be a list, e.g., TaskList) to iterate over.
+    pub over: String,
+    /// The name to expose each item of the list as in the `block_outputs` for this block's prompt composition.
+    #[serde(rename = "as")]
+    pub as_key: String,
+    /// If true, clears the conversation history at the start of each iteration to keep context focused.
+    #[serde(default)]
+    pub clear_history_on_iteration: bool,
 }
