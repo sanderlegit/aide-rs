@@ -91,7 +91,7 @@ impl FlowRunner {
             };
 
             self.logger.log_prompt(PromptLog {
-                model_name: self.gemini_client.model_name.clone(),
+                model_name: self.gemini_client.model_name().to_string(),
                 system_prompt: "".to_string(), // We are using a user-style prompt for now
                 user_prompt: prompt_string,
                 tools: json!(tools_config),

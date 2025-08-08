@@ -35,6 +35,10 @@ impl GeminiClientWrapper {
         })
     }
 
+    pub fn model_name(&self) -> &str {
+        &self.model_name
+    }
+
     pub async fn generate_content<T: serde::Serialize>(
         &self,
         contents: Vec<Content>,
