@@ -327,6 +327,8 @@ pub mod my_module {
         let (_dir, crate_root) = setup_test_crate();
         let original_dir = std::env::current_dir().unwrap();
         std::env::set_current_dir(&crate_root).unwrap();
+        // Unset CARGO_TARGET_DIR to prevent cargo from using the parent project's target dir
+        std::env::remove_var("CARGO_TARGET_DIR");
 
         let result = get_crate_docs("test_crate").unwrap();
         std::env::set_current_dir(original_dir).unwrap();
@@ -343,6 +345,8 @@ pub mod my_module {
         let (_dir, crate_root) = setup_test_crate();
         let original_dir = std::env::current_dir().unwrap();
         std::env::set_current_dir(&crate_root).unwrap();
+        // Unset CARGO_TARGET_DIR to prevent cargo from using the parent project's target dir
+        std::env::remove_var("CARGO_TARGET_DIR");
 
         let result = get_module_docs("test_crate", "test_crate::my_module").unwrap();
         std::env::set_current_dir(original_dir).unwrap();
@@ -361,6 +365,8 @@ pub mod my_module {
         let (_dir, crate_root) = setup_test_crate();
         let original_dir = std::env::current_dir().unwrap();
         std::env::set_current_dir(&crate_root).unwrap();
+        // Unset CARGO_TARGET_DIR to prevent cargo from using the parent project's target dir
+        std::env::remove_var("CARGO_TARGET_DIR");
 
         let result = get_type_docs("test_crate", "test_crate::my_module::MyStruct").unwrap();
         std::env::set_current_dir(original_dir).unwrap();
