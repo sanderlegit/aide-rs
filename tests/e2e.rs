@@ -72,29 +72,41 @@ validation_commands = [{ command = "cargo check", expected_exit_code = 0 }]
         .await;
 
     // 3. Run the `aide plan` command
-    get_aide_cmd()
+    let output = get_aide_cmd()
         .current_dir(env.path())
         .arg("plan")
         .arg("--prompt")
         .arg("my_feature.toml")
         .assert()
-        .success();
+        .success()
+        .get_output()
+        .clone();
 
     // 4. Assert that the plan file was created correctly
-    let plan_path = env.full_path(".ai/implementation_plan.json");
-    assert!(plan_path.exists());
-    let plan_content: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(plan_path).unwrap()).unwrap();
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let plan_path_str = stderr
+        .lines()
+        .find(|line| line.contains("Implementation plan saved to"))
+        .and_then(|line| line.split('"').nth(1).map(|s| s.to_string()))
+        .expect("Could not find plan path in command output");
+
+    let plan_path = env.full_path(&plan_path_str);
+    assert!(plan_path.exists(), "Plan file should exist");
+
+    let plan_content: toml::Value =
+        toml::from_str(&fs::read_to_string(plan_path).unwrap()).unwrap();
 
     assert_eq!(
-        plan_content["tasks"][0]["description"],
-        "First task: Refactor the main function."
+        plan_content["tasks"][0]["description"].as_str(),
+        Some("First task: Refactor the main function.")
     );
-    assert_eq!(plan_content["tasks"][0]["status"], "Pending");
-    assert!(plan_content["tasks"][0].get("file_scoping").is_none());
     assert_eq!(
-        plan_content["tasks"][0]["validation_steps"][0]["command"],
-        "cargo check"
+        plan_content["tasks"][0]["status"].as_str(),
+        Some("Pending")
+    );
+    assert_eq!(
+        plan_content["tasks"][0]["validation_steps"][0]["command"].as_str(),
+        Some("cargo check")
     );
 }
 
@@ -104,44 +116,30 @@ async fn test_impl_workflow() {
 
     // 1. Create a sample project and plan file
     env.create_file("src/main.rs", "fn main() {\n    println!(\"Hello, old world!\");\n}\n");
-    let plan_content = json!({
-        "original_prompt": {
-            "objective": "Update greeting",
-            "file_scoping": { "include": ["src/main.rs"] },
-            "coding_conventions": "",
-            "validation_commands": [{ "command": "cargo check", "expected_exit_code": 0 }]
-        },
-        "tasks": [{
-            "description": "Update the greeting message in main.rs",
-            "validation_steps": [], // No validation for simplicity
-            "status": "Pending",
-            "attempts": 0,
-            "result": null
-        }]
-    });
-    env.create_file(".ai/implementation_plan.json", &plan_content.to_string());
+    let plan_content = r#"
+[original_prompt]
+objective = "Update greeting"
+coding_conventions = ""
+use_google_search_for_deps = false
 
-    // 2. Mock the file selection and implementation API responses
-    let selection_response = json!({
-        "candidates": [{
-            "content": {
-                "role": "model",
-                "parts": [{
-                    "functionCall": {
-                        "name": "select_context_files",
-                        "args": { "files": ["src/main.rs"] }
-                    }
-                }]
-            }
-        }]
-    });
-    Mock::given(method("POST"))
-        .and(path_regex(r"/models/gemini-2.5-flash:generateContent.*"))
-        .and(body_string_contains("select_context_files"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(selection_response))
-        .expect(1)
-        .mount(&env.mock_server)
-        .await;
+[original_prompt.file_scoping]
+include = ["src/main.rs"]
+exclude = []
+
+[[original_prompt.validation_commands]]
+command = "cargo check"
+expected_exit_code = 0
+
+[[tasks]]
+description = "Update the greeting message in main.rs"
+status = "Pending"
+attempts = 0
+validation_steps = []
+    "#;
+    let plan_path = ".ai/test_plan.toml";
+    env.create_file(plan_path, plan_content);
+
+    // 2. Mock the implementation API response
 
     let mock_response = json!({
         "candidates": [{
@@ -172,11 +170,12 @@ async fn test_impl_workflow() {
         .await;
 
     // 3. Run the `aide impl` command
+    let plan_path = ".ai/test_plan.toml";
     get_aide_cmd()
         .current_dir(env.path())
         .arg("impl")
         .arg("--plan")
-        .arg(".ai/implementation_plan.json")
+        .arg(plan_path)
         .assert()
         .success();
 
@@ -185,11 +184,20 @@ async fn test_impl_workflow() {
     assert!(new_content.contains("Hello, new world!"));
 
     // 5. Assert that the plan was updated
-    let plan_content: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(env.full_path(".ai/implementation_plan.json")).unwrap()).unwrap();
-    assert_eq!(plan_content["tasks"][0]["status"], "Success");
-    assert_eq!(plan_content["tasks"][0]["result"]["agent_tips"], "Updated the greeting.");
-    assert_eq!(plan_content["tasks"][0]["result"]["modified_files"][0], "src/main.rs");
+    let plan_content: toml::Value =
+        toml::from_str(&fs::read_to_string(env.full_path(plan_path)).unwrap()).unwrap();
+    assert_eq!(
+        plan_content["tasks"][0]["status"].as_str(),
+        Some("Success")
+    );
+    assert_eq!(
+        plan_content["tasks"][0]["result"]["agent_tips"].as_str(),
+        Some("Updated the greeting.")
+    );
+    assert_eq!(
+        plan_content["tasks"][0]["result"]["modified_files"][0].as_str(),
+        Some("src/main.rs")
+    );
 }
 
 #[tokio::test]
@@ -206,44 +214,27 @@ async fn test_impl_workflow_with_auto_commit() {
     )
     .unwrap();
 
-    let plan_content = json!({
-        "original_prompt": {
-            "objective": "Update greeting",
-            "file_scoping": { "include": ["src/main.rs"] },
-            "coding_conventions": "",
-            "validation_commands": []
-        },
-        "tasks": [{
-            "description": "Add a print statement",
-            "validation_steps": [],
-            "status": "Pending",
-            "attempts": 0,
-            "result": null
-        }]
-    });
-    env.create_file(".ai/implementation_plan.json", &plan_content.to_string());
+    let plan_content = r#"
+[original_prompt]
+objective = "Update greeting"
+coding_conventions = ""
+use_google_search_for_deps = false
+validation_commands = []
 
-    // 2. Mock the file selection and implementation API responses
-    let selection_response = json!({
-        "candidates": [{
-            "content": {
-                "role": "model",
-                "parts": [{
-                    "functionCall": {
-                        "name": "select_context_files",
-                        "args": { "files": ["src/main.rs"] }
-                    }
-                }]
-            }
-        }]
-    });
-    Mock::given(method("POST"))
-        .and(path_regex(r"/models/gemini-2.5-flash:generateContent.*"))
-        .and(body_string_contains("select_context_files"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(selection_response))
-        .expect(1)
-        .mount(&env.mock_server)
-        .await;
+[original_prompt.file_scoping]
+include = ["src/main.rs"]
+exclude = []
+
+[[tasks]]
+description = "Add a print statement"
+status = "Pending"
+attempts = 0
+validation_steps = []
+    "#;
+    let plan_path = ".ai/test_plan.toml";
+    env.create_file(plan_path, plan_content);
+
+    // 2. Mock the implementation API response
 
     let mock_response = json!({
         "candidates": [{
@@ -268,11 +259,12 @@ async fn test_impl_workflow_with_auto_commit() {
         .await;
 
     // 3. Run the `aide impl` command with --auto-commit
+    let plan_path = ".ai/test_plan.toml";
     get_aide_cmd()
         .current_dir(env.path())
         .arg("impl")
         .arg("--plan")
-        .arg(".ai/implementation_plan.json")
+        .arg(plan_path)
         .arg("--auto-commit")
         .assert()
         .success();
@@ -363,23 +355,32 @@ validation_commands = []
         .await;
 
     // 5. Run the `aide plan` command
-    get_aide_cmd()
+    let output = get_aide_cmd()
         .current_dir(env.path())
         .arg("plan")
         .arg("--prompt")
         .arg("search_prompt.toml")
         .assert()
-        .success();
+        .success()
+        .get_output()
+        .clone();
 
     // 6. Assert that the plan file was created correctly
-    let plan_path = env.full_path(".ai/implementation_plan.json");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let plan_path_str = stderr
+        .lines()
+        .find(|line| line.contains("Implementation plan saved to"))
+        .and_then(|line| line.split('"').nth(1).map(|s| s.to_string()))
+        .expect("Could not find plan path in command output");
+
+    let plan_path = env.full_path(&plan_path_str);
     assert!(plan_path.exists());
-    let plan_content: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(plan_path).unwrap()).unwrap();
+    let plan_content: toml::Value =
+        toml::from_str(&fs::read_to_string(plan_path).unwrap()).unwrap();
 
     assert_eq!(
-        plan_content["tasks"][0]["description"],
-        "Add axum to Cargo.toml"
+        plan_content["tasks"][0]["description"].as_str(),
+        Some("Add axum to Cargo.toml")
     );
 }
 
@@ -453,25 +454,30 @@ async fn test_impl_workflow_with_error_summarization() {
         "[package]\nname = \"test-proj\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
     );
 
-    let plan_content = json!({
-        "original_prompt": {
-            "objective": "Fix compile error",
-            "file_scoping": { "include": ["src/main.rs"] },
-            "coding_conventions": "",
-            "validation_commands": [{ "command": "cargo check", "expected_exit_code": 0 }]
-        },
-        "tasks": [{
-            "description": "Fix the compile error in main.rs",
-            "validation_steps": [{ "command": "cargo check", "expected_exit_code": 0 }],
-            "status": "Pending",
-            "attempts": 0,
-            "result": null
-        }]
-    });
-    env.create_file(
-        ".ai/implementation_plan.json",
-        &plan_content.to_string(),
-    );
+    let plan_content = r#"
+[original_prompt]
+objective = "Fix compile error"
+coding_conventions = ""
+use_google_search_for_deps = false
+
+[original_prompt.file_scoping]
+include = ["src/main.rs"]
+exclude = []
+
+[[original_prompt.validation_commands]]
+command = "cargo check"
+expected_exit_code = 0
+
+[[tasks]]
+description = "Fix the compile error in main.rs"
+status = "Pending"
+attempts = 0
+[[tasks.validation_steps]]
+command = "cargo check"
+expected_exit_code = 0
+    "#;
+    let plan_path = ".ai/test_plan.toml";
+    env.create_file(plan_path, plan_content);
 
     // 2. Mock the summarization API response
     let summary_response = json!({
@@ -489,26 +495,6 @@ async fn test_impl_workflow_with_error_summarization() {
         .mount(&env.mock_server)
         .await;
 
-    // Add a mock for file selection. The first attempt will fail, so it will be called again.
-    let selection_response = json!({
-        "candidates": [{
-            "content": {
-                "role": "model",
-                "parts": [{
-                    "functionCall": {
-                        "name": "select_context_files",
-                        "args": { "files": ["src/main.rs", "Cargo.toml"] }
-                    }
-                }]
-            }
-        }]
-    });
-    Mock::given(method("POST"))
-        .and(path_regex(r"/models/gemini-2.5-flash:generateContent.*"))
-        .and(body_string_contains("select_context_files"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(selection_response))
-        .mount(&env.mock_server)
-        .await;
 
     // 3. Mock the implementation API response (with the fix)
     let impl_response = json!({
@@ -534,11 +520,12 @@ async fn test_impl_workflow_with_error_summarization() {
         .await;
 
     // 4. Run `aide impl`
+    let plan_path = ".ai/test_plan.toml";
     get_aide_cmd()
         .current_dir(env.path())
         .arg("impl")
         .arg("--plan")
-        .arg(".ai/implementation_plan.json")
+        .arg(plan_path)
         .assert()
         .success();
 
@@ -556,46 +543,38 @@ async fn test_impl_multi_task_workflow() {
     );
 
     // 1. Create a multi-task plan
-    let plan_content = json!({
-        "original_prompt": {
-            "objective": "Create a hello world app using anyhow",
-            "file_scoping": { "include": ["src/**/*.rs", "Cargo.toml"] },
-            "coding_conventions": "",
-            "validation_commands": [{ "command": "cargo check", "expected_exit_code": 0 }]
-        },
-        "tasks": [
-            {
-                "description": "Add anyhow dependency to Cargo.toml",
-                "validation_steps": [], // No validation for this step, just apply
-                "status": "Pending",
-                "attempts": 0,
-                "result": null
-            },
-            {
-                "description": "Create main.rs to print hello world",
-                "validation_steps": [{ "command": "cargo check", "expected_exit_code": 0 }],
-                "status": "Pending",
-                "attempts": 0,
-                "result": null
-            }
-        ]
-    });
-    env.create_file(
-        ".ai/implementation_plan.json",
-        &plan_content.to_string(),
-    );
+    let plan_content = r#"
+[original_prompt]
+objective = "Create a hello world app using anyhow"
+coding_conventions = ""
+use_google_search_for_deps = false
 
-    // 2. Mock file selection and API responses
-    let selection_response_task1 = json!({
-        "candidates": [{"content": {"role": "model", "parts": [{"functionCall": {"name": "select_context_files", "args": {"files": ["Cargo.toml"]}}}]}}]
-    });
-    Mock::given(method("POST"))
-        .and(path_regex(r"/models/gemini-2.5-flash:generateContent.*"))
-        .and(body_string_contains("Add anyhow dependency"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(selection_response_task1))
-        .expect(1)
-        .mount(&env.mock_server)
-        .await;
+[original_prompt.file_scoping]
+include = ["src/**/*.rs", "Cargo.toml"]
+exclude = []
+
+[[original_prompt.validation_commands]]
+command = "cargo check"
+expected_exit_code = 0
+
+[[tasks]]
+description = "Add anyhow dependency to Cargo.toml"
+status = "Pending"
+attempts = 0
+validation_steps = []
+
+[[tasks]]
+description = "Create main.rs to print hello world"
+status = "Pending"
+attempts = 0
+[[tasks.validation_steps]]
+command = "cargo check"
+expected_exit_code = 0
+    "#;
+    let plan_path = ".ai/test_plan.toml";
+    env.create_file(plan_path, plan_content);
+
+    // 2. Mock API responses
 
     let mock_response_task1 = json!({
         "candidates": [{
@@ -620,17 +599,6 @@ async fn test_impl_multi_task_workflow() {
             "**Current Task:**\\nAdd anyhow dependency to Cargo.toml",
         ))
         .respond_with(ResponseTemplate::new(200).set_body_json(mock_response_task1))
-        .expect(1)
-        .mount(&env.mock_server)
-        .await;
-
-    let selection_response_task2 = json!({
-        "candidates": [{"content": {"role": "model", "parts": [{"functionCall": {"name": "select_context_files", "args": {"files": ["src/main.rs", "Cargo.toml"]}}}]}}]
-    });
-    Mock::given(method("POST"))
-        .and(path_regex(r"/models/gemini-2.5-flash:generateContent.*"))
-        .and(body_string_contains("Create main.rs"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(selection_response_task2))
         .expect(1)
         .mount(&env.mock_server)
         .await;
@@ -664,11 +632,12 @@ async fn test_impl_multi_task_workflow() {
         .await;
 
     // 4. Run `aide impl`
+    let plan_path = ".ai/test_plan.toml";
     get_aide_cmd()
         .current_dir(env.path())
         .arg("impl")
         .arg("--plan")
-        .arg(".ai/implementation_plan.json")
+        .arg(plan_path)
         .assert()
         .success();
 
@@ -680,9 +649,15 @@ async fn test_impl_multi_task_workflow() {
     assert!(main_rs_content.contains("anyhow::Result<()>"));
 
     // 6. Assert plan status
-    let plan_content: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(env.full_path(".ai/implementation_plan.json")).unwrap())
-            .unwrap();
-    assert_eq!(plan_content["tasks"][0]["status"], "Success");
-    assert_eq!(plan_content["tasks"][1]["status"], "Success");
+    let plan_path = ".ai/test_plan.toml";
+    let plan_content: toml::Value =
+        toml::from_str(&fs::read_to_string(env.full_path(plan_path)).unwrap()).unwrap();
+    assert_eq!(
+        plan_content["tasks"][0]["status"].as_str(),
+        Some("Success")
+    );
+    assert_eq!(
+        plan_content["tasks"][1]["status"].as_str(),
+        Some("Success")
+    );
 }
