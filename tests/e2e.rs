@@ -122,7 +122,6 @@ async fn test_impl_workflow() {
 [original_prompt]
 objective = "Update greeting"
 coding_conventions = ""
-use_google_search_for_deps = false
 
 [original_prompt.file_scoping]
 include = ["src/main.rs"]
@@ -220,7 +219,6 @@ async fn test_impl_workflow_with_auto_commit() {
 [original_prompt]
 objective = "Update greeting"
 coding_conventions = ""
-use_google_search_for_deps = false
 validation_commands = []
 
 [original_prompt.file_scoping]
@@ -278,114 +276,6 @@ validation_steps = []
     assert_eq!(commit_message, "AI: Add a print statement");
 }
 
-#[tokio::test]
-async fn test_plan_workflow_with_google_search() {
-    let env = TestEnv::new().await;
-
-    // 1. Create a sample prompt file with the search flag enabled
-    let prompt_content = r#"
-objective = "Create a web server"
-use_google_search_for_deps = true
-file_scoping.include = ["src/**/*.rs"]
-coding_conventions = "Use snake_case"
-validation_commands = []
-"#;
-    env.create_file("search_prompt.toml", prompt_content);
-
-    // 2. Mock the Gemini API response for the dependency search
-    let search_response = json!({
-        "candidates": [{
-            "content": {
-                "role": "model",
-                "parts": [{ "text": "Use `axum` and `tokio`." }]
-            }
-        }]
-    });
-    Mock::given(method("POST"))
-        .and(path_regex(r"/models/gemini-2.5-flash:generateContent.*"))
-        .and(body_string_contains("please use Google Search"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(search_response))
-        .expect(1)
-        .mount(&env.mock_server)
-        .await;
-
-    // 3. Mock the Gemini API response for the planning step (descriptions)
-    let descriptions_response = json!({
-        "candidates": [{
-            "content": {
-                "role": "model",
-                "parts": [{
-                    "functionCall": {
-                        "name": "create_task_descriptions",
-                        "args": { "tasks": ["Add axum to Cargo.toml"] }
-                    }
-                }]
-            }
-        }]
-    });
-    Mock::given(method("POST"))
-        .and(path_regex(r"/models/gemini-2.5-flash:generateContent.*"))
-        .and(body_string_contains("Suggested Libraries (from Google Search)"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(descriptions_response))
-        .expect(1)
-        .mount(&env.mock_server)
-        .await;
-
-    // 4. Mock the Gemini API response for the planning step (details)
-    let details_response = json!({
-        "candidates": [{
-            "content": {
-                "role": "model",
-                "parts": [{
-                    "functionCall": {
-                        "name": "create_task_details",
-                        "args": {
-                            "validation_steps": []
-                        }
-                    }
-                }]
-            }
-        }]
-    });
-    Mock::given(method("POST"))
-        .and(path_regex(r"/models/gemini-2.5-flash:generateContent.*"))
-        .and(body_string_contains("create_task_details"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(details_response))
-        .expect(1)
-        .mount(&env.mock_server)
-        .await;
-
-    // 5. Run the `aide plan` command
-    let output = get_aide_cmd()
-        .current_dir(env.path())
-        .arg("plan")
-        .arg("--prompt")
-        .arg("search_prompt.toml")
-        .assert()
-        .success()
-        .get_output()
-        .clone();
-
-    // 6. Assert that the plan file was created correctly
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    println!("\n--- E2E TEST: test_plan_workflow_with_google_search ---\n--- STDOUT ---\n{}\n--- STDERR ---\n{}\n---\n", stdout, stderr);
-    let plan_path_str = stderr
-        .lines()
-        .find(|line| line.contains("Implementation plan saved to"))
-        .and_then(|line| line.split('"').nth(1).map(|s| s.to_string()))
-        .expect("Could not find plan path in command output");
-
-    let plan_path = env.full_path(&plan_path_str);
-    assert!(plan_path.exists());
-    let plan_content: toml::Value =
-        toml::from_str(&fs::read_to_string(plan_path).unwrap()).unwrap();
-
-    assert_eq!(
-        plan_content["tasks"][0]["description"].as_str(),
-        Some("Add axum to Cargo.toml")
-    );
-}
 
 #[tokio::test]
 async fn test_plan_lancedb_prompt_sends_correct_schema() {
@@ -480,7 +370,6 @@ futures = "0.3"
 [original_prompt]
 objective = "Fix compile error"
 coding_conventions = ""
-use_google_search_for_deps = false
 
 [original_prompt.file_scoping]
 include = ["src/main.rs", "Cargo.toml"]
@@ -588,7 +477,6 @@ async fn test_impl_multi_task_workflow() {
 [original_prompt]
 objective = "Create a hello world app using anyhow"
 coding_conventions = ""
-use_google_search_for_deps = false
 
 [original_prompt.file_scoping]
 include = ["src/**/*.rs", "Cargo.toml"]

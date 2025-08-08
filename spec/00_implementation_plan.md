@@ -81,7 +81,6 @@ pub struct PlanPrompt {
     pub coding_conventions: String, // A detailed description of coding standards. Can be a multiline string in TOML.
     pub formatter_command: Option<String>,
     pub validation_commands: Vec<ValidationStep>,
-    pub use_google_search_for_deps: bool, // Optional: Use Google Search to find libraries.
 }
 
 // Defines file include/exclude rules.
@@ -166,13 +165,16 @@ pub struct ValidationStep {
                  *   `edit_file(path: String, new_content: String)`
                  *   `create_file(path: String, content: String)`
             iii. **Construct Prompt Context:**
-                 *   **System Prompt:** "You are an expert pair programmer. Implement the user's request by calling the provided file manipulation functions. Adhere strictly to the coding conventions provided. After your final edit, run the formatter if one is specified. Finally, explain the problem and your solution."
+                 *   **System Prompt:** "You are an expert pair programmer. Your goal is to fix a compilation error. Analyze the error and the provided code. If you are unsure about an API, use the `doc_retriever` tool to get documentation. You can call it multiple times. Once you have enough information, call the file manipulation functions to fix the code. Finally, explain the problem and your solution."
                  *   **Context:** The task description, coding conventions, and full content of all scoped files.
                  *   **Correction Context (if `attempt > 0`):** "On the previous attempt, validation failed. The command `{cmd}` exited with code `{code}`. Output: `{stdout/stderr}`. Please analyze the error, fix the code, and explain the fix."
-            iv.  **Call Gemini API**. Process the function calls to apply file edits.
+            iv.  **Begin Tool-Use Loop:**
+                 *   Call the Gemini API. The agent can respond with a request to use a tool (`doc_retriever`, `edit_file`, `create_file`).
+                 *   If `doc_retriever` is called, the `ImplAgent` executes it locally, captures the JSON output, and sends it back to the LLM as a `FunctionResponse`. This conversational loop continues until the LLM has enough information.
+                 *   If `edit_file` or `create_file` is called, the agent applies the changes and the tool-use loop terminates for this attempt.
             v.   **Run Formatter:** If `plan.original_prompt.formatter_command` is `Some`, execute it. If it fails, treat it as a validation failure and add its output to the correction context for the next loop.
             vi.  **Run Validation:** Sequentially execute each `ValidationStep`.
-            vii. **Check Success:** If a command's exit code does not match `expected_exit_code`, the step fails. Capture its output. If the `--enrich-errors` flag is active, use Google Search to find context for the error. Increment `task.attempts`, and `continue` to the next retry loop iteration with the enriched error context.
+            vii. **Check Success:** If a command's exit code does not match `expected_exit_code`, the step fails. Capture its output. Increment `task.attempts`, and `continue` to the next retry loop iteration with the new error context.
             viii.If all validation steps pass: update `task.status` to `Success`, populate `task.result` with the agent's tips, save the entire `ImplementationPlan` back to disk, and `break` the retry loop.
         c. If the retry loop finishes without success, set `task.status` to `Failed` and save the plan. The entire process halts, informing the user which task failed.
     4.  **Finalize:** After the loop, the agent's work is complete. If `--auto-commit` was used, the changes will have been committed incrementally.
@@ -207,4 +209,4 @@ pub struct ValidationStep {
 
 ### **8. Key Implemented Features**
 
-*   **LLM-based Log Summarization:** To manage context window limitations on verbose validation failures, the `ImplAgent` includes a pre-processing step for errors. On a failed validation with a long error message, before constructing the correction context for a retry, it makes a separate call to a smaller model (Gemini Flash) with a prompt to "Summarize this compiler error into its most critical message." The summarized error is then used in the main agent's prompt, reducing token count and focusing the agent on the core issue.
+*   **LLM-based Documentation Retrieval:** To fix complex compiler errors, the `ImplAgent` can engage in a multi-turn dialogue with the LLM. When the `--enrich-errors` flag is active, the agent provides a `doc-retriever` tool. The LLM can call this tool to get structured documentation for specific types, traits, or modules from the project's dependencies. The agent runs the tool locally and sends the documentation back to the LLM, allowing it to gather information before proposing a fix.

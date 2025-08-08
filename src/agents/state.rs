@@ -9,8 +9,6 @@ pub struct PlanPrompt {
     pub coding_conventions: String,
     pub formatter_command: Option<String>,
     pub validation_commands: Vec<ValidationStep>,
-    #[serde(default)]
-    pub use_google_search_for_deps: bool,
 }
 
 // Defines file include/exclude rules.
@@ -79,7 +77,6 @@ mod tests {
                 command: "cargo check".to_string(),
                 expected_exit_code: 0,
             }],
-            use_google_search_for_deps: true,
         };
 
         let toml_string = toml::to_string(&prompt).unwrap();
@@ -90,20 +87,6 @@ mod tests {
             deserialized.file_scoping.include,
             prompt.file_scoping.include
         );
-        assert!(deserialized.use_google_search_for_deps);
-
-        // Test default value
-        let toml_without_flag = r#"
-objective = "Test"
-coding_conventions = "..."
-validation_commands = []
-
-[file_scoping]
-include = ["src/*"]
-exclude = []
-"#;
-        let deserialized_default: PlanPrompt = toml::from_str(toml_without_flag).unwrap();
-        assert!(!deserialized_default.use_google_search_for_deps);
     }
 
     #[test]
@@ -115,7 +98,6 @@ exclude = []
                 coding_conventions: "None".to_string(),
                 formatter_command: None,
                 validation_commands: vec![],
-                use_google_search_for_deps: false,
             },
             tasks: vec![Task {
                 description: "Do a thing".to_string(),

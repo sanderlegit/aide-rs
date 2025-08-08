@@ -26,7 +26,6 @@ const MAX_TOOL_CALLS: u32 = 5;
 
 pub struct ImplAgent {
     gemini: GeminiClientWrapper,
-    summarize_gemini: GeminiClientWrapper,
     max_retries: u32,
     auto_commit: bool,
     enrich_errors: bool,
@@ -54,11 +53,8 @@ fn run_command(command_str: &str) -> Result<(i32, String, String)> {
 impl ImplAgent {
     pub fn new(max_retries: u32, auto_commit: bool, enrich_errors: bool) -> Result<Self> {
         let gemini = GeminiClientWrapper::new_impl_agent()?;
-        // The plan agent uses a faster model, which is good for summarization.
-        let summarize_gemini = GeminiClientWrapper::new_plan_agent()?;
         Ok(Self {
             gemini,
-            summarize_gemini,
             max_retries,
             auto_commit,
             enrich_errors,

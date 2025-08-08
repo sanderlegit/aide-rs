@@ -29,8 +29,8 @@ pub enum Error {
     #[error("Glob pattern error: {0}")]
     Glob(#[from] globset::Error),
 
-    #[error("Gemini API error: {0}")]
-    Gemini(#[from] gemini_client_rs::GeminiError),
+    #[error("API error: {0}")]
+    ApiError(String),
 
     #[error("Reqwest error: {0}")]
     Reqwest(#[from] reqwest::Error),

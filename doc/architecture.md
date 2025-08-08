@@ -62,16 +62,18 @@ This abstraction standardizes how agents are invoked.
     2.  Iterates through each `Task`, skipping those already marked as `Success`.
     3.  **Retry Loop**: For each task, it enters a retry loop (`max_retries`).
         a. **Prompt Construction**: It gathers the content of files defined in the *original prompt's* global `file_scoping` and constructs a prompt for the Gemini API. If it's a retry, it includes the error message from the previous failed attempt.
-        b. **Tool Definition**: It provides `edit_file` and `create_file` function declarations to the API.
-        c. **API Call**: It calls the Gemini API, which returns function calls to modify the filesystem. The agent applies these changes.
+        b. **Tool Definition**: It provides `edit_file`, `create_file`, and `doc_retriever` function declarations to the API.
+        c. **Tool-Use Loop**: It calls the Gemini API. The API can either return function calls to modify the filesystem (`edit_file`, `create_file`) or to research an error (`doc_retriever`).
+            - If `doc_retriever` is called, the agent executes it locally, captures the JSON output, and sends it back to the LLM in a new turn. This loop continues until the LLM has enough information to attempt a fix.
+            - If a file modification tool is called, the agent applies the changes and the tool-use loop for this attempt concludes.
         d. **Validation**: It runs the formatter (if configured) and all `validation_steps` for the task.
         e. **Success/Failure**:
             - If validation succeeds, the task is marked `Success` and the plan on disk is updated. If `--auto-commit` is enabled, a Git commit is created for the task before moving to the next one.
-            - If validation fails, the error output is captured. If the error is long, it's summarized via another API call (`summarize_error`). If the `--enrich-errors` flag is active, the agent will also use Google Search to find relevant documentation for the error. The error context (potentially enriched) is saved for the next attempt in the retry loop.
+            - If validation fails, the error output is captured and saved for the next attempt in the retry loop.
 
 ### 6. Supporting Modules
 
--   **`gemini.rs` (`GeminiClientWrapper`)**: A wrapper that handles all communication with the Google Gemini REST API. It constructs requests, sends them via `reqwest`, and processes responses, including handling function calling tools. It provides constructors for different agent types (plan, impl, summarize) which may use different models.
+-   **`gemini.rs` (`GeminiClientWrapper`)**: A wrapper that handles all communication with the Google Gemini REST API. It constructs requests, sends them via `reqwest`, and processes responses, including handling function calling tools. It provides constructors for different agent types (plan, impl) which may use different models.
 -   **`files.rs`**: Provides the `get_filtered_files` utility, which uses the `ignore` crate to walk the directory tree and find files matching a `FileScope`, while respecting `.gitignore` rules.
 -   **`vcs.rs`**: Provides Git functionality, specifically `add_and_commit`, using the `git2` crate.
 -   **`error.rs`**: Defines a centralized `Error` enum using `thiserror` for clean, consistent error handling across the application.

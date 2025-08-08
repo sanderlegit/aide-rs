@@ -6,10 +6,7 @@ use crate::{
     error::{Error, Result},
     files,
     gemini::GeminiClientWrapper,
-    gemini_types::{
-        Content, ContentPart, DynamicRetrieval, DynamicRetrievalConfig, FunctionCall,
-        GenerateContentResponse, Role, ToolConfig,
-    },
+    gemini_types::{Content, ContentPart, FunctionCall, GenerateContentResponse, Role},
 };
 use async_trait::async_trait;
 use serde::Deserialize;
@@ -242,42 +239,6 @@ Please provide the validation steps for this specific task by calling the `creat
         ))
     }
 
-    // Google Search related functions
-    fn create_dependency_research_prompt(&self, prompt: &PlanPrompt) -> String {
-        format!(
-            "Based on the following objective, please use Google Search to find the best and most up-to-date Rust crates (libraries) to accomplish the task. Provide their names and latest versions.
-
-Objective: {}
-
-Focus on libraries that are well-maintained, popular, and fit the requirements. List them clearly.",
-            prompt.objective
-        )
-    }
-
-    fn create_google_search_tool(&self) -> ToolConfig {
-        ToolConfig::DynamicRetrieval {
-            google_search: DynamicRetrieval {},
-        }
-    }
-
-    fn process_search_response(&self, response: &GenerateContentResponse) -> Result<String> {
-        let candidate = response
-            .candidates
-            .as_ref()
-            .and_then(|c| c.first())
-            .ok_or_else(|| Error::Config("No candidates in search response".to_string()))?;
-
-        if let Some(part) = candidate.content.parts.first() {
-            if let Some(text) = &part.text {
-                info!(search_result = %text, "Successfully got search result");
-                return Ok(text.clone());
-            }
-        }
-
-        Err(Error::Config(
-            "Expected a text part in the search response".to_string(),
-        ))
-    }
 }
 
 #[async_trait]
@@ -289,33 +250,8 @@ impl Agent for PlanAgent {
         let files = files::get_filtered_files(Path::new("."), &prompt.file_scoping)?;
         info!(?files, "Found files for planning context");
 
-        let mut user_prompt_for_descriptions =
+        let user_prompt_for_descriptions =
             self.create_description_generation_user_prompt(&prompt, &files);
-
-        if prompt.use_google_search_for_deps {
-            info!("Using Google Search to find up-to-date libraries.");
-            let search_prompt = self.create_dependency_research_prompt(&prompt);
-            info!(
-                prompt = %format!("\n---\n{}\n---", search_prompt),
-                "Sending dependency research prompt to Gemini"
-            );
-            let search_contents = vec![Content {
-                role: Role::User,
-                parts: vec![ContentPart::Text(search_prompt)],
-            }];
-            let search_tools = vec![self.create_google_search_tool()];
-
-            let search_response = self
-                .gemini
-                .generate_content(search_contents, Some(search_tools))
-                .await?;
-
-            let search_result_text = self.process_search_response(&search_response)?;
-            user_prompt_for_descriptions = format!(
-                "{}\n\n**Suggested Libraries (from Google Search):**\n{}",
-                user_prompt_for_descriptions, search_result_text
-            );
-        }
 
         // STEP 1: Get task descriptions
         info!("Step 1: Generating task descriptions...");

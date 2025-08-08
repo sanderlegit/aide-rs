@@ -14,17 +14,12 @@ Key Crates to Use:
 - `thiserror`: For custom error handling.
 - `tokio`: For the async runtime.
 - `tracing`: For logging.
-    lancedb: v0.21.2
-    clap: v4.5.43
-    hound: v3.5.1
-    rodio: v0.21.1
-    thiserror: v2.0.12
-    tokio: v1.47.1
-    tracing: v0.1.41
 """
 
-# Use Google Search to find the latest versions of the crates.
-use_google_search_for_deps = false
+# The `use_google_search_for_deps` feature has been removed.
+# The agent now relies on the `doc-retriever` tool for error fixing rather than
+# upfront dependency research.
+# use_google_search_for_deps = false
 
 # Provide detailed coding conventions for the agent to follow.
 coding_conventions = """

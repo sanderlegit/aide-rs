@@ -62,11 +62,7 @@ Create a file, for example, `prompts/add_feature.toml`:
 
 objective = """
 Add a new function `hello_world()` to `src/lib.rs` that prints 'Hello, World!' to the console.
-Suggest and use a popular crate for colored terminal output to make the message stand out.
 """
-
-# Use Google Search to find a suitable library for the objective.
-use_google_search_for_deps = true
 
 # Define the files the agent should look at for context.
 # It uses glob patterns and respects .gitignore.

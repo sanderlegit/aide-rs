@@ -41,10 +41,6 @@ git2 = "0.18.3"
 # For loading .env files for local development.
 dotenvy = "0.15.7"
 
-# Google Gemini API Client
-# Provides type definitions (e.g., for requests and responses) for the Gemini API. [4]
-gemini_client_rs = "0.6.0"
-
 # For using async functions in traits.
 async-trait = "0.1.88"
 
@@ -78,7 +74,6 @@ tempfile = "3.10.1"
 *   **`ignore`**, **`globset`**: The perfect combination for implementing `FileScope` logic. `ignore` respects `.gitignore` rules by default and provides a fast, parallel directory walker, while `globset` provides efficient matching of multiple glob patterns.
 *   **`git2`**: The standard library for programmatic Git operations in Rust, necessary for the `--auto-commit` feature.
 *   **`dotenvy`**: A utility to load environment variables from a `.env` file, useful for managing secrets like API keys during local development.
-*   **`gemini_client_rs`**: Provides the necessary type definitions for requests, responses, and function calling, ensuring compatibility with the Gemini API.
 *   **`reqwest`**: A powerful HTTP client used to build a custom wrapper for sending requests to the Gemini API.
 *   **`async-trait`**: Allows the use of `async fn` in traits, which is key for the generic `Agent` abstraction.
 *   **`wiremock`**: Critical for integration testing. It allows you to create a mock HTTP server that can simulate the Gemini API, enabling you to test your agent's logic without making actual API calls, which is faster, cheaper, and more predictable.

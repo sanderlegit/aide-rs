@@ -264,3 +264,105 @@ fn clean_type(ty: &Type) -> String {
         _ => "impl ...".to_string(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::tempdir;
+
+    fn setup_test_crate() -> (tempfile::TempDir, PathBuf) {
+        let dir = tempdir().unwrap();
+        let crate_root = dir.path().join("test_crate");
+        fs::create_dir_all(crate_root.join("src")).unwrap();
+
+        let cargo_toml = r#"
+[package]
+name = "test_crate"
+version = "0.1.0"
+edition = "2021"
+"#;
+        fs::write(crate_root.join("Cargo.toml"), cargo_toml).unwrap();
+
+        let lib_rs = r#"
+//! Crate documentation.
+
+pub mod my_module {
+    //! Module documentation.
+
+    /// Struct documentation.
+    pub struct MyStruct {
+        pub field: u32,
+    }
+
+    impl MyStruct {
+        /// A method on MyStruct.
+        pub fn new() -> Self {
+            Self { field: 0 }
+        }
+    }
+
+    /// Enum documentation.
+    pub enum MyEnum {
+        VariantA,
+    }
+}
+"#;
+        fs::write(crate_root.join("src/lib.rs"), lib_rs).unwrap();
+
+        (dir, crate_root)
+    }
+
+    #[test]
+    fn test_get_crate_docs() {
+        let (_dir, crate_root) = setup_test_crate();
+        let original_dir = std::env::current_dir().unwrap();
+        std::env::set_current_dir(&crate_root).unwrap();
+
+        let result = get_crate_docs("test_crate").unwrap();
+        std::env::set_current_dir(original_dir).unwrap();
+
+        assert_eq!(result["type"], "crate");
+        assert_eq!(result["name"], "test_crate");
+        assert_eq!(result["version"], "0.1.0");
+        assert_eq!(result["documentation"], "Crate documentation.");
+        assert_eq!(result["modules"], json!(["my_module"]));
+    }
+
+    #[test]
+    fn test_get_module_docs() {
+        let (_dir, crate_root) = setup_test_crate();
+        let original_dir = std::env::current_dir().unwrap();
+        std::env::set_current_dir(&crate_root).unwrap();
+
+        let result = get_module_docs("test_crate", "test_crate::my_module").unwrap();
+        std::env::set_current_dir(original_dir).unwrap();
+
+        assert_eq!(result["type"], "module");
+        assert_eq!(result["crate"], "test_crate");
+        assert_eq!(result["path"], "test_crate::my_module");
+        assert_eq!(result["documentation"], "Module documentation.");
+        assert_eq!(result["structs"], json!(["MyStruct"]));
+        assert_eq!(result["enums"], json!(["MyEnum"]));
+        assert!(result["functions"].as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_get_type_docs_struct() {
+        let (_dir, crate_root) = setup_test_crate();
+        let original_dir = std::env::current_dir().unwrap();
+        std::env::set_current_dir(&crate_root).unwrap();
+
+        let result = get_type_docs("test_crate", "test_crate::my_module::MyStruct").unwrap();
+        std::env::set_current_dir(original_dir).unwrap();
+
+        assert_eq!(result["type"], "struct");
+        assert_eq!(result["crate"], "test_crate");
+        assert_eq!(result["path"], "test_crate::my_module::MyStruct");
+        assert_eq!(result["documentation"], "Struct documentation.");
+        let methods = result["methods"].as_array().unwrap();
+        assert_eq!(methods.len(), 1);
+        assert_eq!(methods[0]["name"], "new");
+        assert_eq!(methods[0]["documentation"], "A method on MyStruct.");
+    }
+}

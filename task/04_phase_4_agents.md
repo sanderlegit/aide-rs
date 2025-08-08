@@ -18,8 +18,7 @@ Build the core intelligent components of the application: the `PlanAgent` and `I
     *   Implement the `Agent` trait for `PlanAgent`.
     *   The agent's main logic will:
         1.  Receive a `PlanPrompt`.
-        2.  If `use_google_search_for_deps` is true, perform a preliminary Gemini API call with Google Search enabled to research suitable libraries. The results are then added to the main prompt.
-        3.  Use `files.rs` to list scoped files.
+        2.  Use `files.rs` to list scoped files.
         4.  Construct a detailed prompt for the Gemini API, asking it to call the `create_task_descriptions` and `create_task_details` functions.
         5.  Call the Gemini API via the `gemini.rs` wrapper.
         6.  Deserialize the function call arguments into an `ImplementationPlan` struct.
@@ -29,8 +28,8 @@ Build the core intelligent components of the application: the `PlanAgent` and `I
     *   The agent's main logic will be a loop over the tasks in an `ImplementationPlan`:
         1.  For each task, enter a retry loop.
         2.  Read files from the global scope defined in the original prompt and construct a prompt including the task, file contents, and any error context from previous failed attempts.
-        3.  Define and provide the `edit_file` and `create_file` function declarations to the Gemini API.
-        4.  Call the API and apply the file modifications returned in the function calls.
+        3.  Define and provide `edit_file`, `create_file`, and `doc_retriever` function declarations to the Gemini API.
+        4.  Engage in a multi-turn conversation with the API. The API can call tools to retrieve documentation (`doc_retriever`) or modify files. The agent executes these tools and sends results back until a file modification is performed.
         5.  Run formatter and validation commands.
         6.  On success, update task status and save the plan. On failure, record the error and continue the retry loop.
 

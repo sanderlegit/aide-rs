@@ -21,10 +21,6 @@ pub struct GenerateContentRequest {
 #[serde(untagged)]
 pub enum ToolConfig {
     FunctionDeclaration(ToolConfigFunctionDeclaration),
-    DynamicRetrieval {
-        #[serde(rename = "googleSearchRetrieval")]
-        google_search: DynamicRetrieval,
-    },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -48,9 +44,6 @@ pub struct ToolConfigFunctionDeclaration {
     pub function_declarations: Vec<FunctionDeclaration>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DynamicRetrieval {}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]

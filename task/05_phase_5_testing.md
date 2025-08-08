@@ -29,6 +29,15 @@ Verify that the compiled application works correctly from a user's perspective b
     *   Initialize a Git repository in the temporary directory.
     *   Run the `aide impl` command with the `--auto-commit` flag.
     *   After the command succeeds, use the `git2` crate to open the repository and assert that a new commit has been created for each successful task, with a message derived from that task's description.
+5.  **E2E Test for `aide impl --enrich-errors`**:
+    *   Create a test function `test_impl_workflow_with_doc_retriever`.
+    *   Create a temporary project with a known compiler error (e.g., using a type as an iterator when it isn't).
+    *   Configure `wiremock` to expect a sequence of calls:
+        1.  The first call from the agent will contain the compiler error. The mock server will respond with a `doc_retriever` function call.
+        2.  The test will then assert that the `doc-retriever` command is run by the agent.
+        3.  The second call to the mock server will contain the result from the `doc_retriever` tool. The mock server will respond with an `edit_file` function call to fix the code.
+    *   Use `assert_cmd` to run `aide impl --enrich-errors`.
+    *   Assert that the command succeeds and the file is correctly patched.
 
 ## Test Coverage
 *   This phase provides comprehensive coverage for the primary user stories:
