@@ -46,3 +46,7 @@ run:
 # `make clean`: Removes the target directory.
 clean:
 	$(CARGO) clean
+
+# `make isntall`: Installs the program
+install:
+	$(CARGO) build --release && cp ./target/release/aide-rs ~/.local/bin/
