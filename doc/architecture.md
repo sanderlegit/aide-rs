@@ -7,7 +7,7 @@ The application follows a two-phase workflow, orchestrated by two distinct agent
 1.  **Plan Phase**: A `PlanAgent` analyzes a user's objective and the existing codebase to generate a structured, step-by-step implementation plan.
 2.  **Implement Phase**: An `ImplAgent` executes the tasks defined in the plan, iteratively making code changes, running validation, and handling errors until the objective is complete.
 
-This separation of concerns makes the process robust and debuggable. The state is managed explicitly in a JSON file (`.ai/implementation_plan.json`), allowing workflows to be inspected and resumed.
+This separation of concerns makes the process robust and debuggable. The state is managed explicitly in a TOML file (e.g., `.ai/plan_my_feature_1678886400.toml`), allowing workflows to be inspected and resumed.
 
 ## Core Components and Flow
 
@@ -25,8 +25,8 @@ The application's logic is orchestrated from `src/main.rs`, which parses command
 This module defines the core data structures that represent the application's state. All structs derive `serde::Serialize` and `Deserialize` for easy conversion to/from JSON and TOML.
 
 -   **`PlanPrompt`**: The initial input for the `plan` phase, containing the user's high-level objective, file scope, and validation rules.
--   **`ImplementationPlan`**: The central state object. It contains the original prompt and a `Vec<Task>`. It is saved as `.ai/implementation_plan.json`.
--   **`Task`**: A single, atomic step in the plan. It includes a description, its own file scope, validation steps, and its current `status` (`Pending`, `Success`, `Failed`).
+-   **`ImplementationPlan`**: The central state object. It contains the original prompt and a `Vec<Task>`. It is saved to a uniquely named TOML file in the `.ai/` directory.
+-   **`Task`**: A single, atomic step in the plan. It includes a description, validation steps, and its current `status` (`Pending`, `Success`, `Failed`).
 
 ### 3. The `Agent` Trait (`src/agents/mod.rs`)
 
@@ -50,7 +50,7 @@ This abstraction standardizes how agents are invoked.
     2.  If `use_google_search_for_deps` is true, it first performs a Google Search-enabled API call to research libraries. The results are injected into the main prompt.
     3.  Uses `files::get_filtered_files` to gather the file context.
     4.  **Step 1: Generate Task Descriptions**: It constructs a prompt asking the Gemini API to act as an architect and break the objective into a high-level list of task descriptions. It provides a `create_task_descriptions` function declaration.
-    5.  **Step 2: Detail Each Task**: It iterates through the descriptions from the previous step. For each description, it constructs a new prompt asking the API to define the specific `file_scoping` and `validation_steps` for that task. It provides a `create_task_details` function declaration.
+    5.  **Step 2: Detail Each Task**: It iterates through the descriptions from the previous step. For each description, it constructs a new prompt asking the API to define the specific `validation_steps` for that task. It provides a `create_task_details` function declaration.
     6.  The agent calls the Gemini API for each step, deserializing the function call arguments.
     7.  The agent assembles the final `ImplementationPlan` from the collected details and returns it.
 
@@ -61,7 +61,7 @@ This abstraction standardizes how agents are invoked.
     1.  Loads the `ImplementationPlan` from its file path.
     2.  Iterates through each `Task`, skipping those already marked as `Success`.
     3.  **Retry Loop**: For each task, it enters a retry loop (`max_retries`).
-        a. **Prompt Construction**: It gathers the content of files in the task's scope and constructs a prompt for the Gemini API. If it's a retry, it includes the error message from the previous failed attempt.
+        a. **Prompt Construction**: It gathers the content of files defined in the *original prompt's* global `file_scoping` and constructs a prompt for the Gemini API. If it's a retry, it includes the error message from the previous failed attempt.
         b. **Tool Definition**: It provides `edit_file` and `create_file` function declarations to the API.
         c. **API Call**: It calls the Gemini API, which returns function calls to modify the filesystem. The agent applies these changes.
         d. **Validation**: It runs the formatter (if configured) and all `validation_steps` for the task.

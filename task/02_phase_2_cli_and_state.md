@@ -11,7 +11,7 @@ Define the user-facing command-line interface and the core data structures that 
     *   Define the `plan` and `impl` subcommands with their respective arguments (`--prompt`, `--plan`, `--auto-commit`, etc.) as specified in `spec/00_implementation_plan.md`.
 2.  **Define State Structs**:
     *   In `src/agents/state.rs`, implement all data models required for the workflow.
-    *   These include `PlanPrompt`, `FileScope`, `ImplementationPlan`, `Task`, `TaskStatus`, and `ValidationStep`.
+    *   These include `PlanPrompt`, `FileScope`, `ImplementationPlan`, `Task`, `TaskStatus`, and `ValidationStep`. The `Task` struct will contain a description and validation steps, but not its own file scope, as scoping is handled globally for the entire plan.
     *   Derive `serde::Serialize` and `serde::Deserialize` for all models to allow for serialization to/from JSON and TOML.
 3.  **Integrate CLI in `main.rs`**:
     *   Update `main.rs` to parse the command-line arguments using `Cli::parse()`.

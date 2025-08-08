@@ -20,8 +20,8 @@ The application will be a library crate with a binary entry point. State will be
 ```plaintext
 .
 ├── .ai/
-│   ├── implementation_plan.json # Primary state file for workflows
-│   └── prompts/                 # Directory for user-defined plan prompts
+│   ├── plan_my_feature_1678886400.toml # Example of a primary state file for a workflow
+│   └── prompts/                        # Directory for user-defined plan prompts
 │       └── my_feature.toml
 ├── .aide-rs.toml                # Optional global configuration
 ├── .env                         # For GEMINI_API_KEY
@@ -55,11 +55,11 @@ The CLI will be defined using `clap`.
 *   **`aide plan --prompt <PATH>`**
     *   **Description:** Invokes the `PlanAgent` to generate a structured implementation plan.
     *   **`--prompt <PATH>`** (Required): Path to a structured prompt file (e.g., `.ai/prompts/my_feature.toml`). This file must be in TOML format and deserialize into the `PlanPrompt` struct.
-    *   **`--output-plan <PATH>`**: (Optional) Path to save the plan. Defaults to `.ai/implementation_plan.json`.
+    *   **`--output-plan <PATH>`**: (Optional) Path to save the plan. If not provided, a unique name will be generated (e.g., `.ai/plan_my_feature_1678886400.toml`).
 
 *   **`aide impl --plan <PATH>`**
     *   **Description:** Invokes the `ImplAgent` to execute a plan. The agent will automatically resume from the last failed or pending task.
-    *   **`--plan <PATH>`** (Required): Path to an `implementation_plan.json` file.
+    *   **`--plan <PATH>`** (Required): Path to an implementation plan TOML file.
     *   **`--max-retries <N>`**: (Optional) The maximum number of attempts per task. Defaults to `5`.
     *   **`--auto-commit`**: (Flag) If set, automatically creates a Git commit after all tasks are successfully completed.
 
@@ -101,7 +101,6 @@ pub struct ImplementationPlan {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Task {
     pub description: String,
-    pub file_scoping: FileScope,
     pub validation_steps: Vec<ValidationStep>,
     pub status: TaskStatus,
     pub attempts: u32,
@@ -113,6 +112,7 @@ pub struct Task {
 pub struct TaskResult {
     pub success: bool,
     pub agent_tips: String, // The agent's explanation of the fix.
+    pub modified_files: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq)]
@@ -144,8 +144,8 @@ pub struct ValidationStep {
         *   Calls the Gemini API and deserializes the resulting function call to get a list of strings.
     4.  **Step 2: Detail Each Task.**
         *   Iterates through the list of descriptions from the previous step.
-        *   For each description, it creates a new prompt asking the architect to define the specific `file_scoping` and `validation_steps` for that single task.
-        *   Defines a Gemini Function Declaration: `create_task_details(file_scoping: FileScope, validation_steps: Vec<ValidationStep>)`.
+        *   For each description, it creates a new prompt asking the architect to define the specific `validation_steps` for that single task.
+        *   Defines a Gemini Function Declaration: `create_task_details(validation_steps: Vec<ValidationStep>)`.
         *   Calls the Gemini API and deserializes the function call arguments.
     5.  **Step 3: Assemble Plan.**
         *   Combines the descriptions and their corresponding details into a final `ImplementationPlan`.
@@ -160,7 +160,7 @@ pub struct ValidationStep {
     3.  **For each task:**
         a. If `task.status == TaskStatus::Success`, skip it and print a status message.
         b. **Begin Retry Loop:** `for attempt in 0..max_retries`
-            i.   Read the contents of all files specified in the *task's* `FileScope` using `files.rs`.
+            i.   Read the contents of all files specified in the *original prompt's* global `FileScope` using `files.rs`.
             ii.  Define Gemini Function Declarations for code modification:
                  *   `edit_file(path: String, new_content: String)`
                  *   `create_file(path: String, content: String)`

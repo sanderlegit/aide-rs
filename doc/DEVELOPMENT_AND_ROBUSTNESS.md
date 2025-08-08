@@ -31,7 +31,7 @@ The codebase is designed to be modular and maintainable, following standard Rust
     *   `vcs.rs`: Version control (Git) operations.
     *   `gemini.rs`: A wrapper for all Gemini API interactions.
     *   `agents/state.rs`: All serializable state structs.
-*   **Structured State**: The application is stateless and relies on the filesystem (`.ai/implementation_plan.json`) to store its state, allowing for resumable and auditable workflows.
+*   **Structured State**: The application is stateless and relies on the filesystem (e.g., `.ai/plan_my_feature_1678886400.toml`) to store its state, allowing for resumable and auditable workflows.
 
 ## Testing Strategy
 
