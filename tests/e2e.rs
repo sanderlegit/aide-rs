@@ -26,30 +26,49 @@ validation_commands = [{ command = "cargo check", expected_exit_code = 0 }]
 "#;
     env.create_file("my_feature.toml", prompt_content);
 
-    // 2. Mock the Gemini API response for planning
-    let mock_response = json!({
+    // 2. Mock API responses for the two-step planning process
+    let descriptions_response = json!({
         "candidates": [{
             "content": {
                 "role": "model",
                 "parts": [{
                     "functionCall": {
-                        "name": "create_implementation_plan",
+                        "name": "create_task_descriptions",
+                        "args": { "tasks": ["First task: Refactor the main function."] }
+                    }
+                }]
+            }
+        }]
+    });
+    Mock::given(method("POST"))
+        .and(path_regex(r"/gemini-2.5-flash:generateContent.*"))
+        .and(body_string_contains("create_task_descriptions"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(descriptions_response))
+        .expect(1)
+        .mount(&env.mock_server)
+        .await;
+
+    let details_response = json!({
+        "candidates": [{
+            "content": {
+                "role": "model",
+                "parts": [{
+                    "functionCall": {
+                        "name": "create_task_details",
                         "args": {
-                            "tasks": [{
-                                "description": "First task: Refactor the main function.",
-                                "file_scoping": { "include": ["src/main.rs"] },
-                                "validation_steps": [{ "command": "cargo check", "expected_exit_code": 0 }]
-                            }]
+                            "file_scoping": { "include": ["src/main.rs"], "exclude": [] },
+                            "validation_steps": [{ "command": "cargo check", "expected_exit_code": 0 }]
                         }
                     }
                 }]
             }
         }]
     });
-
     Mock::given(method("POST"))
         .and(path_regex(r"/gemini-2.5-flash:generateContent.*"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(mock_response))
+        .and(body_string_contains("create_task_details"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(details_response))
+        .expect(1)
         .mount(&env.mock_server)
         .await;
 
@@ -73,6 +92,14 @@ validation_commands = [{ command = "cargo check", expected_exit_code = 0 }]
         "First task: Refactor the main function."
     );
     assert_eq!(plan_content["tasks"][0]["status"], "Pending");
+    assert_eq!(
+        plan_content["tasks"][0]["file_scoping"]["include"][0],
+        "src/main.rs"
+    );
+    assert_eq!(
+        plan_content["tasks"][0]["validation_steps"][0]["command"],
+        "cargo check"
+    );
 }
 
 #[tokio::test]
@@ -252,15 +279,15 @@ validation_commands = []
         .mount(&env.mock_server)
         .await;
 
-    // 3. Mock the Gemini API response for the planning step
-    let plan_response = json!({
+    // 3. Mock the Gemini API response for the planning step (descriptions)
+    let descriptions_response = json!({
         "candidates": [{
             "content": {
                 "role": "model",
                 "parts": [{
                     "functionCall": {
-                        "name": "create_implementation_plan",
-                        "args": { "tasks": [{ "description": "Add axum to Cargo.toml", "file_scoping": { "include": ["Cargo.toml"] }, "validation_steps": [] }] }
+                        "name": "create_task_descriptions",
+                        "args": { "tasks": ["Add axum to Cargo.toml"] }
                     }
                 }]
             }
@@ -269,12 +296,37 @@ validation_commands = []
     Mock::given(method("POST"))
         .and(path_regex(r"/gemini-2.5-flash:generateContent.*"))
         .and(body_string_contains("Suggested Libraries (from Google Search)"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(plan_response))
+        .respond_with(ResponseTemplate::new(200).set_body_json(descriptions_response))
         .expect(1)
         .mount(&env.mock_server)
         .await;
 
-    // 4. Run the `aide plan` command
+    // 4. Mock the Gemini API response for the planning step (details)
+    let details_response = json!({
+        "candidates": [{
+            "content": {
+                "role": "model",
+                "parts": [{
+                    "functionCall": {
+                        "name": "create_task_details",
+                        "args": {
+                            "file_scoping": { "include": ["Cargo.toml"], "exclude": [] },
+                            "validation_steps": []
+                        }
+                    }
+                }]
+            }
+        }]
+    });
+    Mock::given(method("POST"))
+        .and(path_regex(r"/gemini-2.5-flash:generateContent.*"))
+        .and(body_string_contains("create_task_details"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(details_response))
+        .expect(1)
+        .mount(&env.mock_server)
+        .await;
+
+    // 5. Run the `aide plan` command
     get_aide_cmd()
         .current_dir(env.path())
         .arg("plan")
@@ -283,7 +335,7 @@ validation_commands = []
         .assert()
         .success();
 
-    // 5. Assert that the plan file was created correctly
+    // 6. Assert that the plan file was created correctly
     let plan_path = env.full_path(".ai/implementation_plan.json");
     assert!(plan_path.exists());
     let plan_content: serde_json::Value =
@@ -303,26 +355,46 @@ async fn test_plan_lancedb_prompt_sends_correct_schema() {
     let prompt_content = fs::read_to_string("prompts/lancedb_example.toml").unwrap();
     env.create_file("lancedb_example.toml", &prompt_content);
 
-    // 2. Mock the Gemini API response for planning
-    let mock_response = json!({
+    // 2. Mock the Gemini API response for planning (Step 1: descriptions)
+    let descriptions_response = json!({
         "candidates": [{
             "content": {
                 "role": "model",
-                "parts": [{"functionCall": {"name": "create_implementation_plan", "args": {"tasks": []}}}]
+                "parts": [{"functionCall": {"name": "create_task_descriptions", "args": {"tasks": ["A sample task"]}}}]
             }
         }]
     });
-
     Mock::given(method("POST"))
         .and(path_regex(r"/gemini-2.5-flash:generateContent.*"))
-        // Key part of the test: assert that the "items" field for the array is present in the request body.
-        .and(body_string_contains("\"items\":{\"type\":\"OBJECT\""))
-        .respond_with(ResponseTemplate::new(200).set_body_json(mock_response))
+        .and(body_string_contains("create_task_descriptions"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(descriptions_response))
         .expect(1)
         .mount(&env.mock_server)
         .await;
 
-    // 3. Run the `aide plan` command
+    // 3. Mock the Gemini API response for planning (Step 2: details)
+    let details_response = json!({
+        "candidates": [{
+            "content": {
+                "role": "model",
+                "parts": [{"functionCall": {"name": "create_task_details", "args": {
+                    "file_scoping": { "include": ["src/main.rs"], "exclude": [] },
+                    "validation_steps": []
+                }}}]
+            }
+        }]
+    });
+    Mock::given(method("POST"))
+        .and(path_regex(r"/gemini-2.5-flash:generateContent.*"))
+        // Key part of the test: assert that the "items" field for the array is present in the request body.
+        // This is for the `validation_steps` parameter in the `create_task_details` tool.
+        .and(body_string_contains("\"items\":{\"type\":\"OBJECT\""))
+        .respond_with(ResponseTemplate::new(200).set_body_json(details_response))
+        .expect(1)
+        .mount(&env.mock_server)
+        .await;
+
+    // 4. Run the `aide plan` command
     get_aide_cmd()
         .current_dir(env.path())
         .arg("plan")
