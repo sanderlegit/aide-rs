@@ -9,14 +9,13 @@ fn generate_docs(crate_name: &str, current_dir: Option<&Path>) -> Result<PathBuf
         .map(|d| d.join("Cargo.toml"))
         .unwrap_or_else(|| PathBuf::from("Cargo.toml"));
 
-    let mut builder = Builder::default();
-    builder
+    let mut builder = Builder::default()
         .package(crate_name)
         .manifest_path(&manifest_path)
         .quiet(true);
 
     if let Some(dir) = current_dir {
-        builder.target_dir(dir.join("target"));
+        builder = builder.target_dir(dir.join("target"));
     }
 
     builder.build().map_err(|e| {
