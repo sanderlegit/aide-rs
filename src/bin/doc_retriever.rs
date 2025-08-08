@@ -68,7 +68,6 @@ fn generate_docs(crate_name: &str) -> Result<PathBuf> {
         .package(crate_name)
         .manifest_path("Cargo.toml")
         .quiet(true)
-        .build_args(&["--offline"])
         .build()
         .map_err(|e| {
             Error::Config(format!(
