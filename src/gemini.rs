@@ -82,7 +82,17 @@ impl GeminiClientWrapper {
         let response_text = response.text().await?;
         debug!(response_text = %response_text, "Raw Gemini response body");
 
-        let response: GenerateContentResponse = serde_json::from_str(&response_text)?;
+        let response: GenerateContentResponse = match serde_json::from_str(&response_text) {
+            Ok(resp) => resp,
+            Err(e) => {
+                error!(
+                    error = %e,
+                    response_text = %response_text,
+                    "Failed to deserialize Gemini response body."
+                );
+                return Err(e.into());
+            }
+        };
         debug!(response = %serde_json::to_string_pretty(&response).unwrap_or_else(|_| "Failed to format response body".to_string()), "Gemini response received");
 
         // Log text parts of response at info level for visibility
