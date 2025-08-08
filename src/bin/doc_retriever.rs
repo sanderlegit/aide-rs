@@ -256,7 +256,7 @@ fn clean_fn_signature(
 
 fn clean_type(ty: &Type) -> String {
     match ty {
-        Type::ResolvedPath { name, .. } => name.clone(),
+        Type::ResolvedPath(path) => path.path.join("::"),
         Type::Generic(name) => name.clone(),
         Type::Primitive(name) => name.clone(),
         Type::BorrowedRef { type_, .. } => format!("&{}", clean_type(type_)),
