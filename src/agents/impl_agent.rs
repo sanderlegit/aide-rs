@@ -397,7 +397,7 @@ impl Agent for ImplAgent {
         let mut initial_error_context: Option<String> = None;
         info!("Running initial validation of the current project state...");
         if let Err(e) = self.run_validation_steps(&plan.original_prompt.validation_commands) {
-            warn!(error = %e, "Initial validation failed. This error will be added to the first task's context.");
+            warn!("Initial validation failed. This error will be added to the first task's context.");
             initial_error_context = Some(e);
         }
 
@@ -465,11 +465,21 @@ impl Agent for ImplAgent {
                         .collect::<Vec<_>>()
                         .join("\n");
 
+                    let last_error_for_log = last_error.as_ref().map(|e| {
+                        let mut lines = e.lines();
+                        let first_line = lines.next().unwrap_or("").to_string();
+                        if lines.next().is_some() {
+                            format!("{}\n... (error truncated in log)", first_line)
+                        } else {
+                            first_line
+                        }
+                    });
+
                     let log_user_prompt = self.create_user_prompt_with_context(
                         i,
                         &plan,
                         &file_names_for_log,
-                        &last_error,
+                        &last_error_for_log,
                     );
                     let log_full_prompt = format!("{}\n\n{}", system_prompt, log_user_prompt);
 
