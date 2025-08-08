@@ -1,5 +1,5 @@
 use crate::error::{Error, Result};
-use crate::gemini_types::{Content, GenerateContentResponse};
+use crate::gemini_types::{Content, GenerateContentRequest, GenerateContentResponse, ToolConfig};
 use crate::logging::{ResponseLog, RunLogger};
 use dotenvy::dotenv;
 use reqwest::Client;
@@ -39,16 +39,16 @@ impl GeminiClientWrapper {
         &self.model_name
     }
 
-    pub async fn generate_content<T: serde::Serialize>(
+    pub async fn generate_content(
         &self,
         contents: Vec<Content>,
-        tools: Option<T>,
+        tools: Option<Vec<ToolConfig>>,
     ) -> Result<GenerateContentResponse> {
         let start_time = Instant::now();
-        let request_body = serde_json::json!({
-            "contents": contents,
-            "tools": tools,
-        });
+        let request_body = GenerateContentRequest {
+            contents,
+            tools,
+        };
 
         info!(
             "Sending request to Gemini model '{}' at '{}'.",
