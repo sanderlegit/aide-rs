@@ -5,37 +5,26 @@ use serde_json::json;
 use std::path::{Path, PathBuf};
 
 fn generate_docs(crate_name: &str, current_dir: Option<&Path>) -> Result<PathBuf> {
-    let original_dir = if current_dir.is_some() {
-        Some(std::env::current_dir()?)
-    } else {
-        None
-    };
+    let manifest_path = current_dir
+        .map(|d| d.join("Cargo.toml"))
+        .unwrap_or_else(|| PathBuf::from("Cargo.toml"));
 
-    if let Some(dir) = current_dir {
-        std::env::set_current_dir(dir)?;
-    }
-
-    // The manifest path is now relative to the current working directory.
-    let manifest_path = PathBuf::from("Cargo.toml");
-
-    let result = Builder::default()
+    let mut builder = Builder::default();
+    builder
         .package(crate_name)
         .manifest_path(&manifest_path)
-        .quiet(true)
-        .build()
-        .map_err(|e| {
-            Error::Config(format!(
-                "Failed to build rustdoc for {}: {}",
-                crate_name, e
-            ))
-        });
+        .quiet(true);
 
-    // Change back to the original directory if we changed it.
-    if let Some(dir) = original_dir {
-        std::env::set_current_dir(&dir)?;
+    if let Some(dir) = current_dir {
+        builder.target_dir(dir.join("target"));
     }
 
-    result
+    builder.build().map_err(|e| {
+        Error::Config(format!(
+            "Failed to build rustdoc for {}: {}",
+            crate_name, e
+        ))
+    })
 }
 
 pub fn get_crate_docs(
