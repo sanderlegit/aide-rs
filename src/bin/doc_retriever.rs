@@ -200,14 +200,17 @@ fn get_methods<T: HasItems>(krate: &Crate, item_with_impls: &T) -> Vec<serde_jso
     for impl_id in item_with_impls.get_items() {
         if let Some(impl_item) = krate.index.get(impl_id) {
             if let ItemEnum::Impl(imp) = &impl_item.inner {
-                for item_id in &imp.items {
-                    if let Some(method_item) = krate.index.get(item_id) {
-                        if let ItemEnum::Function(func) = &method_item.inner {
-                            methods.push(json!({
-                                "name": method_item.name.clone().unwrap_or_default(),
-                                "signature": clean_fn_signature(&func.sig.output, &func.sig.inputs, method_item.name.as_deref().unwrap_or("")),
-                                "documentation": method_item.docs.clone().unwrap_or_default(),
-                            }));
+                // We only care about inherent methods for this tool's purpose.
+                if imp.trait_.is_none() {
+                    for item_id in &imp.items {
+                        if let Some(method_item) = krate.index.get(item_id) {
+                            if let ItemEnum::Function(func) = &method_item.inner {
+                                methods.push(json!({
+                                    "name": method_item.name.clone().unwrap_or_default(),
+                                    "signature": clean_fn_signature(&func.sig.output, &func.sig.inputs, method_item.name.as_deref().unwrap_or("")),
+                                    "documentation": method_item.docs.clone().unwrap_or_default(),
+                                }));
+                            }
                         }
                     }
                 }
