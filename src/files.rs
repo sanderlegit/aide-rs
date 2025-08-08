@@ -59,7 +59,6 @@ pub fn get_filtered_files(base_dir: &Path, scope: &FileScope) -> Result<Vec<Path
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::agents::state::FileScope;
     use std::fs::{self, File};
     use std::io::Write;
     use tempfile::tempdir;
@@ -88,6 +87,7 @@ mod tests {
         let scope1 = FileScope {
             include: vec!["**/*.rs".to_string()],
             exclude: vec!["src/main.rs".to_string()],
+            ..Default::default()
         };
         let mut files1 = get_filtered_files(base, &scope1)?;
         let mut expected1 = vec![
@@ -102,6 +102,7 @@ mod tests {
         let scope2 = FileScope {
             include: vec!["**/*.md".to_string(), "**/*.toml".to_string()],
             exclude: vec![],
+            ..Default::default()
         };
         let files2 = get_filtered_files(base, &scope2)?;
         // config.toml should be ignored due to .gitignore
@@ -112,6 +113,7 @@ mod tests {
         let scope3 = FileScope {
             include: vec!["src/**/*".to_string()],
             exclude: vec!["src/components/**/*".to_string()],
+            ..Default::default()
         };
         let mut files3 = get_filtered_files(base, &scope3)?;
         let mut expected3 = vec![
@@ -126,6 +128,7 @@ mod tests {
         let scope4 = FileScope {
             include: vec!["**/*.txt".to_string()],
             exclude: vec![],
+            ..Default::default()
         };
         let files4 = get_filtered_files(base, &scope4)?;
         let expected4 = vec![canonical_base.join(".hidden_dir/secret.txt")];

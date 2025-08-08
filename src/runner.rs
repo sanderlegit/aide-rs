@@ -10,7 +10,7 @@ pub struct FlowRunner {
     logger: RunLogger,
     prompt_builder: PromptBuilder,
     // We will store the output of each block here, keyed by block.id.
-    _block_outputs: HashMap<String, serde_json::Value>,
+    block_outputs: HashMap<String, serde_json::Value>,
 }
 
 impl FlowRunner {
@@ -18,7 +18,7 @@ impl FlowRunner {
         Ok(Self {
             logger,
             prompt_builder: PromptBuilder::new(),
-            _block_outputs: HashMap::new(),
+            block_outputs: HashMap::new(),
         })
     }
 
@@ -37,7 +37,10 @@ impl FlowRunner {
             let _tool_executor = ToolExecutor::new(&block.annotations.tools);
 
             // 2. Build the prompt.
-            let prompt_string = self.prompt_builder.build(&block.prompt).await?;
+            let prompt_string = self
+                .prompt_builder
+                .build(&block.prompt, prompt_path, &self.block_outputs)
+                .await?;
             println!("PROMPT for block '{}':\n{}", block.id, prompt_string);
 
             // 3. TODO: Call Gemini API with the prompt and tool schemas.
