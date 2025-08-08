@@ -1,3 +1,4 @@
+use crate::gemini_types::FunctionResponsePayload;
 use crate::{
     agents::{
         state::{ImplementationPlan, Task, TaskResult, TaskStatus},
@@ -228,14 +229,8 @@ Implement the current task by calling the `edit_file` or `create_file` functions
             .collect::<Vec<_>>()
             .join("\n\n");
 
-        self.create_user_prompt_with_context(
-            current_task_index,
-            plan,
-            &file_context,
-            error_context,
-        )
+        self.create_user_prompt_with_context(current_task_index, plan, &file_context, error_context)
     }
-
 
     fn run_validation_steps(
         &self,
@@ -354,10 +349,7 @@ Implement the current task by calling the `edit_file` or `create_file` functions
                     let doc_json: serde_json::Value = serde_json::from_str(&stdout)?;
                     (false, doc_json)
                 } else {
-                    (
-                        false,
-                        json!({ "success": false, "error": stderr }),
-                    )
+                    (false, json!({ "success": false, "error": stderr }))
                 }
             }
             _ => {
@@ -393,7 +385,9 @@ impl Agent for ImplAgent {
         let mut initial_error_context: Option<String> = None;
         info!("Running initial validation of the current project state...");
         if let Err(e) = self.run_validation_steps(&plan.original_prompt.validation_commands) {
-            warn!("Initial validation failed. This error will be added to the first task's context.");
+            warn!(
+                "Initial validation failed. This error will be added to the first task's context."
+            );
             initial_error_context = Some(e);
         }
 
@@ -505,7 +499,9 @@ impl Agent for ImplAgent {
                             .candidates
                             .as_ref()
                             .and_then(|c| c.first())
-                            .ok_or_else(|| Error::Config("No candidates in response".to_string()))?;
+                            .ok_or_else(|| {
+                                Error::Config("No candidates in response".to_string())
+                            })?;
 
                         let mut has_tool_call = false;
                         for part in &candidate.content.parts {
@@ -541,7 +537,8 @@ impl Agent for ImplAgent {
                         match run_command(formatter_cmd) {
                             Ok((code, stdout, stderr)) => {
                                 if code != 0 {
-                                    let output = format!("STDOUT:\n{}\nSTDERR:\n{}", stdout, stderr);
+                                    let output =
+                                        format!("STDOUT:\n{}\nSTDERR:\n{}", stdout, stderr);
                                     let error_msg = format!(
                                         "Formatter command `{}` failed with exit code {}.\nOutput:\n{}",
                                         formatter_cmd, code, output
@@ -588,7 +585,8 @@ impl Agent for ImplAgent {
 
                             let mut diff_context = String::new();
                             if !modified_files.is_empty() {
-                                diff_context.push_str("\n\nChanges applied in the failed attempt:\n");
+                                diff_context
+                                    .push_str("\n\nChanges applied in the failed attempt:\n");
                                 for path in &modified_files {
                                     if let Some((_, old_content)) =
                                         file_contents.iter().find(|(p, _)| p == path)
@@ -606,7 +604,8 @@ impl Agent for ImplAgent {
                                                     ChangeTag::Insert => "+",
                                                     ChangeTag::Equal => " ",
                                                 };
-                                                diff_context.push_str(&format!("{}{}", sign, change));
+                                                diff_context
+                                                    .push_str(&format!("{}{}", sign, change));
                                             }
                                             diff_context.push_str("--- END DIFF ---\n");
                                         }
@@ -630,11 +629,8 @@ impl Agent for ImplAgent {
                     if let Some(result) = &plan.tasks[i].result {
                         if !result.modified_files.is_empty() {
                             let commit_message = format!("AI: {}", plan.tasks[i].description);
-                            let paths_to_commit: Vec<PathBuf> = result
-                                .modified_files
-                                .iter()
-                                .map(PathBuf::from)
-                                .collect();
+                            let paths_to_commit: Vec<PathBuf> =
+                                result.modified_files.iter().map(PathBuf::from).collect();
                             info!(commit_message = %commit_message, "Committing changes for successful task.");
                             vcs::add_and_commit(Path::new("."), &paths_to_commit, &commit_message)?;
                             info!("Changes committed successfully.");
@@ -661,5 +657,4 @@ impl Agent for ImplAgent {
 
         Ok(())
     }
-
 }
