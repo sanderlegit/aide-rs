@@ -51,6 +51,10 @@ async-trait = "0.1.88"
 # For making HTTP requests in the Gemini wrapper
 reqwest = { version = "0.12.5", features = ["json"] }
 
+# For parsing rustdoc JSON for the doc-retriever tool
+rustdoc-json = "0.8.8"
+rustdoc-types = "0.2.0"
+
 # For showing diffs
 similar = "2.5.0"
 

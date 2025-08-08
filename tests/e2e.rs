@@ -445,17 +445,35 @@ async fn test_plan_lancedb_prompt_sends_correct_schema() {
 }
 
 #[tokio::test]
-async fn test_impl_workflow_with_error_summarization() {
+async fn test_impl_workflow_with_doc_retriever() {
     let env = TestEnv::new().await;
     env.init_git_repo();
 
     // 1. Create a project with a file that will cause a validation error
-    let long_error_str = "a very long error message...".repeat(100);
-    let initial_content = format!("fn main() {{ compile_error!(\"{}\"); }}", long_error_str);
-    env.create_file("src/main.rs", &initial_content);
+    // This simulates the lancedb example where `.query()` is not an iterator.
+    let initial_content = r#"
+use anyhow::Result;
+fn main() -> Result<()> {
+    let query = lancedb::query::Query::new();
+    for _item in query {
+        // this will fail to compile
+    }
+    Ok(())
+}
+"#;
+    env.create_file("src/main.rs", initial_content);
     env.create_file(
         "Cargo.toml",
-        "[package]\nname = \"test-proj\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+        r#"[package]
+name = "test-proj"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0"
+lancedb = { version = "0.5.5", features = ["remote"] }
+futures = "0.3"
+"#,
     );
 
     let plan_content = r#"
@@ -465,7 +483,7 @@ coding_conventions = ""
 use_google_search_for_deps = false
 
 [original_prompt.file_scoping]
-include = ["src/main.rs"]
+include = ["src/main.rs", "Cargo.toml"]
 exclude = []
 
 [[original_prompt.validation_commands]]
@@ -483,34 +501,18 @@ expected_exit_code = 0
     let plan_path = ".ai/test_plan.toml";
     env.create_file(plan_path, plan_content);
 
-    // 2. Mock the summarization API response
-    let summary_response = json!({
-        "candidates": [{
-            "content": {
-                "role": "model",
-                "parts": [{ "text": "Summarized: compile_error!" }]
-            }
-        }]
-    });
-    Mock::given(method("POST"))
-        .and(path_regex(r"/models/gemini-2.5-flash:generateContent.*"))
-        .and(body_string_contains("Summarize this compiler/tool error"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(summary_response))
-        .mount(&env.mock_server)
-        .await;
-
-
-    // 3. Mock the implementation API response (with the fix)
-    let impl_response = json!({
+    // 2. Mock the initial LLM call which asks for documentation
+    let doc_request_response = json!({
         "candidates": [{
             "content": {
                 "role": "model",
                 "parts": [{
                     "functionCall": {
-                        "name": "edit_file",
+                        "name": "doc_retriever",
                         "args": {
-                            "path": "src/main.rs",
-                            "new_content": "fn main() { println!(\"Fixed!\"); }"
+                            "subcommand": "type",
+                            "crate_name": "lancedb",
+                            "path": "lancedb::query::Query"
                         }
                     }
                 }]
@@ -519,33 +521,51 @@ expected_exit_code = 0
     });
     Mock::given(method("POST"))
         .and(path_regex(r"/models/gemini-2.5-pro:generateContent.*"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(impl_response))
+        .and(body_string_contains("is not an iterator")) // First prompt contains the error
+        .respond_with(ResponseTemplate::new(200).set_body_json(doc_request_response))
+        .expect(1)
         .mount(&env.mock_server)
         .await;
 
-    // 4. Run `aide impl`
+    // 3. Mock the second LLM call which provides the fix after getting docs
+    let fix_response = json!({
+        "candidates": [{
+            "content": {
+                "role": "model",
+                "parts": [{
+                    "functionCall": {
+                        "name": "edit_file",
+                        "args": {
+                            "path": "src/main.rs",
+                            "new_content": "use anyhow::Result;\nuse futures::stream::StreamExt;\n\nfn main() -> Result<()> {\n    let query = lancedb::query::Query::new();\n    // Fixed: must execute the query\n    // let mut stream = query.execute().await?;\n    // while let Some(batch) = stream.next().await {}\n    Ok(())\n}\n"
+                        }
+                    }
+                }]
+            }
+        }]
+    });
+    Mock::given(method("POST"))
+        .and(path_regex(r"/models/gemini-2.5-pro:generateContent.*"))
+        .and(body_string_contains("functionResponse")) // Second prompt contains tool result
+        .respond_with(ResponseTemplate::new(200).set_body_json(fix_response))
+        .expect(1)
+        .mount(&env.mock_server)
+        .await;
+
+    // 4. Run `aide impl` with error enrichment
     let plan_path = ".ai/test_plan.toml";
     get_aide_cmd()
         .current_dir(env.path())
         .arg("impl")
         .arg("--plan")
         .arg(plan_path)
-        .arg("--auto-commit")
+        .arg("--enrich-errors")
         .assert()
         .success();
 
     // 5. Assert file was fixed
     let new_content = fs::read_to_string(env.full_path("src/main.rs")).unwrap();
-    assert!(new_content.contains("Fixed!"));
-
-    // 6. Assert that a new commit was created
-    let repo = Repository::open(env.path()).unwrap();
-    let head = repo.head().unwrap().peel_to_commit().unwrap();
-    let commit_message = head.message().unwrap();
-    assert_eq!(
-        commit_message,
-        "AI: Fix the compile error in main.rs"
-    );
+    assert!(new_content.contains("Fixed: must execute the query"));
 }
 
 #[tokio::test]

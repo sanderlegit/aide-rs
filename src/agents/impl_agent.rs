@@ -1,14 +1,14 @@
 use crate::{
     agents::{
-        Agent,
         state::{ImplementationPlan, Task, TaskResult, TaskStatus},
+        Agent,
     },
     error::{Error, Result},
     files,
     gemini::GeminiClientWrapper,
     gemini_types::{
-        Content, ContentPart, DynamicRetrieval, DynamicRetrievalConfig, FunctionCall,
-        FunctionDeclaration, GenerateContentResponse, Role, ToolConfig,
+        Content, ContentPart, FunctionCall, FunctionDeclaration, FunctionResponse,
+        GenerateContentResponse, Role,
     },
     vcs,
 };
@@ -22,15 +22,17 @@ use std::{
 };
 use tracing::{error, info, warn};
 
+const MAX_TOOL_CALLS: u32 = 5;
+
 pub struct ImplAgent {
     gemini: GeminiClientWrapper,
-    enrich_gemini: GeminiClientWrapper,
+    summarize_gemini: GeminiClientWrapper,
     max_retries: u32,
     auto_commit: bool,
     enrich_errors: bool,
 }
 
-fn run_command(command_str: &str) -> Result<(i32, String)> {
+fn run_command(command_str: &str) -> Result<(i32, String, String)> {
     info!(command = command_str, "Running command");
     if command_str.is_empty() {
         return Err(Error::Config("Empty command".to_string()));
@@ -45,27 +47,51 @@ fn run_command(command_str: &str) -> Result<(i32, String)> {
     let exit_code = output.status.code().unwrap_or(1);
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-    let full_output = format!("STDOUT:\n{}\nSTDERR:\n{}", stdout, stderr);
 
-    Ok((exit_code, full_output))
+    Ok((exit_code, stdout, stderr))
 }
 
 impl ImplAgent {
     pub fn new(max_retries: u32, auto_commit: bool, enrich_errors: bool) -> Result<Self> {
         let gemini = GeminiClientWrapper::new_impl_agent()?;
-        // The plan agent uses a faster model, which is good for summarization/enrichment.
-        let enrich_gemini = GeminiClientWrapper::new_plan_agent()?;
+        // The plan agent uses a faster model, which is good for summarization.
+        let summarize_gemini = GeminiClientWrapper::new_plan_agent()?;
         Ok(Self {
             gemini,
-            enrich_gemini,
+            summarize_gemini,
             max_retries,
             auto_commit,
             enrich_errors,
         })
     }
 
+    fn create_doc_retriever_tool(&self) -> FunctionDeclaration {
+        FunctionDeclaration {
+            name: "doc_retriever".to_string(),
+            description: "Retrieves documentation for a Rust crate, module, or type from the local project's dependencies. Use this to understand how to use a library correctly.".to_string(),
+            parameters: json!({
+                "type": "OBJECT",
+                "properties": {
+                    "subcommand": {
+                        "type": "STRING",
+                        "description": "The subcommand to run: 'crate', 'module', or 'type'."
+                    },
+                    "crate_name": {
+                        "type": "STRING",
+                        "description": "The name of the crate to inspect."
+                    },
+                    "path": {
+                        "type": "STRING",
+                        "description": "The full path to the module or type (e.g., 'lancedb::query' or 'lancedb::query::Query'). Not used for the 'crate' subcommand."
+                    }
+                },
+                "required": ["subcommand", "crate_name"]
+            }),
+        }
+    }
+
     fn create_file_tools(&self) -> Vec<FunctionDeclaration> {
-        vec![
+        let mut tools = vec![
             FunctionDeclaration {
                 name: "edit_file".to_string(),
                 description: "Edits an existing file with new content. Overwrites the entire file."
@@ -103,11 +129,19 @@ impl ImplAgent {
                     "required": ["path", "content"]
                 }),
             },
-        ]
+        ];
+        if self.enrich_errors {
+            tools.push(self.create_doc_retriever_tool());
+        }
+        tools
     }
 
     fn create_system_prompt(&self) -> String {
-        "You are an expert pair programmer. Implement the user's request by calling the provided file manipulation functions. Adhere strictly to the coding conventions provided. After your final edit, run the formatter if one is specified. Finally, explain the problem and your solution.".to_string()
+        if self.enrich_errors {
+            "You are an expert pair programmer. Your goal is to fix a compilation error. Analyze the error and the provided code. If you are unsure about an API, use the `doc_retriever` tool to get documentation. You can call it multiple times. Once you have enough information, call the file manipulation functions to fix the code. Finally, explain the problem and your solution.".to_string()
+        } else {
+            "You are an expert pair programmer. Implement the user's request by calling the provided file manipulation functions. Adhere strictly to the coding conventions provided. After your final edit, run the formatter if one is specified. Finally, explain the problem and your solution.".to_string()
+        }
     }
 
     fn create_user_prompt_with_context(
@@ -207,88 +241,6 @@ Implement the current task by calling the `edit_file` or `create_file` functions
         )
     }
 
-    fn process_response(
-        &self,
-        response: &GenerateContentResponse,
-    ) -> Result<(String, Vec<PathBuf>)> {
-        use std::io::Write;
-
-        #[derive(Deserialize)]
-        struct EditFileArgs {
-            path: String,
-            new_content: String,
-        }
-
-        #[derive(Deserialize)]
-        struct CreateFileArgs {
-            path: String,
-            content: String,
-        }
-
-        let candidate = response
-            .candidates
-            .as_ref()
-            .and_then(|c| c.first())
-            .ok_or_else(|| Error::Config("No candidates in response".to_string()))?;
-
-        let mut agent_tips = "".to_string();
-        let mut modified_files = Vec::new();
-
-        for part in &candidate.content.parts {
-            if let Some(FunctionCall { name, arguments }) = &part.function_call {
-                info!(?name, "Processing function call");
-                match name.as_str() {
-                    "edit_file" => {
-                        let args: EditFileArgs = serde_json::from_value(arguments.clone())?;
-                        let path = PathBuf::from(&args.path);
-
-                        let old_content = std::fs::read_to_string(&path).unwrap_or_default();
-                        std::fs::write(&path, &args.new_content)?;
-
-                        println!("\n--- DIFF for {} ---", path.display());
-                        let diff = TextDiff::from_lines(&old_content, &args.new_content);
-                        for change in diff.iter_all_changes() {
-                            let sign = match change.tag() {
-                                ChangeTag::Delete => "-",
-                                ChangeTag::Insert => "+",
-                                ChangeTag::Equal => " ",
-                            };
-                            print!("{}{}", sign, change);
-                        }
-                        println!("--- END DIFF ---\n");
-
-                        info!(path = %args.path, "Edited file");
-                        modified_files.push(path);
-                    }
-                    "create_file" => {
-                        let args: CreateFileArgs = serde_json::from_value(arguments.clone())?;
-                        let path = PathBuf::from(&args.path);
-                        if let Some(parent) = path.parent() {
-                            std::fs::create_dir_all(parent)?;
-                        }
-                        let mut file = std::fs::File::create(&path)?;
-                        file.write_all(args.content.as_bytes())?;
-                        file.sync_all()?;
-
-                        println!("\n--- NEW FILE {} ---", path.display());
-                        for line in args.content.lines() {
-                            println!("+{}", line);
-                        }
-                        println!("--- END NEW FILE ---\n");
-
-                        info!(path = %args.path, "Created file");
-                        modified_files.push(path);
-                    }
-                    _ => warn!(?name, "Unknown function call"),
-                }
-            }
-            if let Some(text) = &part.text {
-                agent_tips = text.clone();
-            }
-        }
-
-        Ok((agent_tips, modified_files))
-    }
 
     fn run_validation_steps(
         &self,
@@ -296,11 +248,12 @@ Implement the current task by calling the `edit_file` or `create_file` functions
     ) -> std::result::Result<(), String> {
         for step in steps {
             match run_command(&step.command) {
-                Ok((exit_code, output)) => {
+                Ok((exit_code, stdout, stderr)) => {
                     if exit_code != step.expected_exit_code {
+                        let full_output = format!("STDOUT:\n{}\nSTDERR:\n{}", stdout, stderr);
                         let error_msg = format!(
                             "Validation failed for command `{}`. Expected exit code {}, but got {}.\nOutput:\n{}",
-                            step.command, step.expected_exit_code, exit_code, output
+                            step.command, step.expected_exit_code, exit_code, full_output
                         );
                         error!("{}", error_msg);
                         return Err(error_msg);
@@ -324,60 +277,6 @@ Implement the current task by calling the `edit_file` or `create_file` functions
         self.run_validation_steps(&task.validation_steps)
     }
 
-    async fn enrich_error_context(&self, error: &str) -> Result<String> {
-        info!("Enriching error context with Google Search.");
-        let search_prompt = format!(
-            "The following error occurred during a software development task:
-\"\"\"
-{error}
-\"\"\"
-Please use Google Search, prioritizing results from `docs.rs` and `crates.io`, to find relevant documentation, examples, or explanations that could help resolve this error. Provide a concise summary of your findings and include any relevant URLs."
-        );
-
-        let search_contents = vec![Content {
-            role: Role::User,
-            parts: vec![ContentPart::Text(search_prompt)],
-        }];
-
-        let search_tools = vec![self.create_google_search_tool()];
-
-        let search_response = self
-            .enrich_gemini
-            .generate_content(search_contents, Some(search_tools))
-            .await?;
-
-        let search_result_text = self.process_search_response(&search_response)?;
-
-        Ok(format!(
-            "Original error:\n{}\n\nResearch results:\n{}",
-            error, search_result_text
-        ))
-    }
-
-    fn create_google_search_tool(&self) -> ToolConfig {
-        ToolConfig::DynamicRetrieval {
-            google_search: DynamicRetrieval {},
-        }
-    }
-
-    fn process_search_response(&self, response: &GenerateContentResponse) -> Result<String> {
-        let candidate = response
-            .candidates
-            .as_ref()
-            .and_then(|c| c.first())
-            .ok_or_else(|| Error::Config("No candidates in search response".to_string()))?;
-
-        if let Some(part) = candidate.content.parts.first() {
-            if let Some(text) = &part.text {
-                info!(search_result = %text, "Successfully got search result");
-                return Ok(text.clone());
-            }
-        }
-
-        Err(Error::Config(
-            "Expected a text part in the search response".to_string(),
-        ))
-    }
 }
 
 #[async_trait]
@@ -447,12 +346,9 @@ impl Agent for ImplAgent {
                         }
                     }
 
-                    let tools = self.create_file_tools();
                     let system_prompt = self.create_system_prompt();
                     let user_prompt =
                         self.create_user_prompt(i, &plan, &file_contents, &last_error);
-
-                    let full_prompt = format!("{}\n\n{}", system_prompt, user_prompt);
 
                     let file_names_for_log = file_contents
                         .iter()
@@ -483,26 +379,67 @@ impl Agent for ImplAgent {
                         "Sending implementation prompt to Gemini"
                     );
 
-                    let contents = vec![Content {
+                    let mut conversation_history = vec![Content {
                         role: Role::User,
-                        parts: vec![ContentPart::Text(full_prompt)],
+                        parts: vec![ContentPart::Text(format!(
+                            "{}\n\n{}",
+                            system_prompt, user_prompt
+                        ))],
                     }];
 
-                    let tool_config = json!([{
-                        "functionDeclarations": tools
-                    }]);
-                    let response = self
-                        .gemini
-                        .generate_content(contents, Some(tool_config))
-                        .await?;
-                    let (agent_tips, modified_files) = self.process_response(&response)?;
+                    let mut agent_tips = String::new();
+                    let mut modified_files = Vec::new();
+                    let mut conversation_succeeded = false;
+
+                    for _ in 0..MAX_TOOL_CALLS {
+                        let tools = self.create_file_tools();
+                        let tool_config = json!([{ "functionDeclarations": tools }]);
+                        let response = self
+                            .gemini
+                            .generate_content(conversation_history.clone(), Some(tool_config))
+                            .await?;
+
+                        let candidate = response
+                            .candidates
+                            .as_ref()
+                            .and_then(|c| c.first())
+                            .ok_or_else(|| Error::Config("No candidates in response".to_string()))?;
+
+                        let mut has_tool_call = false;
+                        for part in &candidate.content.parts {
+                            if let Some(fc) = &part.function_call {
+                                has_tool_call = true;
+                                let (stop, tool_response) =
+                                    self.handle_function_call(fc, &mut modified_files).await?;
+                                conversation_history.push(Content {
+                                    role: Role::Model,
+                                    parts: vec![ContentPart::FunctionCall(fc.clone())],
+                                });
+                                conversation_history.push(Content {
+                                    role: Role::Tool,
+                                    parts: vec![tool_response],
+                                });
+                                if stop {
+                                    conversation_succeeded = true;
+                                }
+                            }
+                            if let Some(text) = &part.text {
+                                agent_tips = text.clone();
+                            }
+                        }
+
+                        if !has_tool_call || conversation_succeeded {
+                            break;
+                        }
+                    }
 
                     let mut formatter_error: Option<String> = None;
                     if let Some(formatter_cmd) = &plan.original_prompt.formatter_command {
                         info!(command = %formatter_cmd, "Running formatter");
                         match run_command(formatter_cmd) {
-                            Ok((code, output)) => {
+                            Ok((code, stdout, stderr)) => {
                                 if code != 0 {
+                                    let output = format!("STDOUT:\n{}\nSTDERR:\n{}", stdout, stderr);
                                     let error_msg = format!(
                                         "Formatter command `{}` failed with exit code {}.\nOutput:\n{}",
                                         formatter_cmd, code, output
@@ -575,19 +512,7 @@ impl Agent for ImplAgent {
                                 }
                             }
 
-                            let full_error = format!("{}{}", e, diff_context);
-
-                            if self.enrich_errors {
-                                match self.enrich_error_context(&full_error).await {
-                                    Ok(enriched_error) => last_error = Some(enriched_error),
-                                    Err(enrich_err) => {
-                                        error!(error = %enrich_err, "Failed to enrich error context");
-                                        last_error = Some(full_error); // Fallback to original error
-                                    }
-                                }
-                            } else {
-                                last_error = Some(full_error);
-                            }
+                            last_error = Some(format!("{}{}", e, diff_context));
                         }
                     }
                 }
@@ -633,5 +558,111 @@ impl Agent for ImplAgent {
         }
 
         Ok(())
+    }
+
+    async fn handle_function_call(
+        &self,
+        fc: &FunctionCall,
+        modified_files: &mut Vec<PathBuf>,
+    ) -> Result<(bool, ContentPart)> {
+        use std::io::Write;
+        info!(name = %fc.name, "Processing function call");
+
+        let (stop_conversation, response_payload) = match fc.name.as_str() {
+            "edit_file" => {
+                #[derive(Deserialize)]
+                struct Args {
+                    path: String,
+                    new_content: String,
+                }
+                let args: Args = serde_json::from_value(fc.arguments.clone())?;
+                let path = PathBuf::from(&args.path);
+
+                let old_content = std::fs::read_to_string(&path).unwrap_or_default();
+                std::fs::write(&path, &args.new_content)?;
+
+                println!("\n--- DIFF for {} ---", path.display());
+                let diff = TextDiff::from_lines(&old_content, &args.new_content);
+                for change in diff.iter_all_changes() {
+                    let sign = match change.tag() {
+                        ChangeTag::Delete => "-",
+                        ChangeTag::Insert => "+",
+                        ChangeTag::Equal => " ",
+                    };
+                    print!("{}{}", sign, change);
+                }
+                println!("--- END DIFF ---\n");
+
+                info!(path = %args.path, "Edited file");
+                modified_files.push(path);
+                (true, json!({"status": "success"}))
+            }
+            "create_file" => {
+                #[derive(Deserialize)]
+                struct Args {
+                    path: String,
+                    content: String,
+                }
+                let args: Args = serde_json::from_value(fc.arguments.clone())?;
+                let path = PathBuf::from(&args.path);
+                if let Some(parent) = path.parent() {
+                    std::fs::create_dir_all(parent)?;
+                }
+                let mut file = std::fs::File::create(&path)?;
+                file.write_all(args.content.as_bytes())?;
+                file.sync_all()?;
+
+                println!("\n--- NEW FILE {} ---", path.display());
+                for line in args.content.lines() {
+                    println!("+{}", line);
+                }
+                println!("--- END NEW FILE ---\n");
+
+                info!(path = %args.path, "Created file");
+                modified_files.push(path);
+                (true, json!({"status": "success"}))
+            }
+            "doc_retriever" => {
+                #[derive(Deserialize)]
+                struct Args {
+                    subcommand: String,
+                    crate_name: String,
+                    path: Option<String>,
+                }
+                let args: Args = serde_json::from_value(fc.arguments.clone())?;
+                let mut cmd_args = vec![args.subcommand, "--crate".to_string(), args.crate_name];
+                if let Some(p) = args.path {
+                    cmd_args.push("--path".to_string());
+                    cmd_args.push(p);
+                }
+                let cmd = format!("cargo run --bin doc-retriever -- {}", cmd_args.join(" "));
+
+                let (exit_code, stdout, stderr) = run_command(&cmd)?;
+                if exit_code == 0 {
+                    let doc_json: serde_json::Value = serde_json::from_str(&stdout)?;
+                    (false, doc_json)
+                } else {
+                    (
+                        false,
+                        json!({ "success": false, "error": stderr }),
+                    )
+                }
+            }
+            _ => {
+                warn!(name = %fc.name, "Unknown function call");
+                (
+                    false,
+                    json!({"success": false, "error": "Unknown function call"}),
+                )
+            }
+        };
+
+        Ok((
+            stop_conversation,
+            ContentPart::FunctionResponse(FunctionResponse {
+                name: fc.name.clone(),
+                response: json!({ "content": response_payload }),
+            }),
+        ))
     }
 }

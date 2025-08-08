@@ -117,9 +117,9 @@ To have the agent automatically create a Git commit after each task succeeds, us
 ```
 This will create a new commit for each successfully completed task, with a message derived from the task's description.
 
-#### Enriching Errors with Google Search
+#### Enriching Errors with Local Documentation
 
-If the agent gets stuck on a complex error (e.g., a tricky compiler issue or a dependency conflict), you can use the `--enrich-errors` flag. This instructs the agent to use Google Search to find relevant documentation, examples, or solutions for the error it encountered, and then add that research to its context for the next attempt.
+If the agent gets stuck on a complex error (e.g., a tricky compiler issue or incorrect API usage), you can use the `--enrich-errors` flag. This instructs the agent to use a local `doc-retriever` tool to look up documentation for the specific types and traits mentioned in the compiler error. It generates and parses `rustdoc` output on your machine to provide accurate, version-specific context for the fix.
 
 ```bash
 /path/to/aide-rs impl --plan .ai/plan_add_feature_1678886400.toml --enrich-errors

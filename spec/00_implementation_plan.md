@@ -62,7 +62,7 @@ The CLI will be defined using `clap`.
     *   **`--plan <PATH>`** (Required): Path to an implementation plan TOML file.
     *   **`--max-retries <N>`**: (Optional) The maximum number of attempts per task. Defaults to `5`.
     *   **`--auto-commit`**: (Flag) If set, automatically creates a Git commit after each task is successfully completed.
-    *   **`--enrich-errors`**: (Flag) If set, uses Google Search to find documentation for errors to improve the correction context.
+    *   **`--enrich-errors`**: (Flag) If set, allows the agent to use the `doc-retriever` tool to look up documentation for types and traits related to a compilation error.
 
 ### **5. State Management and Data Models (`agents/state.rs`)**
 
