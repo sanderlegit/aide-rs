@@ -1,17 +1,13 @@
-// use aide_rs::vcs::add_and_commit;
 use assert_cmd::Command;
-// use git2::Repository;
-// use serde_json::json;
-// use std::fs;
+use serde_json::json;
+use std::fs;
 use std::path::PathBuf;
-// use wiremock::matchers::{body_string_contains, method, path_regex};
-// use wiremock_logical_matchers::not;
-// use wiremock::{Mock, ResponseTemplate};
+use wiremock::matchers::{body_string_contains, method, path_regex};
+use wiremock::{Mock, ResponseTemplate};
 
 mod common;
-// use common::TestEnv;
+use common::TestEnv;
 
-#[allow(dead_code)]
 fn get_aide_cmd() -> Command {
     let mut cmd = Command::cargo_bin("aide-rs").unwrap();
     let program_path = PathBuf::from(cmd.get_program());
@@ -25,21 +21,77 @@ fn get_aide_cmd() -> Command {
     cmd
 }
 
-// TODO: All E2E tests need to be rewritten for the new flow-based architecture.
-// The general approach will be:
-// 1. Create a TestEnv.
-// 2. Create a sample project structure (e.g., `src/main.rs`, `Cargo.toml`).
-// 3. Create a `my_prompt.toml` file with an objective.
-// 4. Create a `flows/my_test_flow.yml` that defines the steps for the test.
-// 5. Mock the sequence of expected Gemini API calls and their responses using `wiremock`.
-// 6. Run `get_aide_cmd().arg("run").arg("my_test_flow").arg("--prompt").arg("my_prompt.toml")`.
-// 7. Assert that the command succeeds.
-// 8. Assert that files were modified correctly.
-// 9. Assert that any expected side-effects (like git commits) occurred.
+#[tokio::test]
+async fn test_e2e_plan_flow() {
+    let env = TestEnv::new().await;
+    env.init_git_repo();
 
-#[test]
-fn placeholder_for_new_e2e_tests() {
-    // This is a placeholder to ensure the test suite compiles.
-    // It should be replaced with actual E2E tests for the new architecture.
-    assert!(true);
+    // 1. Create the flow file
+    fs::create_dir_all(env.full_path("flows")).unwrap();
+    let flow_content = fs::read_to_string("flows/plan.yml").unwrap();
+    env.create_file("flows/plan.yml", &flow_content);
+
+    // 2. Create the prompt file
+    env.create_file(
+        "my_prompt.toml",
+        r#"
+        objective = "Create a hello world app"
+        [file_scoping]
+        include = ["src/**/*.rs"]
+        "#,
+    );
+
+    // 3. Create a dummy file for context
+    env.create_file("src/main.rs", "fn main() {}");
+
+    // 4. Mock the Gemini API call
+    let response_body = json!({
+        "candidates": [{
+            "content": {
+                "parts": [{
+                    "functionCall": {
+                        "name": "create_task_list",
+                        "args": {
+                            "tasks": [
+                                { "id": "create-file", "description": "Create a new main.rs file." },
+                                { "id": "add-code", "description": "Add hello world code to main.rs." }
+                            ]
+                        }
+                    }
+                }],
+                "role": "model"
+            }
+        }]
+    });
+
+    Mock::given(method("POST"))
+        .and(path_regex(
+            r"/v1beta/models/gemini-1.5-flash-latest:generateContent",
+        ))
+        .and(body_string_contains("Create a hello world app"))
+        .and(body_string_contains("fn main() {}"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(response_body))
+        .mount(&env.mock_server)
+        .await;
+
+    // 5. Run the command
+    let mut cmd = get_aide_cmd();
+    cmd.current_dir(env.path());
+    cmd.arg("run")
+        .arg("plan")
+        .arg("--prompt")
+        .arg("my_prompt.toml");
+
+    // 6. Assert the command succeeds and logs correctly
+    let output = cmd.output().unwrap();
+    assert!(
+        output.status.success(),
+        "Command failed. Stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.contains("Flow 'plan' finished."));
+    assert!(stderr.contains("Executing block: 'generate_tasks'..."));
+    assert!(stderr.contains("TOOL CALL: create_task_list"));
 }

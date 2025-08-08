@@ -56,23 +56,25 @@ This phase implements the more complex features of the architecture, such as loo
 
 This phase ensures the new system is working correctly end-to-end.
 
--   **[ ] Task 3.1: Restore Unit Tests**
+-   **[~] Task 3.1: Restore Unit Tests**
     -   Go through all `#[cfg(test)]` modules and update them to reflect the new architecture.
-    -   Ensure all core logic in `prompt.rs`, `tools.rs`, and `runner.rs` has high test coverage.
+    -   **[X]** Add unit tests for `prompt.rs`.
+    -   **[X]** Add unit tests for `tools.rs`.
+    -   **[ ]** Add unit tests for `runner.rs` (to be covered via E2E tests).
 
--   **[ ] Task 3.2: Create E2E Test Suite (`tests/e2e.rs`)**
+-   **[~] Task 3.2: Create E2E Test Suite (`tests/e2e.rs`)**
     -   Create a new test repository or project within the `tests/` directory.
     -   Write E2E tests for the primary flows (`plan`, `code`).
     -   Use `wiremock` to mock Gemini API calls.
-    -   **Test Case: `plan` flow**:
+    -   **[X] Test Case: `plan` flow**:
         -   Run `aide-rs run plan --prompt ...`.
         -   Mock the API call.
-        -   Assert that the correct structured `TaskList` is printed to stdout or saved to a file.
-    -   **Test Case: `code` flow (single task)**:
+        -   Assert that the correct structured `TaskList` is produced.
+    -   **[ ] Test Case: `code` flow (single task)**:
         -   Run `aide-rs run code --prompt ...`.
         -   Mock the sequence of API calls (plan, implement, verify).
         -   Assert that the target file is modified correctly.
-    -   **Test Case: `code` flow with verification failure and retry**:
+    -   **[ ] Test Case: `code` flow with verification failure and retry**:
         -   Mock an initial implementation that fails `cargo check`.
         -   Mock the follow-up API call that includes the error message.
         -   Mock the final, correct implementation.

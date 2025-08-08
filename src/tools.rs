@@ -251,3 +251,121 @@ impl Tool for DocRetrieverTool {
         ))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::error::Error;
+    use serde_json::json;
+    use tempfile::tempdir;
+
+    #[tokio::test]
+    async fn test_tool_executor_new_and_schemas() {
+        let executor = ToolExecutor::new(&["file_system".to_string(), "task_creator".to_string()]);
+        let schemas = executor.schemas();
+        assert_eq!(schemas.len(), 4); // create, edit, read, create_task_list
+        assert!(schemas.iter().any(|s| s.name == "create_file"));
+        assert!(schemas.iter().any(|s| s.name == "edit_file"));
+        assert!(schemas.iter().any(|s| s.name == "read_file"));
+        assert!(schemas.iter().any(|s| s.name == "create_task_list"));
+    }
+
+    #[tokio::test]
+    async fn test_tool_executor_execute_dispatch() {
+        let executor = ToolExecutor::new(&["task_creator".to_string()]);
+        let args = json!({
+            "tasks": [
+                { "id": "task1", "description": "First task" }
+            ]
+        });
+        let call = FunctionCall {
+            name: "create_task_list".to_string(),
+            arguments: args.clone(),
+        };
+
+        let result = executor.execute(&call).await.unwrap();
+        assert_eq!(result, args);
+    }
+
+    #[tokio::test]
+    async fn test_tool_executor_execute_not_found() {
+        let executor = ToolExecutor::new(&["file_system".to_string()]);
+        let call = FunctionCall {
+            name: "non_existent_tool".to_string(),
+            arguments: json!({}),
+        };
+
+        let result = executor.execute(&call).await;
+        assert!(result.is_err());
+        if let Err(Error::Config(msg)) = result {
+            assert!(msg.contains("Tool 'non_existent_tool' not found"));
+        } else {
+            panic!("Expected Config error");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_create_file_tool() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("test.txt");
+        let tool = CreateFileTool;
+        let args = json!({
+            "path": file_path.to_str().unwrap(),
+            "content": "hello world"
+        });
+
+        let result = tool.execute(args).await.unwrap();
+        assert_eq!(result["status"], "success");
+        assert_eq!(result["path"], file_path.to_str().unwrap());
+
+        let content = tokio::fs::read_to_string(&file_path).await.unwrap();
+        assert_eq!(content, "hello world");
+
+        // Test failure on existing file
+        let args_fail = json!({
+            "path": file_path.to_str().unwrap(),
+            "content": "fail"
+        });
+        let result_fail = tool.execute(args_fail).await;
+        assert!(result_fail.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_edit_file_tool() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("test.txt");
+        tokio::fs::write(&file_path, "initial content")
+            .await
+            .unwrap();
+
+        let tool = EditFileTool;
+        let args = json!({
+            "path": file_path.to_str().unwrap(),
+            "content": "new content"
+        });
+
+        let result = tool.execute(args).await.unwrap();
+        assert_eq!(result["status"], "success");
+
+        let content = tokio::fs::read_to_string(&file_path).await.unwrap();
+        assert_eq!(content, "new content");
+    }
+
+    #[tokio::test]
+    async fn test_read_file_tool() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("test.txt");
+        tokio::fs::write(&file_path, "read me").await.unwrap();
+
+        let tool = ReadFileTool;
+        let args = json!({ "path": file_path.to_str().unwrap() });
+
+        let result = tool.execute(args).await.unwrap();
+        assert_eq!(result["content"], "read me");
+
+        // Test failure on non-existent file
+        let args_fail = json!({ "path": "nonexistent.txt" });
+        let result_fail = tool.execute(args_fail).await;
+        assert!(result_fail.is_err());
+    }
+}
