@@ -513,22 +513,6 @@ impl Agent for ImplAgent {
                     let user_prompt =
                         self.create_user_prompt(i, &plan, &file_contents, &last_error);
 
-                    let file_names_for_log = file_contents
-                        .iter()
-                        .map(|(path, _)| path.to_string_lossy().to_string())
-                        .collect::<Vec<_>>()
-                        .join("\n");
-
-                    let last_error_for_log = last_error.as_ref().map(|e| {
-                        let mut lines = e.lines();
-                        let first_line = lines.next().unwrap_or("").to_string();
-                        if lines.next().is_some() {
-                            format!("{}\n... (error truncated in log)", first_line)
-                        } else {
-                            first_line
-                        }
-                    });
-
                     let tools = self.create_file_tools();
                     self.logger.log_prompt(PromptLog {
                         agent_type: "ImplAgent".to_string(),

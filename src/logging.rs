@@ -5,7 +5,6 @@ use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct LogEntry<T> {
@@ -61,7 +60,7 @@ pub struct ValidationLog {
 
 #[derive(Clone)]
 pub struct RunLogger {
-    log_dir: PathBuf,
+    _log_dir: PathBuf,
     summary_log_path: PathBuf,
     complete_log_path: PathBuf,
     // Using Mutex for interior mutability to be able to write from `&self` methods.
@@ -92,7 +91,7 @@ impl RunLogger {
         ));
 
         let logger = Self {
-            log_dir,
+            _log_dir: log_dir,
             summary_log_path,
             complete_log_path,
             summary_file,
