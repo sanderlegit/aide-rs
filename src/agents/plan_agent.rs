@@ -24,7 +24,6 @@ struct TaskDescriptions {
 
 #[derive(Deserialize)]
 struct TaskDetails {
-    file_scoping: FileScope,
     validation_steps: Vec<ValidationStep>,
 }
 
@@ -168,7 +167,7 @@ Generate a list of task descriptions by calling the `create_task_descriptions` f
 **Task to Detail:**
 {task_description}
 
-Please provide the file scoping and validation steps for this specific task by calling the `create_task_details` function. The validation steps must be a subset of the following available commands:
+Please provide the validation steps for this specific task by calling the `create_task_details` function. The validation steps must be a subset of the following available commands:
 {validation_commands_list}
 "#,
             objective = original_prompt.objective,
@@ -186,27 +185,10 @@ Please provide the file scoping and validation steps for this specific task by c
     fn create_task_details_tool(&self) -> serde_json::Value {
         json!({
             "name": "create_task_details",
-            "description": "Creates the details (file scope, validation) for a single task.",
+            "description": "Creates the details (validation steps) for a single task.",
             "parameters": {
                 "type": "OBJECT",
                 "properties": {
-                    "file_scoping": {
-                        "type": "OBJECT",
-                        "description": "The files relevant to this task.",
-                        "properties": {
-                            "include": {
-                                "type": "ARRAY",
-                                "description": "Glob patterns for files to include.",
-                                "items": { "type": "STRING" }
-                            },
-                            "exclude": {
-                                "type": "ARRAY",
-                                "description": "Glob patterns for files to exclude.",
-                                "items": { "type": "STRING" }
-                            }
-                        },
-                        "required": ["include"]
-                    },
                     "validation_steps": {
                         "type": "ARRAY",
                         "description": "Commands to validate the task's completion.",
@@ -226,7 +208,7 @@ Please provide the file scoping and validation steps for this specific task by c
                         }
                     }
                 },
-                "required": ["file_scoping", "validation_steps"]
+                "required": ["validation_steps"]
             }
         })
     }
@@ -423,7 +405,6 @@ impl Agent for PlanAgent {
 
             tasks.push(Task {
                 description: description.clone(),
-                file_scoping: details.file_scoping,
                 validation_steps: details.validation_steps,
                 status: TaskStatus::Pending,
                 attempts: 0,

@@ -56,7 +56,6 @@ validation_commands = [{ command = "cargo check", expected_exit_code = 0 }]
                     "functionCall": {
                         "name": "create_task_details",
                         "args": {
-                            "file_scoping": { "include": ["src/main.rs"], "exclude": [] },
                             "validation_steps": [{ "command": "cargo check", "expected_exit_code": 0 }]
                         }
                     }
@@ -92,10 +91,7 @@ validation_commands = [{ command = "cargo check", expected_exit_code = 0 }]
         "First task: Refactor the main function."
     );
     assert_eq!(plan_content["tasks"][0]["status"], "Pending");
-    assert_eq!(
-        plan_content["tasks"][0]["file_scoping"]["include"][0],
-        "src/main.rs"
-    );
+    assert!(plan_content["tasks"][0].get("file_scoping").is_none());
     assert_eq!(
         plan_content["tasks"][0]["validation_steps"][0]["command"],
         "cargo check"
@@ -117,7 +113,6 @@ async fn test_impl_workflow() {
         },
         "tasks": [{
             "description": "Update the greeting message in main.rs",
-            "file_scoping": { "include": ["src/main.rs"] },
             "validation_steps": [], // No validation for simplicity
             "status": "Pending",
             "attempts": 0,
@@ -126,7 +121,28 @@ async fn test_impl_workflow() {
     });
     env.create_file(".ai/implementation_plan.json", &plan_content.to_string());
 
-    // 2. Mock the Gemini API response for implementation
+    // 2. Mock the file selection and implementation API responses
+    let selection_response = json!({
+        "candidates": [{
+            "content": {
+                "role": "model",
+                "parts": [{
+                    "functionCall": {
+                        "name": "select_context_files",
+                        "args": { "files": ["src/main.rs"] }
+                    }
+                }]
+            }
+        }]
+    });
+    Mock::given(method("POST"))
+        .and(path_regex(r"/models/gemini-2.5-flash:generateContent.*"))
+        .and(body_string_contains("select_context_files"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(selection_response))
+        .expect(1)
+        .mount(&env.mock_server)
+        .await;
+
     let mock_response = json!({
         "candidates": [{
             "content": {
@@ -173,6 +189,7 @@ async fn test_impl_workflow() {
         serde_json::from_str(&fs::read_to_string(env.full_path(".ai/implementation_plan.json")).unwrap()).unwrap();
     assert_eq!(plan_content["tasks"][0]["status"], "Success");
     assert_eq!(plan_content["tasks"][0]["result"]["agent_tips"], "Updated the greeting.");
+    assert_eq!(plan_content["tasks"][0]["result"]["modified_files"][0], "src/main.rs");
 }
 
 #[tokio::test]
@@ -198,7 +215,6 @@ async fn test_impl_workflow_with_auto_commit() {
         },
         "tasks": [{
             "description": "Add a print statement",
-            "file_scoping": { "include": ["src/main.rs"] },
             "validation_steps": [],
             "status": "Pending",
             "attempts": 0,
@@ -207,7 +223,28 @@ async fn test_impl_workflow_with_auto_commit() {
     });
     env.create_file(".ai/implementation_plan.json", &plan_content.to_string());
 
-    // 2. Mock the Gemini API response
+    // 2. Mock the file selection and implementation API responses
+    let selection_response = json!({
+        "candidates": [{
+            "content": {
+                "role": "model",
+                "parts": [{
+                    "functionCall": {
+                        "name": "select_context_files",
+                        "args": { "files": ["src/main.rs"] }
+                    }
+                }]
+            }
+        }]
+    });
+    Mock::given(method("POST"))
+        .and(path_regex(r"/models/gemini-2.5-flash:generateContent.*"))
+        .and(body_string_contains("select_context_files"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(selection_response))
+        .expect(1)
+        .mount(&env.mock_server)
+        .await;
+
     let mock_response = json!({
         "candidates": [{
             "content": {
@@ -310,7 +347,6 @@ validation_commands = []
                     "functionCall": {
                         "name": "create_task_details",
                         "args": {
-                            "file_scoping": { "include": ["Cargo.toml"], "exclude": [] },
                             "validation_steps": []
                         }
                     }
@@ -378,7 +414,6 @@ async fn test_plan_lancedb_prompt_sends_correct_schema() {
             "content": {
                 "role": "model",
                 "parts": [{"functionCall": {"name": "create_task_details", "args": {
-                    "file_scoping": { "include": ["src/main.rs"], "exclude": [] },
                     "validation_steps": []
                 }}}]
             }
@@ -389,6 +424,7 @@ async fn test_plan_lancedb_prompt_sends_correct_schema() {
         // Key part of the test: assert that the "items" field for the array is present in the request body.
         // This is for the `validation_steps` parameter in the `create_task_details` tool.
         .and(body_string_contains("\"items\":{\"properties\""))
+        .and(body_string_contains("create_task_details"))
         .respond_with(ResponseTemplate::new(200).set_body_json(details_response))
         .expect(1)
         .mount(&env.mock_server)
@@ -426,7 +462,6 @@ async fn test_impl_workflow_with_error_summarization() {
         },
         "tasks": [{
             "description": "Fix the compile error in main.rs",
-            "file_scoping": { "include": ["src/main.rs"] },
             "validation_steps": [{ "command": "cargo check", "expected_exit_code": 0 }],
             "status": "Pending",
             "attempts": 0,
@@ -450,6 +485,27 @@ async fn test_impl_workflow_with_error_summarization() {
     Mock::given(method("POST"))
         .and(path_regex(r"/models/gemini-2.5-flash:generateContent.*"))
         .respond_with(ResponseTemplate::new(200).set_body_json(summary_response))
+        .mount(&env.mock_server)
+        .await;
+
+    // Add a mock for file selection. The first attempt will fail, so it will be called again.
+    let selection_response = json!({
+        "candidates": [{
+            "content": {
+                "role": "model",
+                "parts": [{
+                    "functionCall": {
+                        "name": "select_context_files",
+                        "args": { "files": ["src/main.rs", "Cargo.toml"] }
+                    }
+                }]
+            }
+        }]
+    });
+    Mock::given(method("POST"))
+        .and(path_regex(r"/models/gemini-2.5-flash:generateContent.*"))
+        .and(body_string_contains("select_context_files"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(selection_response))
         .mount(&env.mock_server)
         .await;
 
@@ -509,7 +565,6 @@ async fn test_impl_multi_task_workflow() {
         "tasks": [
             {
                 "description": "Add anyhow dependency to Cargo.toml",
-                "file_scoping": { "include": ["Cargo.toml"] },
                 "validation_steps": [], // No validation for this step, just apply
                 "status": "Pending",
                 "attempts": 0,
@@ -517,7 +572,6 @@ async fn test_impl_multi_task_workflow() {
             },
             {
                 "description": "Create main.rs to print hello world",
-                "file_scoping": { "include": ["src/main.rs", "Cargo.toml"] },
                 "validation_steps": [{ "command": "cargo check", "expected_exit_code": 0 }],
                 "status": "Pending",
                 "attempts": 0,
@@ -530,7 +584,18 @@ async fn test_impl_multi_task_workflow() {
         &plan_content.to_string(),
     );
 
-    // 2. Mock API response for Task 1 (edit Cargo.toml)
+    // 2. Mock file selection and API responses
+    let selection_response_task1 = json!({
+        "candidates": [{"content": {"role": "model", "parts": [{"functionCall": {"name": "select_context_files", "args": {"files": ["Cargo.toml"]}}}]}}]
+    });
+    Mock::given(method("POST"))
+        .and(path_regex(r"/models/gemini-2.5-flash:generateContent.*"))
+        .and(body_string_contains("Add anyhow dependency"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(selection_response_task1))
+        .expect(1)
+        .mount(&env.mock_server)
+        .await;
+
     let mock_response_task1 = json!({
         "candidates": [{
             "content": {
@@ -554,6 +619,17 @@ async fn test_impl_multi_task_workflow() {
             "**Current Task:**\\nAdd anyhow dependency to Cargo.toml",
         ))
         .respond_with(ResponseTemplate::new(200).set_body_json(mock_response_task1))
+        .expect(1)
+        .mount(&env.mock_server)
+        .await;
+
+    let selection_response_task2 = json!({
+        "candidates": [{"content": {"role": "model", "parts": [{"functionCall": {"name": "select_context_files", "args": {"files": ["src/main.rs", "Cargo.toml"]}}}]}}]
+    });
+    Mock::given(method("POST"))
+        .and(path_regex(r"/models/gemini-2.5-flash:generateContent.*"))
+        .and(body_string_contains("Create main.rs"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(selection_response_task2))
         .expect(1)
         .mount(&env.mock_server)
         .await;

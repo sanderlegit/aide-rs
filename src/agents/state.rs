@@ -31,7 +31,6 @@ pub struct ImplementationPlan {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Task {
     pub description: String,
-    pub file_scoping: FileScope,
     pub validation_steps: Vec<ValidationStep>,
     pub status: TaskStatus,
     pub attempts: u32,
@@ -43,6 +42,8 @@ pub struct Task {
 pub struct TaskResult {
     pub success: bool,
     pub agent_tips: String,
+    #[serde(default)]
+    pub modified_files: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -117,10 +118,6 @@ exclude = []
             },
             tasks: vec![Task {
                 description: "Do a thing".to_string(),
-                file_scoping: FileScope {
-                    include: vec!["src/lib.rs".to_string()],
-                    exclude: vec![],
-                },
                 validation_steps: vec![ValidationStep {
                     command: "cargo test".to_string(),
                     expected_exit_code: 0,

@@ -53,6 +53,81 @@ async fn summarize_error(error_output: &str) -> Result<String> {
     ))
 }
 
+async fn select_context_files(
+    task_description: &str,
+    all_files: &[PathBuf],
+) -> Result<Vec<PathBuf>> {
+    info!("Selecting context files for task...");
+    let gemini = GeminiClientWrapper::new_summarize_agent()?; // Use the lighter agent
+
+    let file_list = all_files
+        .iter()
+        .map(|p| p.to_string_lossy())
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let prompt = format!(
+        r#"
+Given the following task description and a list of all files in the project, select the files that are most relevant for completing the task. Only select files that already exist.
+
+**Task:**
+{task_description}
+
+**Available Files:**
+{file_list}
+
+Call the `select_context_files` function with the paths of the files you have selected.
+"#,
+    );
+
+    let tool = json!({
+        "name": "select_context_files",
+        "description": "Selects a list of files to use as context for a task.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "files": {
+                    "type": "ARRAY",
+                    "description": "The list of file paths to include in the context.",
+                    "items": { "type": "STRING" }
+                }
+            },
+            "required": ["files"]
+        }
+    });
+
+    let contents = vec![Content {
+        role: Role::User,
+        parts: vec![ContentPart::Text(prompt)],
+    }];
+    let tool_config = json!([{"functionDeclarations": [tool]}]);
+
+    let response = gemini.generate_content(contents, Some(tool_config)).await?;
+
+    let candidate = response
+        .candidates
+        .and_then(|mut c| c.pop())
+        .ok_or_else(|| Error::Config("No candidates in file selection response".to_string()))?;
+
+    if let Some(part) = candidate.content.parts.into_iter().next() {
+        if let Some(FunctionCall { name, arguments }) = part.function_call {
+            if name == "select_context_files" {
+                #[derive(Deserialize)]
+                struct SelectFilesArgs {
+                    files: Vec<String>,
+                }
+                let args: SelectFilesArgs = serde_json::from_value(arguments)?;
+                info!(files = ?args.files, "Selected context files");
+                return Ok(args.files.into_iter().map(PathBuf::from).collect());
+            }
+        }
+    }
+
+    Err(Error::Config(
+        "Expected a function call to `select_context_files`".to_string(),
+    ))
+}
+
 pub struct ImplAgent {
     gemini: GeminiClientWrapper,
     max_retries: u32,
@@ -217,7 +292,10 @@ Implement the current task by calling the `edit_file` or `create_file` functions
         )
     }
 
-    fn process_response(&self, response: &GenerateContentResponse) -> Result<String> {
+    fn process_response(
+        &self,
+        response: &GenerateContentResponse,
+    ) -> Result<(String, Vec<PathBuf>)> {
         use std::io::Write;
 
         #[derive(Deserialize)]
@@ -239,6 +317,7 @@ Implement the current task by calling the `edit_file` or `create_file` functions
             .ok_or_else(|| Error::Config("No candidates in response".to_string()))?;
 
         let mut agent_tips = "".to_string();
+        let mut modified_files = Vec::new();
 
         for part in &candidate.content.parts {
             if let Some(FunctionCall { name, arguments }) = &part.function_call {
@@ -246,8 +325,10 @@ Implement the current task by calling the `edit_file` or `create_file` functions
                 match name.as_str() {
                     "edit_file" => {
                         let args: EditFileArgs = serde_json::from_value(arguments.clone())?;
-                        std::fs::write(&args.path, &args.new_content)?;
+                        let path = PathBuf::from(&args.path);
+                        std::fs::write(&path, &args.new_content)?;
                         info!(path = %args.path, "Edited file");
+                        modified_files.push(path);
                     }
                     "create_file" => {
                         let args: CreateFileArgs = serde_json::from_value(arguments.clone())?;
@@ -259,6 +340,7 @@ Implement the current task by calling the `edit_file` or `create_file` functions
                         file.write_all(args.content.as_bytes())?;
                         file.sync_all()?;
                         info!(path = %args.path, "Created file");
+                        modified_files.push(path);
                     }
                     _ => warn!(?name, "Unknown function call"),
                 }
@@ -268,7 +350,7 @@ Implement the current task by calling the `edit_file` or `create_file` functions
             }
         }
 
-        Ok(agent_tips)
+        Ok((agent_tips, modified_files))
     }
 
     fn run_validation_steps(
@@ -359,13 +441,20 @@ impl Agent for ImplAgent {
                     );
 
                     let workdir = Path::new(".");
-                    // Use the overall plan's file scoping for broader context
-                    let files_in_scope =
+
+                    // Dynamically select which files to use as context for this specific task.
+                    let all_project_files =
                         files::get_filtered_files(workdir, &plan.original_prompt.file_scoping)?;
+                    let files_for_context =
+                        select_context_files(&task.description, &all_project_files).await?;
+
                     let mut file_contents = Vec::new();
-                    for path in &files_in_scope {
-                        let content = std::fs::read_to_string(path)?;
-                        file_contents.push((path.clone(), content));
+                    for path in &files_for_context {
+                        if let Ok(content) = std::fs::read_to_string(path) {
+                            file_contents.push((path.clone(), content));
+                        } else {
+                            warn!(path = %path.display(), "Could not read file for context, it may have been deleted.");
+                        }
                     }
 
                     let tools = self.create_file_tools();
@@ -392,7 +481,7 @@ impl Agent for ImplAgent {
                         .gemini
                         .generate_content(contents, Some(tool_config))
                         .await?;
-                    let agent_tips = self.process_response(&response)?;
+                    let (agent_tips, modified_files) = self.process_response(&response)?;
 
                     let mut formatter_error: Option<String> = None;
                     if let Some(formatter_cmd) = &plan.original_prompt.formatter_command {
@@ -433,6 +522,10 @@ impl Agent for ImplAgent {
                             task.result = Some(TaskResult {
                                 success: true,
                                 agent_tips,
+                                modified_files: modified_files
+                                    .into_iter()
+                                    .map(|p| p.to_string_lossy().to_string())
+                                    .collect(),
                             });
                             succeeded = true;
                             break;
@@ -485,15 +578,20 @@ impl Agent for ImplAgent {
 
             for task in &plan.tasks {
                 commit_message.push_str(&format!("- {}\n", task.description));
-                let files = files::get_filtered_files(Path::new("."), &task.file_scoping)?;
-                for file in files {
-                    changed_files.insert(file);
+                if let Some(result) = &task.result {
+                    for file_path_str in &result.modified_files {
+                        changed_files.insert(PathBuf::from(file_path_str));
+                    }
                 }
             }
 
             let paths_to_commit: Vec<PathBuf> = changed_files.into_iter().collect();
-            vcs::add_and_commit(Path::new("."), &paths_to_commit, &commit_message)?;
-            info!("Changes committed successfully.");
+            if !paths_to_commit.is_empty() {
+                vcs::add_and_commit(Path::new("."), &paths_to_commit, &commit_message)?;
+                info!("Changes committed successfully.");
+            } else {
+                info!("No files were modified, skipping commit.");
+            }
         }
 
         Ok(())
