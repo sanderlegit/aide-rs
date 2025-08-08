@@ -504,6 +504,11 @@ impl Agent for ImplAgent {
                         for part in &candidate.content.parts {
                             if let Some(fc) = &part.function_call {
                                 has_tool_call = true;
+                                info!(
+                                    tool_name = %fc.name,
+                                    tool_args = %serde_json::to_string_pretty(&fc.arguments).unwrap_or_default(),
+                                    "LLM requested tool call"
+                                );
                                 let (stop, tool_response) =
                                     self.handle_function_call(fc, &mut modified_files).await?;
                                 conversation_history.push(Content {
