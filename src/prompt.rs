@@ -23,10 +23,20 @@ impl PromptBuilder {
         prompt_def: &Prompt,
         prompt_path: &Path,
         block_outputs: &HashMap<String, serde_json::Value>,
+        current_block_id: &str,
+        verification_output: &Option<serde_json::Value>,
     ) -> Result<String> {
         let mut parts = Vec::new();
         for part in &prompt_def.composition {
-            let content = self.process_part(part, prompt_path, block_outputs).await?;
+            let content = self
+                .process_part(
+                    part,
+                    prompt_path,
+                    block_outputs,
+                    current_block_id,
+                    verification_output,
+                )
+                .await?;
             parts.push(content);
         }
         Ok(parts.join("\n"))
@@ -37,6 +47,8 @@ impl PromptBuilder {
         part: &PromptPart,
         prompt_path: &Path,
         block_outputs: &HashMap<String, serde_json::Value>,
+        current_block_id: &str,
+        verification_output: &Option<serde_json::Value>,
     ) -> Result<String> {
         match part {
             PromptPart::StaticText { content } => Ok(content.clone()),
@@ -49,10 +61,25 @@ impl PromptBuilder {
                 Ok(format!("{}{}", prefix, field_value))
             }
             PromptPart::PreviousOutput { block_id, prefix } => {
-                let output = block_outputs
-                    .get(block_id)
-                    .and_then(|v| serde_json::to_string_pretty(v).ok())
-                    .unwrap_or_else(|| format!("Error: Output for block '{}' not found.", block_id));
+                let output = if block_id == current_block_id {
+                    // Special case: reference to current block's verification output
+                    verification_output
+                        .as_ref()
+                        .and_then(|v| serde_json::to_string_pretty(v).ok())
+                        .unwrap_or_else(|| {
+                            format!(
+                                "Error: Verification output for block '{}' not available.",
+                                block_id
+                            )
+                        })
+                } else {
+                    block_outputs
+                        .get(block_id)
+                        .and_then(|v| serde_json::to_string_pretty(v).ok())
+                        .unwrap_or_else(|| {
+                            format!("Error: Output for block '{}' not found.", block_id)
+                        })
+                };
                 Ok(format!("{}{}", prefix, output))
             }
             PromptPart::FileContents { scopes, prefix } => {

@@ -38,13 +38,13 @@ This phase focuses on building out the core components of the `FlowRunner` so th
 
 This phase implements the more complex features of the architecture, such as looping and self-correction.
 
--   **[ ] Task 2.1: Implement Block Verification**
+-   **[X] Task 2.1: Implement Block Verification**
     -   Add logic to the `FlowRunner` to handle the `verification` block property.
     -   Implement the `command` verification strategy:
         -   Execute the shell command.
         -   Check the exit code.
         -   On failure, construct the `on_failure_prompt` and re-run the block.
-    -   Implement the `prompt` verification strategy.
+    -   **[ ]** Implement the `prompt` verification strategy.
 
 -   **[ ] Task 2.2: Implement Looping for Task Lists**
     -   Add special handling in the `FlowRunner` for blocks that operate on a list output from a previous block (e.g., implementing a `TaskList`).

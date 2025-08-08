@@ -40,6 +40,9 @@ pub enum Error {
 
     #[error("Logging error: {0}")]
     Logging(String),
+
+    #[error("Block verification failed: {0}")]
+    VerificationFailed(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
