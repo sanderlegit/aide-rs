@@ -33,9 +33,8 @@ impl GeminiClientWrapper {
         let api_key = env::var("GEMINI_API_KEY")
             .map_err(|_| Error::Config("GEMINI_API_KEY must be set".to_string()))?;
 
-        let base_url = env::var("GEMINI_BASE_URL").unwrap_or_else(|_| {
-            "https://generativelanguage.googleapis.com/v1beta/models".to_string()
-        });
+        let base_url = env::var("GEMINI_BASE_URL")
+            .unwrap_or_else(|_| "https://generativelanguage.googleapis.com/v1beta".to_string());
 
         let client = Client::new();
 
@@ -64,7 +63,7 @@ impl GeminiClientWrapper {
         debug!(request = %serde_json::to_string_pretty(&request_body).unwrap_or_else(|_| "Failed to format request body".to_string()), "Gemini request body");
 
         let url = format!(
-            "{}/{}:generateContent?key={}",
+            "{}/models/{}:generateContent?key={}",
             self.base_url, self.model_name, self.api_key
         );
 
