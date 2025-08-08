@@ -54,19 +54,17 @@ The agent relies heavily on Gemini's **Function Calling** capabilities to ensure
 
 ## Usage
 
-`aide-rs` is designed to be run from the root of the project you want to modify. The project should be a Git repository, especially if you plan to use the `--auto-commit` feature.
+`aide-rs` is designed to be run from the root of the project you want to modify. It operates by executing "Flows"—declarative YAML files that define a sequence of prompt-driven steps.
 
-### Step 1: Create a Prompt File
+### Step 1: Define Your Objective
 
-First, define your objective in a TOML file. This file tells the agent what you want to achieve, which files it should consider, and how to validate its work. For complex objectives or detailed coding conventions, you can use TOML's multiline strings (`"""..."""`).
+First, create a simple TOML file that describes your high-level goal and the files the agent should be aware of.
 
-Create a file, for example, `prompts/add_feature.toml`:
-
+**`my_feature.toml`:**
 ```toml
-# prompts/add_feature.toml
-
 objective = """
 Add a new function `hello_world()` to `src/lib.rs` that prints 'Hello, World!' to the console.
+Then, call this new function from `main.rs`.
 """
 
 # Define the files the agent should look at for context.
@@ -77,54 +75,41 @@ exclude = []
 
 # Provide coding conventions for the agent to follow.
 coding_conventions = """
-All functions must have a doc comment.
+All public functions must have a doc comment.
 Follow standard Rust formatting (`cargo fmt`).
 """
-
-# Define commands that must pass for a task to be considered complete.
-[[validation_commands]]
-command = "cargo check"
-expected_exit_code = 0
 ```
 
-### Step 2: Generate the Implementation Plan
+### Step 2: Run a Flow
 
-Run the `plan` command to have the AI architect create a plan.
+`aide-rs` comes with pre-defined flows for common activities like planning and coding. You can see all available flows by running `aide-rs list`.
+
+To execute a flow, use the `run` command, specifying the flow name and your prompt file.
+
+#### Example 1: Generating a Plan
+
+The `plan` flow analyzes your objective and creates a structured list of tasks, but does not execute them.
 
 ```bash
 # Make sure you are in the root of your target git repository
-/path/to/aide-rs plan --prompt prompts/add_feature.toml
+aide-rs run plan --prompt my_feature.toml
 ```
+This will output the plan to your console and save it to the `.ai/` directory.
 
-This will generate a uniquely named plan file in the `.ai/` directory, such as `.ai/plan_add_feature_1678886400.toml`. This file contains the sequence of tasks the agent will perform. You can review this file before proceeding.
+#### Example 2: Implementing Code
 
-### Step 3: Execute the Plan
-
-Now, run the `impl` command to have the AI programmer execute the plan. You can pass the path to the generated plan file.
+The `code` flow will analyze the objective, create a plan, and then immediately attempt to implement it, running validation commands along the way.
 
 ```bash
 # This will execute the plan, edit files, and run validation.
-/path/to/aide-rs impl --plan .ai/plan_add_feature_1678886400.toml
+aide-rs run code --prompt my_feature.toml
 ```
 
 If all tasks are completed successfully, the changes will be applied to your files.
 
-#### Auto-Committing
+### Creating Your Own Flows
 
-To have the agent automatically create a Git commit after each task succeeds, use the `--auto-commit` flag.
-
-```bash
-/path/to/aide-rs impl --plan .ai/plan_add_feature_1678886400.toml --auto-commit
-```
-This will create a new commit for each successfully completed task, with a message derived from the task's description.
-
-#### Enriching Errors with Local Documentation
-
-If the agent gets stuck on a complex error (e.g., a tricky compiler issue or incorrect API usage), you can use the `--enrich-errors` flag. This instructs the agent to use a local `doc-retriever` tool to look up documentation for the specific types and traits mentioned in the compiler error. It generates and parses `rustdoc` output on your machine to provide accurate, version-specific context for the fix.
-
-```bash
-/path/to/aide-rs impl --plan .ai/plan_add_feature_1678886400.toml --enrich-errors
-```
+The true power of `aide-rs` comes from creating your own `*.yml` files in the `flows/` directory. You can define custom sequences of prompts, tools, and validation logic to automate any development task. For a complete guide, see the [Architecture Documentation](doc/refactor_architecture.md).
 
 ## Development
 
