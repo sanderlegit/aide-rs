@@ -6,13 +6,12 @@ use crate::{
     error::{Error, Result},
     files,
     gemini::GeminiClientWrapper,
+    gemini_types::{
+        Content, ContentPart, FunctionCall, FunctionDeclaration, GenerateContentResponse, Role,
+    },
     vcs,
 };
 use async_trait::async_trait;
-use gemini_client_rs::types::{
-    Content, ContentPart, FunctionCall, FunctionDeclaration, GenerateContentResponse, PartResponse,
-    Role,
-};
 use serde::Deserialize;
 use serde_json::json;
 use std::{
@@ -93,7 +92,7 @@ impl ImplAgent {
                 name: "edit_file".to_string(),
                 description: "Edits an existing file with new content. Overwrites the entire file."
                     .to_string(),
-                parameters: serde_json::from_value(json!({
+                parameters: json!({
                     "type": "OBJECT",
                     "properties": {
                         "path": {
@@ -106,13 +105,12 @@ impl ImplAgent {
                         }
                     },
                     "required": ["path", "new_content"]
-                }))
-                .expect("Static schema for edit_file is invalid"),
+                }),
             },
             FunctionDeclaration {
                 name: "create_file".to_string(),
                 description: "Creates a new file with specified content.".to_string(),
-                parameters: serde_json::from_value(json!({
+                parameters: json!({
                     "type": "OBJECT",
                     "properties": {
                         "path": {
@@ -125,8 +123,7 @@ impl ImplAgent {
                         }
                     },
                     "required": ["path", "content"]
-                }))
-                .expect("Static schema for create_file is invalid"),
+                }),
             },
         ]
     }
@@ -206,31 +203,28 @@ Implement the task by calling the `edit_file` or `create_file` functions.
         let mut agent_tips = "".to_string();
 
         for part in &candidate.content.parts {
-            match part {
-                PartResponse::FunctionCall(FunctionCall { name, arguments }) => {
-                    info!(?name, "Processing function call");
-                    match name.as_str() {
-                        "edit_file" => {
-                            let args: EditFileArgs = serde_json::from_value(arguments.clone())?;
-                            std::fs::write(&args.path, &args.new_content)?;
-                            info!(path = %args.path, "Edited file");
-                        }
-                        "create_file" => {
-                            let args: CreateFileArgs = serde_json::from_value(arguments.clone())?;
-                            let path = PathBuf::from(&args.path);
-                            if let Some(parent) = path.parent() {
-                                std::fs::create_dir_all(parent)?;
-                            }
-                            std::fs::write(&path, &args.content)?;
-                            info!(path = %args.path, "Created file");
-                        }
-                        _ => warn!(?name, "Unknown function call"),
+            if let Some(FunctionCall { name, arguments }) = &part.function_call {
+                info!(?name, "Processing function call");
+                match name.as_str() {
+                    "edit_file" => {
+                        let args: EditFileArgs = serde_json::from_value(arguments.clone())?;
+                        std::fs::write(&args.path, &args.new_content)?;
+                        info!(path = %args.path, "Edited file");
                     }
+                    "create_file" => {
+                        let args: CreateFileArgs = serde_json::from_value(arguments.clone())?;
+                        let path = PathBuf::from(&args.path);
+                        if let Some(parent) = path.parent() {
+                            std::fs::create_dir_all(parent)?;
+                        }
+                        std::fs::write(&path, &args.content)?;
+                        info!(path = %args.path, "Created file");
+                    }
+                    _ => warn!(?name, "Unknown function call"),
                 }
-                PartResponse::Text(text) => {
-                    agent_tips = text.clone();
-                }
-                _ => {}
+            }
+            if let Some(text) = &part.text {
+                agent_tips = text.clone();
             }
         }
 

@@ -1,17 +1,17 @@
 use crate::{
     agents::{
-        Agent,
         state::{FileScope, ImplementationPlan, PlanPrompt, Task, TaskStatus, ValidationStep},
+        Agent,
     },
     error::{Error, Result},
     files,
     gemini::GeminiClientWrapper,
+    gemini_types::{
+        Content, ContentPart, DynamicRetrieval, DynamicRetrievalConfig, FunctionCall,
+        GenerateContentResponse, Role, ToolConfig,
+    },
 };
 use async_trait::async_trait;
-use gemini_client_rs::types::{
-    Content, ContentPart, DynamicRetrieval, DynamicRetrievalConfig, FunctionCall,
-    GenerateContentResponse, PartResponse, Role, ToolConfig,
-};
 use serde::Deserialize;
 use serde_json::json;
 use std::path::{Path, PathBuf};
@@ -112,7 +112,7 @@ Generate a list of task descriptions by calling the `create_task_descriptions` f
             Error::Config("No parts in candidate for description response".to_string())
         })?;
 
-        if let PartResponse::FunctionCall(FunctionCall { name, arguments }) = part {
+        if let Some(FunctionCall { name, arguments }) = part.function_call {
             if name == "create_task_descriptions" {
                 info!(
                     ?arguments,
@@ -244,7 +244,7 @@ Please provide the file scoping and validation steps for this specific task by c
             .next()
             .ok_or_else(|| Error::Config("No parts in candidate for detailing response".to_string()))?;
 
-        if let PartResponse::FunctionCall(FunctionCall { name, arguments }) = part {
+        if let Some(FunctionCall { name, arguments }) = part.function_call {
             if name == "create_task_details" {
                 info!(
                     ?arguments,
@@ -291,7 +291,7 @@ Focus on libraries that are well-maintained, popular, and fit the requirements. 
             .ok_or_else(|| Error::Config("No candidates in search response".to_string()))?;
 
         if let Some(part) = candidate.content.parts.first() {
-            if let PartResponse::Text(text) = part {
+            if let Some(text) = &part.text {
                 info!(search_result = %text, "Successfully got search result");
                 return Ok(text.clone());
             }
