@@ -409,10 +409,7 @@ impl Agent for ImplAgent {
                 let mut last_error: Option<String> = None;
                 if is_first_pending_task {
                     if let Some(initial_error) = initial_error_context.take() {
-                        last_error = Some(format!(
-                            "The project failed initial validation before starting the first task. Please fix this issue first.\nError:\n{}",
-                            initial_error
-                        ));
+                        last_error = Some(initial_error);
                     }
                     is_first_pending_task = false;
                 }
