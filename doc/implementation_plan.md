@@ -46,9 +46,10 @@ This phase implements the more complex features of the architecture, such as loo
         -   On failure, construct the `on_failure_prompt` and re-run the block.
     -   **[ ]** Implement the `prompt` verification strategy.
 
--   **[ ] Task 2.2: Implement Looping for Task Lists**
+-   **[X] Task 2.2: Implement Looping for Task Lists**
     -   Add special handling in the `FlowRunner` for blocks that operate on a list output from a previous block (e.g., implementing a `TaskList`).
-    -   This will involve iterating over the list and running a sub-flow (or the same block with different context) for each item.
+    -   This involves iterating over the list and running the block's logic for each item.
+    -   The current loop item is exposed to the prompt system via the `as` key in the `looping` config.
     -   This is the mechanism for the "Just-in-Time Planning" described in the architecture.
 
 ## Phase 3: Testing and Validation

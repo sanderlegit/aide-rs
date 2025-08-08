@@ -26,9 +26,9 @@ blocks:
 
   - id: "implement_tasks"
     description: "Iterate through the generated tasks and implement them."
-    # This block would be handled by special logic in the FlowRunner
-    # to loop over the `TaskList` from the previous block.
-    # For each task, it would run a sub-flow similar to this:
+    looping:
+      over: "generate_tasks"
+      as: "current_task"
     prompt:
       composition:
         - type: static_text
@@ -40,8 +40,8 @@ blocks:
         - type: file_contents
           scopes: [ "base", "prompt" ]
           prefix: "\n**Project File Context:**\n"
-        - type: previous_output # This would be the current task description from the loop
-          block_id: "generate_tasks"
+        - type: previous_output # This is the current task description from the loop
+          block_id: "current_task"
           prefix: "\n**Current Task:**\n"
     annotations:
       history: full
