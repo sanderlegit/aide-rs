@@ -49,7 +49,7 @@ blocks:
         - type: static_text
           content: "You are an expert software architect..." # System prompt
         - type: file_contents
-          scope_from_prompt: true # Use file_scoping from the user's prompt file
+          scopes: [ "base", "prompt" ] # Use the base scope and the one from the user prompt
           prefix: "**Project File Context:**\n"
         - type: prompt_file_field
           field: "objective"

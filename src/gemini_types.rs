@@ -30,12 +30,22 @@ pub struct Content {
     pub role: Role,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
-pub enum ContentPart {
-    Text(String),
-    FunctionCall(FunctionCall),
-    FunctionResponse(FunctionResponse),
+#[serde(skip_serializing_if = "Option::is_none")]
+pub struct ContentPart {
+    pub text: Option<String>,
+    pub function_call: Option<FunctionCall>,
+    pub function_response: Option<FunctionResponse>,
+}
+
+impl ContentPart {
+    pub fn new_text(text: String) -> Self {
+        Self {
+            text: Some(text),
+            ..Default::default()
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
