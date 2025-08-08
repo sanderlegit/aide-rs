@@ -659,6 +659,7 @@ expected_exit_code = 0
         .arg("impl")
         .arg("--plan")
         .arg(plan_path)
+        .arg("--auto-commit")
         .assert()
         .success();
 
