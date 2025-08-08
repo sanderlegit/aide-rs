@@ -388,12 +388,9 @@ impl FlowRunner {
                         parameters: serde_json::from_str(r#"{"type": "object", "properties": {}}"#)
                             .unwrap(),
                     };
-                    let tools_config =
-                        Some(vec![crate::gemini_types::ToolConfig::FunctionDeclaration(
-                            crate::gemini_types::ToolConfigFunctionDeclaration {
-                                function_declarations: vec![verification_tool],
-                            },
-                        )]);
+                    let tools_config = Some(vec![crate::gemini_types::Tool {
+                        function_declarations: vec![verification_tool],
+                    }]);
 
                     let user_content = Content {
                         role: Role::User,
