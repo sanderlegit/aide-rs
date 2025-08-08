@@ -22,4 +22,16 @@ pub enum Commands {
     },
     /// Lists all available flows.
     List,
+    /// Shows the definition of a specific flow.
+    Show {
+        /// The name of the flow to show.
+        #[arg(value_name = "FLOW_NAME")]
+        flow_name: String,
+    },
+    /// Lists all files included in one or more context scopes.
+    ListFiles {
+        /// The names of the context scopes to use (e.g., "base", "ai").
+        #[arg(required = true)]
+        scope_names: Vec<String>,
+    },
 }
