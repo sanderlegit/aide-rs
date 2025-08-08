@@ -205,7 +205,7 @@ fn get_methods<T: HasItems>(krate: &Crate, item_with_impls: &T) -> Vec<serde_jso
                         if let ItemEnum::Function(func) = &method_item.inner {
                             methods.push(json!({
                                 "name": method_item.name.clone().unwrap_or_default(),
-                                "signature": clean_fn_signature(&func.sig.decl.output, &func.sig.decl.inputs, method_item.name.as_deref().unwrap_or("")),
+                                "signature": clean_fn_signature(&func.sig.output, &func.sig.inputs, method_item.name.as_deref().unwrap_or("")),
                                 "documentation": method_item.docs.clone().unwrap_or_default(),
                             }));
                         }
@@ -225,7 +225,7 @@ fn get_impls(krate: &Crate, item_id: &Id) -> Vec<String> {
             ItemEnum::Impl(imp) => {
                 if let Type::ResolvedPath(path) = &imp.for_ {
                     if &path.id == item_id {
-                        return imp.trait_.as_ref().map(|t| t.path.join("::"));
+                        return imp.trait_.as_ref().map(|t| t.path.clone());
                     }
                 }
                 None
@@ -256,7 +256,7 @@ fn clean_fn_signature(
 
 fn clean_type(ty: &Type) -> String {
     match ty {
-        Type::ResolvedPath(path) => path.path.join("::"),
+        Type::ResolvedPath(path) => path.path.clone(),
         Type::Generic(name) => name.clone(),
         Type::Primitive(name) => name.clone(),
         Type::BorrowedRef { type_, .. } => format!("&{}", clean_type(type_)),
