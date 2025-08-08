@@ -57,6 +57,14 @@ rustdoc-types = "0.55.0"
 # For showing diffs
 similar = "2.5.0"
 
+[[bin]]
+name = "aide-rs"
+path = "src/main.rs"
+
+[[bin]]
+name = "doc-retriever"
+path = "src/bin/doc_retriever.rs"
+
 [dev-dependencies]
 # HTTP mocking for testing API interactions deterministically.
 wiremock = "0.6.0"

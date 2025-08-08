@@ -65,6 +65,7 @@ fn main() -> Result<()> {
 fn generate_docs(crate_name: &str) -> Result<PathBuf> {
     Builder::default()
         .package(crate_name)
+        .manifest_path("Cargo.toml")
         .quiet(true)
         .build()
         .map_err(|e| Error::Config(format!("Failed to build rustdoc for {}: {}", crate_name, e)))
