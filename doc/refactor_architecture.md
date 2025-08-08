@@ -21,16 +21,16 @@ The new system revolves around three key concepts:
 -   **Block**: A single, atomic step within a Flow. A Block defines how to construct a prompt, how to execute it (e.g., with history, with tools), and how to validate its output.
 -   **Flow Runner**: The Rust component (`src/runner.rs`) responsible for parsing a Flow YAML file and executing its Blocks sequentially, managing state, history, and tool calls.
 
-The execution process is as follows:
-1.  User invokes `aide-rs run <flow_name> --prompt <initial_context.toml>`.
-2.  The `Flow Runner` loads `flows/<flow_name>.yml`.
-3.  It iterates through the `blocks` defined in the Flow.
-4.  For each Block, it:
-    a. Constructs the prompt based on the Block's `prompt` definition (e.g., combining static text, file contents, and output from previous blocks).
-    b. Executes the prompt against the Gemini API, respecting the Block's `annotations` (e.g., history management, tool availability).
-    c. Handles the response, which could be text, a tool call, or structured data.
-    d. If the Block has a `verification` step, it runs it (e.g., executing a shell command or a follow-up prompt) and loops if verification fails.
-    e. Stores the final output of the Block, making it available to subsequent Blocks.
+A typical end-to-end `code` flow execution process is as follows:
+1.  User invokes `aide-rs run code --prompt <initial_context.toml>`.
+2.  The `Flow Runner` loads `flows/code.yml`.
+3.  **Block 1: High-Level Planning.** The first block prompts the LLM to generate a detailed, human-readable implementation plan in Markdown format. This is a creative step to outline the strategy, including new files, tests, and logic changes.
+4.  **Block 2: Structured Task Generation.** The Markdown plan from the previous block is used as input. This block's prompt asks the LLM to convert the plan into a structured list of high-level task descriptions (e.g., a `Vec<TaskDescription>`). This is achieved by calling a tool like `create_task_list`.
+5.  **Block 3: Task Implementation Loop.** This block is managed by special logic within the `FlowRunner`. It iterates through the list of tasks generated in the previous step. The agent may decide to batch several related tasks together. For each task (or batch):
+    a. **Just-in-Time (JIT) Planning:** A sub-prompt is run to create a `DetailedTaskPlan` for the current task batch. This plan is a structured object defining the specific file scopes, validation commands, and success criteria for *only this batch*.
+    b. **Implementation:** Another sub-prompt is run to execute the `DetailedTaskPlan`. The LLM uses tools like `edit_file` to perform the work.
+    c. **Verification:** The `verification` strategy for the block (e.g., `cargo check`) is executed. If it fails, the implementation step is retried with the error context, up to `max_retries`.
+6.  The `FlowRunner` continues this loop until all tasks are successfully completed.
 
 ## 3. Flow Definition: The YAML Schema
 
@@ -145,6 +145,11 @@ This new architecture requires significant changes to the codebase.
 The previous `plan` and `impl` functionality can be replicated as two separate flows.
 
 -   **`flows/plan.yml`**: A single-block flow that uses a prompt and the `task_creator` tool to generate a structured list of tasks, similar to the old `PlanAgent`.
--   **`flows/code.yml`**: A more complex flow that takes a task list as input. It would contain a block with a `verification` step using `type: command` to loop over a task, attempt to implement it, and run `cargo check` until it passes.
+-   **`flows/code.yml`**: A multi-stage flow that orchestrates the entire development process:
+    1.  **High-Level Plan Block**: Takes the user's objective and generates a detailed implementation plan in Markdown.
+    2.  **Structured Task Block**: Takes the Markdown plan and converts it into a structured list of task descriptions using a tool.
+    3.  **Implementation Loop Block**: This block is designed to be looped over by the `FlowRunner`. For each task description from the previous block (or a batch of them), it performs a two-step process:
+        -   **JIT Planning**: A prompt that takes the task description(s) and creates a detailed, structured `TaskPlan` (defining scopes, validation, etc.) for that specific work item.
+        -   **Implementation & Verification**: A prompt that takes the `TaskPlan` and implements the code, followed by a `verification` step (e.g., `command: "cargo check"`) to ensure correctness. The `FlowRunner` handles the retry loop on failure.
 
 This demonstrates the power of the new system: core behaviors are no longer hardcoded but are flexible, composable workflows.
