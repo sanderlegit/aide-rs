@@ -13,7 +13,7 @@ Establish the foundational structure of the Rust project. This includes setting 
     *   Create the directory structure `src/agents`, `src/bin`, etc., as outlined in `spec/00_implementation_plan.md`.
 3.  **Implement Error Handling**: Create `src/error.rs` and define a top-level `Error` enum using `thiserror` to handle various failure scenarios (I/O, API, Config).
 4.  **Implement Configuration**: Create `src/config.rs` to define and load application configuration (e.g., from `.aide-rs.toml`).
-5.  **Initialize Logging**: In `main.rs`, set up `tracing` and `tracing-subscriber` to provide structured, level-based logging. The initial setup should be simple, configurable via an environment variable like `RUST_LOG`.
+5.  **Initialize Logging**: In `main.rs`, set up `tracing` and `tracing-subscriber` to provide structured, level-based logging to the console. Additionally, implement a `RunLogger` in `src/logging.rs` that creates a unique directory for each run and writes detailed, structured logs for debugging and analysis.
 
 ## Test Coverage
 *   **Unit Tests**:

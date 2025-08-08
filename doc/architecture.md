@@ -16,7 +16,7 @@ The application's logic is orchestrated from `src/main.rs`, which parses command
 ### 1. CLI and Entrypoint (`src/main.rs`, `src/cli.rs`)
 
 -   **`cli.rs`**: Defines the command-line interface using `clap`. It specifies the `plan` and `impl` subcommands and their arguments.
--   **`main.rs`**: The application entry point. It parses the CLI input and orchestrates the high-level workflow:
+-   **`main.rs`**: The application entry point. It initializes logging, parses the CLI input, and orchestrates the high-level workflow:
     - For `aide plan`, it deserializes the user's TOML prompt, runs the `PlanAgent`, and saves the resulting plan.
     - For `aide impl`, it loads a plan and runs the `ImplAgent` to execute it.
 
@@ -72,7 +72,7 @@ This abstraction standardizes how agents are invoked.
 
 ### 6. Supporting Modules
 
--   **`gemini.rs` (`GeminiClientWrapper`)**: A wrapper that handles all communication with the Google Gemini REST API. It constructs requests, sends them via `reqwest`, and processes responses, including handling function calling tools. It provides constructors for different agent types (plan, impl) which may use different models.
+-   **`gemini.rs` (`GeminiClientWrapper`)**: A wrapper that handles all communication with the Google Gemini REST API. It constructs requests, sends them via `reqwest`, processes responses, and logs all interactions (prompts, responses, tool calls) via the `RunLogger`. It provides constructors for different agent types (plan, impl) which may use different models.
 -   **`files.rs`**: Provides the `get_filtered_files` utility, which uses the `ignore` crate to walk the directory tree and find files matching a `FileScope`, while respecting `.gitignore` rules.
 -   **`vcs.rs`**: Provides Git functionality, specifically `add_and_commit`, using the `git2` crate.
 -   **`error.rs`**: Defines a centralized `Error` enum using `thiserror` for clean, consistent error handling across the application.

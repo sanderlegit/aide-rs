@@ -13,6 +13,7 @@ Build the core intelligent components of the application: the `PlanAgent` and `I
         *   Initializing the client (e.g., loading the API key from `.env`).
         *   Constructing `GenerateContentRequest` objects, including system prompts, user messages, and tool definitions (function declarations).
         *   Handling responses and extracting function calls or text content.
+        *   Logging all prompts and responses to the run-specific log files.
         *   Translating `gemini_client_rs` errors into the application's custom `Error` type.
 3.  **Implement `PlanAgent` (`agents/plan_agent.rs`)**:
     *   Implement the `Agent` trait for `PlanAgent`.

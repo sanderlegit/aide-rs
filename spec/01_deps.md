@@ -46,6 +46,9 @@ async-trait = "0.1.88"
 
 # For making HTTP requests in the custom Gemini wrapper.
 reqwest = { version = "0.12.5", features = ["json"] }
+
+# For timestamps in logging
+chrono = { version = "0.4", features = ["serde"] }
 ```
 
 ### Development Dependencies (`[dev-dependencies]`)
@@ -76,5 +79,6 @@ tempfile = "3.10.1"
 *   **`dotenvy`**: A utility to load environment variables from a `.env` file, useful for managing secrets like API keys during local development.
 *   **`reqwest`**: A powerful HTTP client used to build a custom wrapper for sending requests to the Gemini API.
 *   **`async-trait`**: Allows the use of `async fn` in traits, which is key for the generic `Agent` abstraction.
+*   **`chrono`**: Provides date and time utilities, used here for timestamping log entries.
 *   **`wiremock`**: Critical for integration testing. It allows you to create a mock HTTP server that can simulate the Gemini API, enabling you to test your agent's logic without making actual API calls, which is faster, cheaper, and more predictable.
 *   **`assert_cmd`** & **`tempfile`**: The go-to combination for end-to-end testing of CLI applications. `assert_cmd` lets you run your compiled binary and make assertions about its output and exit code, while `tempfile` provides a safe way to create temporary project structures and files for your tests to run against.

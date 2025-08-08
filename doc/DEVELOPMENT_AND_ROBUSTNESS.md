@@ -30,6 +30,7 @@ The codebase is designed to be modular and maintainable, following standard Rust
     *   `files.rs`: File system operations.
     *   `vcs.rs`: Version control (Git) operations.
     *   `gemini.rs`: A wrapper for all Gemini API interactions.
+    *   `logging.rs`: A comprehensive logging system that records agent operations to run-specific files for debugging and analysis.
     *   `agents/state.rs`: All serializable state structs.
 *   **Structured State**: The application is stateless and relies on the filesystem (e.g., `.ai/plan_my_feature_1678886400.toml`) to store its state, allowing for resumable and auditable workflows.
 
@@ -46,6 +47,10 @@ All tests are designed to run sequentially (`--test-threads=1`) to avoid race co
 ## Robustness and Error Handling
 
 Several mechanisms are in place to ensure the agent operates reliably and fails gracefully.
+
+*   **Comprehensive Logging**: For each run, the agent creates a unique, timestamped directory in `.ai/logs/`. Inside, it generates:
+    *   `summary.log`: A human-readable log of major events (prompts, responses, tool calls).
+    *   `complete.log.jsonl`: A machine-readable JSONL file with detailed, structured data for every event, including full API request/response bodies, tool arguments, and validation results. This is invaluable for debugging agent behavior and analyzing performance.
 
 *   **Circuit Breakers for Loops**: The `ImplAgent` operates on a retry loop for each task. The `max_retries` parameter (configurable via the CLI) acts as a crucial circuit breaker, preventing infinite loops if a task consistently fails validation. If a task fails all retries, the agent halts and reports the failure.
 *   **Structured API Interaction**: The system heavily relies on Gemini's **Function Calling** feature instead of parsing free-form text. This ensures that data from the LLM is structured and can be reliably deserialized into Rust structs.

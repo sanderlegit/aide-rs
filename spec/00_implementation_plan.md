@@ -46,7 +46,7 @@ The application will be a library crate with a binary entry point. State will be
 
 *   **Error Handling:** The custom `error.rs` module will define a comprehensive `Error` enum using `thiserror`. It will distinguish between API errors, configuration errors, I/O errors, and validation failures to provide precise, user-friendly diagnostics.
 *   **Coding Standards:** The project will adhere to standard Rust conventions. `cargo fmt` will be used for formatting, and `cargo clippy -- -D warnings` will be run as part of the CI pipeline to enforce high code quality.
-*   **Logging:** The `tracing` crate will be used for structured logging. Log levels will be configurable via the CLI (`-v`, `-vv`) to control verbosity for debugging.
+*   **Logging:** The `tracing` crate will be used for structured logging to the console. In addition, a dedicated `RunLogger` will create a unique directory for each run (e.g., `.ai/logs/20250808_123000/`) containing a human-readable summary log and a detailed, machine-readable JSONL log of all agent operations. This provides full traceability for debugging and analysis.
 
 ### **4. Command-Line Interface (CLI) Specification (`cli.rs`)**
 
