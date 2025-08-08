@@ -11,6 +11,7 @@ fn setup_logging() {
     let subscriber = FmtSubscriber::builder()
         // Disable ANSI colors when running tests, as they can interfere with test output parsing.
         .with_ansi(cfg!(not(test)))
+        .with_writer(std::io::stderr)
         .with_env_filter(
             EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
         )

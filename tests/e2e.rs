@@ -83,7 +83,9 @@ validation_commands = [{ command = "cargo check", expected_exit_code = 0 }]
         .clone();
 
     // 4. Assert that the plan file was created correctly
+    let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
+    println!("\n--- E2E TEST: test_plan_workflow ---\n--- STDOUT ---\n{}\n--- STDERR ---\n{}\n---\n", stdout, stderr);
     let plan_path_str = stderr
         .lines()
         .find(|line| line.contains("Implementation plan saved to"))
@@ -366,7 +368,9 @@ validation_commands = []
         .clone();
 
     // 6. Assert that the plan file was created correctly
+    let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
+    println!("\n--- E2E TEST: test_plan_workflow_with_google_search ---\n--- STDOUT ---\n{}\n--- STDERR ---\n{}\n---\n", stdout, stderr);
     let plan_path_str = stderr
         .lines()
         .find(|line| line.contains("Implementation plan saved to"))
