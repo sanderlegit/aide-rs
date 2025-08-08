@@ -61,12 +61,15 @@ pub struct ImplAgent {
 
 fn run_command(command_str: &str) -> Result<(i32, String)> {
     info!(command = command_str, "Running command");
-    let parts: Vec<&str> = command_str.split_whitespace().collect();
-    if parts.is_empty() {
+    if command_str.is_empty() {
         return Err(Error::Config("Empty command".to_string()));
     }
 
-    let output = Command::new(parts[0]).args(&parts[1..]).output()?;
+    let output = if cfg!(target_os = "windows") {
+        Command::new("cmd").args(["/C", command_str]).output()?
+    } else {
+        Command::new("sh").arg("-c").arg(command_str).output()?
+    };
 
     let exit_code = output.status.code().unwrap_or(1);
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
