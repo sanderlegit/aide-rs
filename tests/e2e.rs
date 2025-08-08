@@ -3,7 +3,8 @@ use assert_cmd::Command;
 use git2::Repository;
 use serde_json::json;
 use std::fs;
-use wiremock::matchers::{body_string_contains, method, not, path_regex};
+use wiremock::matchers::{body_string_contains, method, path_regex};
+use wiremock_logical_matchers::not;
 use wiremock::{Mock, ResponseTemplate};
 
 mod common;
