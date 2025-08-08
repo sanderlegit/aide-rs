@@ -23,14 +23,14 @@ pub enum ToolConfig {
     FunctionDeclaration(ToolConfigFunctionDeclaration),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Content {
     pub parts: Vec<ContentPart>,
     pub role: Role,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub enum ContentPart {
     Text(String),
@@ -121,14 +121,14 @@ pub struct FunctionCall {
     pub arguments: serde_json::Value,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct FunctionResponse {
     pub name: String,
     pub response: FunctionResponsePayload,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct FunctionResponsePayload {
     pub content: serde_json::Value,

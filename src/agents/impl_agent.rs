@@ -7,8 +7,7 @@ use crate::{
     files,
     gemini::GeminiClientWrapper,
     gemini_types::{
-        Content, ContentPart, FunctionCall, FunctionDeclaration, FunctionResponse,
-        GenerateContentResponse, Role,
+        Content, ContentPart, FunctionCall, FunctionDeclaration, FunctionResponse, Role,
     },
     vcs,
 };
@@ -273,6 +272,113 @@ Implement the current task by calling the `edit_file` or `create_file` functions
         self.run_validation_steps(&task.validation_steps)
     }
 
+    async fn handle_function_call(
+        &self,
+        fc: &FunctionCall,
+        modified_files: &mut Vec<PathBuf>,
+    ) -> Result<(bool, ContentPart)> {
+        use std::io::Write;
+        info!(name = %fc.name, "Processing function call");
+
+        let (stop_conversation, response_payload) = match fc.name.as_str() {
+            "edit_file" => {
+                #[derive(Deserialize)]
+                struct Args {
+                    path: String,
+                    new_content: String,
+                }
+                let args: Args = serde_json::from_value(fc.arguments.clone())?;
+                let path = PathBuf::from(&args.path);
+
+                let old_content = std::fs::read_to_string(&path).unwrap_or_default();
+                std::fs::write(&path, &args.new_content)?;
+
+                println!("\n--- DIFF for {} ---", path.display());
+                let diff = TextDiff::from_lines(&old_content, &args.new_content);
+                for change in diff.iter_all_changes() {
+                    let sign = match change.tag() {
+                        ChangeTag::Delete => "-",
+                        ChangeTag::Insert => "+",
+                        ChangeTag::Equal => " ",
+                    };
+                    print!("{}{}", sign, change);
+                }
+                println!("--- END DIFF ---\n");
+
+                info!(path = %args.path, "Edited file");
+                modified_files.push(path);
+                (true, json!({"status": "success"}))
+            }
+            "create_file" => {
+                #[derive(Deserialize)]
+                struct Args {
+                    path: String,
+                    content: String,
+                }
+                let args: Args = serde_json::from_value(fc.arguments.clone())?;
+                let path = PathBuf::from(&args.path);
+                if let Some(parent) = path.parent() {
+                    std::fs::create_dir_all(parent)?;
+                }
+                let mut file = std::fs::File::create(&path)?;
+                file.write_all(args.content.as_bytes())?;
+                file.sync_all()?;
+
+                println!("\n--- NEW FILE {} ---", path.display());
+                for line in args.content.lines() {
+                    println!("+{}", line);
+                }
+                println!("--- END NEW FILE ---\n");
+
+                info!(path = %args.path, "Created file");
+                modified_files.push(path);
+                (true, json!({"status": "success"}))
+            }
+            "doc_retriever" => {
+                #[derive(Deserialize)]
+                struct Args {
+                    subcommand: String,
+                    crate_name: String,
+                    path: Option<String>,
+                }
+                let args: Args = serde_json::from_value(fc.arguments.clone())?;
+                let mut cmd_args = vec![args.subcommand, "--crate".to_string(), args.crate_name];
+                if let Some(p) = args.path {
+                    cmd_args.push("--path".to_string());
+                    cmd_args.push(p);
+                }
+                let cmd = format!("cargo run --bin doc-retriever -- {}", cmd_args.join(" "));
+
+                let (exit_code, stdout, stderr) = run_command(&cmd)?;
+                if exit_code == 0 {
+                    let doc_json: serde_json::Value = serde_json::from_str(&stdout)?;
+                    (false, doc_json)
+                } else {
+                    (
+                        false,
+                        json!({ "success": false, "error": stderr }),
+                    )
+                }
+            }
+            _ => {
+                warn!(name = %fc.name, "Unknown function call");
+                (
+                    false,
+                    json!({"success": false, "error": "Unknown function call"}),
+                )
+            }
+        };
+
+        Ok((
+            stop_conversation,
+            ContentPart::FunctionResponse(FunctionResponse {
+                name: fc.name.clone(),
+                response: FunctionResponsePayload {
+                    content: response_payload,
+                },
+            }),
+        ))
+    }
 }
 
 #[async_trait]
@@ -556,109 +662,4 @@ impl Agent for ImplAgent {
         Ok(())
     }
 
-    async fn handle_function_call(
-        &self,
-        fc: &FunctionCall,
-        modified_files: &mut Vec<PathBuf>,
-    ) -> Result<(bool, ContentPart)> {
-        use std::io::Write;
-        info!(name = %fc.name, "Processing function call");
-
-        let (stop_conversation, response_payload) = match fc.name.as_str() {
-            "edit_file" => {
-                #[derive(Deserialize)]
-                struct Args {
-                    path: String,
-                    new_content: String,
-                }
-                let args: Args = serde_json::from_value(fc.arguments.clone())?;
-                let path = PathBuf::from(&args.path);
-
-                let old_content = std::fs::read_to_string(&path).unwrap_or_default();
-                std::fs::write(&path, &args.new_content)?;
-
-                println!("\n--- DIFF for {} ---", path.display());
-                let diff = TextDiff::from_lines(&old_content, &args.new_content);
-                for change in diff.iter_all_changes() {
-                    let sign = match change.tag() {
-                        ChangeTag::Delete => "-",
-                        ChangeTag::Insert => "+",
-                        ChangeTag::Equal => " ",
-                    };
-                    print!("{}{}", sign, change);
-                }
-                println!("--- END DIFF ---\n");
-
-                info!(path = %args.path, "Edited file");
-                modified_files.push(path);
-                (true, json!({"status": "success"}))
-            }
-            "create_file" => {
-                #[derive(Deserialize)]
-                struct Args {
-                    path: String,
-                    content: String,
-                }
-                let args: Args = serde_json::from_value(fc.arguments.clone())?;
-                let path = PathBuf::from(&args.path);
-                if let Some(parent) = path.parent() {
-                    std::fs::create_dir_all(parent)?;
-                }
-                let mut file = std::fs::File::create(&path)?;
-                file.write_all(args.content.as_bytes())?;
-                file.sync_all()?;
-
-                println!("\n--- NEW FILE {} ---", path.display());
-                for line in args.content.lines() {
-                    println!("+{}", line);
-                }
-                println!("--- END NEW FILE ---\n");
-
-                info!(path = %args.path, "Created file");
-                modified_files.push(path);
-                (true, json!({"status": "success"}))
-            }
-            "doc_retriever" => {
-                #[derive(Deserialize)]
-                struct Args {
-                    subcommand: String,
-                    crate_name: String,
-                    path: Option<String>,
-                }
-                let args: Args = serde_json::from_value(fc.arguments.clone())?;
-                let mut cmd_args = vec![args.subcommand, "--crate".to_string(), args.crate_name];
-                if let Some(p) = args.path {
-                    cmd_args.push("--path".to_string());
-                    cmd_args.push(p);
-                }
-                let cmd = format!("cargo run --bin doc-retriever -- {}", cmd_args.join(" "));
-
-                let (exit_code, stdout, stderr) = run_command(&cmd)?;
-                if exit_code == 0 {
-                    let doc_json: serde_json::Value = serde_json::from_str(&stdout)?;
-                    (false, doc_json)
-                } else {
-                    (
-                        false,
-                        json!({ "success": false, "error": stderr }),
-                    )
-                }
-            }
-            _ => {
-                warn!(name = %fc.name, "Unknown function call");
-                (
-                    false,
-                    json!({"success": false, "error": "Unknown function call"}),
-                )
-            }
-        };
-
-        Ok((
-            stop_conversation,
-            ContentPart::FunctionResponse(FunctionResponse {
-                name: fc.name.clone(),
-                response: json!({ "content": response_payload }),
-            }),
-        ))
-    }
 }
