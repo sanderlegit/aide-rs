@@ -1,5 +1,5 @@
 use crate::error::{Error, Result};
-use crate::gemini_types::{Content, GenerateContentResponse, PartResponse};
+use crate::gemini_types::{Content, GenerateContentResponse};
 use dotenvy::dotenv;
 use reqwest::Client;
 use std::env;
@@ -15,7 +15,7 @@ pub struct GeminiClientWrapper {
 impl GeminiClientWrapper {
     // Using gemini-2.5-flash for planning as it's fast and capable for generation.
     pub fn new_plan_agent() -> Result<Self> {
-        Self::new("gemini-2.5-pro".to_string())
+        Self::new("gemini-2.5-flash".to_string())
     }
 
     // Using gemini-2.5-flash for summarization as it's fast and cheap.

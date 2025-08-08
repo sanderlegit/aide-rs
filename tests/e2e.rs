@@ -494,7 +494,7 @@ async fn test_impl_multi_task_workflow() {
                         "name": "create_file",
                         "args": {
                             "path": "src/main.rs",
-                            "new_content": "fn main() -> anyhow::Result<()> {\n    println!(\"Hello, world!\");\n    Ok(())\n}\n"
+                            "content": "fn main() -> anyhow::Result<()> {\n    println!(\"Hello, world!\");\n    Ok(())\n}\n"
                         }
                     }
                 }]
