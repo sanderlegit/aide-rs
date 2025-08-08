@@ -14,44 +14,12 @@ use crate::{
 use async_trait::async_trait;
 use serde::Deserialize;
 use serde_json::json;
+use similar::{ChangeTag, TextDiff};
 use std::{
     path::{Path, PathBuf},
     process::Command,
 };
 use tracing::{error, info, warn};
-
-async fn summarize_error(error_output: &str) -> Result<String> {
-    info!("Summarizing error output...");
-    let gemini = GeminiClientWrapper::new_summarize_agent()?;
-    let prompt = format!(
-        "Summarize this compiler/tool error into its most critical message, keeping it concise and focusing on the root cause: {}",
-        error_output
-    );
-
-    let contents = vec![Content {
-        role: Role::User,
-        parts: vec![ContentPart::Text(prompt)],
-    }];
-
-    let response = gemini.generate_content::<()>(contents, None).await?;
-
-    let candidate = response
-        .candidates
-        .and_then(|mut c| c.pop())
-        .ok_or_else(|| Error::Config("No candidates in summarization response".to_string()))?;
-
-    if let Some(part) = candidate.content.parts.into_iter().next() {
-        if let Some(text) = part.text {
-            info!(summary = %text, "Successfully summarized error");
-            return Ok(text);
-        }
-    }
-
-    Err(Error::Config(
-        "Expected a text part in the summarization response".to_string(),
-    ))
-}
-
 
 pub struct ImplAgent {
     gemini: GeminiClientWrapper,
@@ -266,7 +234,22 @@ Implement the current task by calling the `edit_file` or `create_file` functions
                     "edit_file" => {
                         let args: EditFileArgs = serde_json::from_value(arguments.clone())?;
                         let path = PathBuf::from(&args.path);
+
+                        let old_content = std::fs::read_to_string(&path).unwrap_or_default();
                         std::fs::write(&path, &args.new_content)?;
+
+                        println!("\n--- DIFF for {} ---", path.display());
+                        let diff = TextDiff::from_lines(&old_content, &args.new_content);
+                        for change in diff.iter_all_changes() {
+                            let sign = match change.tag() {
+                                ChangeTag::Delete => "-",
+                                ChangeTag::Insert => "+",
+                                ChangeTag::Equal => " ",
+                            };
+                            print!("{}{}", sign, change);
+                        }
+                        println!("--- END DIFF ---\n");
+
                         info!(path = %args.path, "Edited file");
                         modified_files.push(path);
                     }
@@ -279,6 +262,13 @@ Implement the current task by calling the `edit_file` or `create_file` functions
                         let mut file = std::fs::File::create(&path)?;
                         file.write_all(args.content.as_bytes())?;
                         file.sync_all()?;
+
+                        println!("\n--- NEW FILE {} ---", path.display());
+                        for line in args.content.lines() {
+                            println!("+{}", line);
+                        }
+                        println!("--- END NEW FILE ---\n");
+
                         info!(path = %args.path, "Created file");
                         modified_files.push(path);
                     }
@@ -484,19 +474,7 @@ impl Agent for ImplAgent {
                         }
                         Err(e) => {
                             warn!(description = %task.description, "Task attempt failed");
-                            const SUMMARIZATION_THRESHOLD: usize = 1000;
-                            let error_for_prompt = if e.len() > SUMMARIZATION_THRESHOLD {
-                                match summarize_error(&e).await {
-                                    Ok(summary) => summary,
-                                    Err(summary_err) => {
-                                        error!(error = %summary_err, "Failed to summarize error, using full error text");
-                                        e
-                                    }
-                                }
-                            } else {
-                                e
-                            };
-                            last_error = Some(error_for_prompt);
+                            last_error = Some(e);
                         }
                     }
                 }

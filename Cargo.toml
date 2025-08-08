@@ -51,6 +51,9 @@ async-trait = "0.1.88"
 # For making HTTP requests in the Gemini wrapper
 reqwest = { version = "0.12.5", features = ["json"] }
 
+# For showing diffs
+similar = "2.5.0"
+
 [dev-dependencies]
 # HTTP mocking for testing API interactions deterministically.
 wiremock = "0.6.0"
