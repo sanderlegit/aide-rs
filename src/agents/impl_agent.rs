@@ -356,12 +356,7 @@ Please use Google Search, prioritizing results from `docs.rs` and `crates.io`, t
 
     fn create_google_search_tool(&self) -> ToolConfig {
         ToolConfig::DynamicRetrieval {
-            google_search: DynamicRetrieval {
-                dynamic_retrieval_config: DynamicRetrievalConfig {
-                    mode: "MODE_DYNAMIC".to_string(),
-                    dynamic_threshold: 0.5,
-                },
-            },
+            google_search: DynamicRetrieval {},
         }
     }
 
@@ -551,16 +546,47 @@ impl Agent for ImplAgent {
                         }
                         Err(e) => {
                             warn!(description = %task.description, "Task attempt failed");
+
+                            let mut diff_context = String::new();
+                            if !modified_files.is_empty() {
+                                diff_context.push_str("\n\nChanges applied in the failed attempt:\n");
+                                for path in &modified_files {
+                                    if let Some((_, old_content)) =
+                                        file_contents.iter().find(|(p, _)| p == path)
+                                    {
+                                        if let Ok(new_content) = std::fs::read_to_string(path) {
+                                            let diff =
+                                                TextDiff::from_lines(old_content, &new_content);
+                                            diff_context.push_str(&format!(
+                                                "\n--- DIFF for {} ---\n",
+                                                path.display()
+                                            ));
+                                            for change in diff.iter_all_changes() {
+                                                let sign = match change.tag() {
+                                                    ChangeTag::Delete => "-",
+                                                    ChangeTag::Insert => "+",
+                                                    ChangeTag::Equal => " ",
+                                                };
+                                                diff_context.push_str(&format!("{}{}", sign, change));
+                                            }
+                                            diff_context.push_str("--- END DIFF ---\n");
+                                        }
+                                    }
+                                }
+                            }
+
+                            let full_error = format!("{}{}", e, diff_context);
+
                             if self.enrich_errors {
-                                match self.enrich_error_context(&e).await {
+                                match self.enrich_error_context(&full_error).await {
                                     Ok(enriched_error) => last_error = Some(enriched_error),
                                     Err(enrich_err) => {
                                         error!(error = %enrich_err, "Failed to enrich error context");
-                                        last_error = Some(e); // Fallback to original error
+                                        last_error = Some(full_error); // Fallback to original error
                                     }
                                 }
                             } else {
-                                last_error = Some(e);
+                                last_error = Some(full_error);
                             }
                         }
                     }

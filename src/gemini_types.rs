@@ -22,7 +22,7 @@ pub struct GenerateContentRequest {
 pub enum ToolConfig {
     FunctionDeclaration(ToolConfigFunctionDeclaration),
     DynamicRetrieval {
-        #[serde(rename = "google_search")]
+        #[serde(rename = "googleSearchRetrieval")]
         google_search: DynamicRetrieval,
     },
 }
@@ -50,16 +50,7 @@ pub struct ToolConfigFunctionDeclaration {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DynamicRetrieval {
-    pub dynamic_retrieval_config: DynamicRetrievalConfig,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DynamicRetrievalConfig {
-    pub mode: String,
-    pub dynamic_threshold: f64,
-}
+pub struct DynamicRetrieval {}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]

@@ -256,12 +256,7 @@ Focus on libraries that are well-maintained, popular, and fit the requirements. 
 
     fn create_google_search_tool(&self) -> ToolConfig {
         ToolConfig::DynamicRetrieval {
-            google_search: DynamicRetrieval {
-                dynamic_retrieval_config: DynamicRetrievalConfig {
-                    mode: "MODE_DYNAMIC".to_string(),
-                    dynamic_threshold: 0.5,
-                },
-            },
+            google_search: DynamicRetrieval {},
         }
     }
 
