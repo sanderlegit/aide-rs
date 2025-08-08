@@ -79,3 +79,9 @@ This phase ensures the new system is working correctly end-to-end.
         -   Mock the follow-up API call that includes the error message.
         -   Mock the final, correct implementation.
         -   Assert the file is eventually correct.
+
+-   **[ ] Task 3.3: Implement JIT Planning in `code` flow**
+    -   Refactor the `FlowRunner` to support executing multiple blocks within a single loop iteration.
+    -   Update `code.yml` to have separate `jit_plan` and `execute_plan` blocks within the implementation loop.
+    -   Add a new tool to create a `DetailedTaskPlan`.
+    -   Add an E2E test for the full JIT planning flow.

@@ -69,7 +69,9 @@ async fn test_e2e_plan_flow() {
     });
 
     Mock::given(method("POST"))
-        .and(path_regex(r"/models/gemini-2.5-flash-latest:generateContent"))
+        .and(path_regex(
+            r"/v1beta/models/gemini-2.5-flash-latest:generateContent",
+        ))
         .and(body_string_contains("Create a hello world app"))
         .and(body_string_contains("fn main() {}"))
         .respond_with(ResponseTemplate::new(200).set_body_json(response_body))
@@ -124,8 +126,27 @@ async fn test_e2e_code_flow_single_task() {
     env.create_file("src/lib.rs", "// Initial content\n");
 
     // 3. Mock API calls
-    // Mock 1: The 'generate_tasks' block
-    let plan_response = json!({
+    // Mock 1: The 'generate_markdown_plan' block
+    let markdown_plan_response = json!({
+        "candidates": [{
+            "content": {
+                "parts": [{ "text": "Plan: Add a function to `src/lib.rs`." }],
+                "role": "model"
+            }
+        }]
+    });
+    Mock::given(method("POST"))
+        .and(path_regex(
+            r"/v1beta/models/gemini-2.5-flash-latest:generateContent",
+        ))
+        .and(body_string_contains("create a detailed, human-readable implementation plan"))
+        .and(body_string_contains("Add a hello world function")) // From objective
+        .respond_with(ResponseTemplate::new(200).set_body_json(markdown_plan_response))
+        .mount(&env.mock_server)
+        .await;
+
+    // Mock 2: The 'generate_structured_tasks' block
+    let structured_task_response = json!({
         "candidates": [{
             "content": {
                 "parts": [{
@@ -143,13 +164,16 @@ async fn test_e2e_code_flow_single_task() {
         }]
     });
     Mock::given(method("POST"))
-        .and(body_string_contains("You are an expert software architect."))
-        .and(body_string_contains("Add a hello world function")) // From objective
-        .respond_with(ResponseTemplate::new(200).set_body_json(plan_response))
+        .and(path_regex(
+            r"/v1beta/models/gemini-2.5-flash-latest:generateContent",
+        ))
+        .and(body_string_contains("convert the provided markdown plan"))
+        .and(body_string_contains("Plan: Add a function to `src/lib.rs`."))
+        .respond_with(ResponseTemplate::new(200).set_body_json(structured_task_response))
         .mount(&env.mock_server)
         .await;
 
-    // Mock 2: The 'implement_tasks' block
+    // Mock 3: The 'implement_tasks' block
     let impl_response = json!({
         "candidates": [{
             "content": {
@@ -167,6 +191,9 @@ async fn test_e2e_code_flow_single_task() {
         }]
     });
     Mock::given(method("POST"))
+        .and(path_regex(
+            r"/v1beta/models/gemini-2.5-flash-latest:generateContent",
+        ))
         .and(body_string_contains("You are an expert pair programmer."))
         .and(body_string_contains("Current Task")) // From implement_tasks prompt
         .respond_with(ResponseTemplate::new(200).set_body_json(impl_response))
@@ -231,8 +258,23 @@ edition = "2021"
     env.create_file("src/lib.rs", "// Initial content\n");
 
     // 3. Mock API calls
-    // Mock 1: The 'generate_tasks' block
-    let plan_response = json!({
+    // Mock 1: The 'generate_markdown_plan' block
+    let markdown_plan_response = json!({
+        "candidates": [{
+            "content": { "parts": [{ "text": "Plan: Add go() function." }], "role": "model" }
+        }]
+    });
+    Mock::given(method("POST"))
+        .and(path_regex(
+            r"/v1beta/models/gemini-2.5-flash-latest:generateContent",
+        ))
+        .and(body_string_contains("create a detailed, human-readable implementation plan"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(markdown_plan_response))
+        .mount(&env.mock_server)
+        .await;
+
+    // Mock 2: The 'generate_structured_tasks' block
+    let structured_task_response = json!({
         "candidates": [{
             "content": {
                 "parts": [{
@@ -250,12 +292,15 @@ edition = "2021"
         }]
     });
     Mock::given(method("POST"))
-        .and(body_string_contains("You are an expert software architect."))
-        .respond_with(ResponseTemplate::new(200).set_body_json(plan_response))
+        .and(path_regex(
+            r"/v1beta/models/gemini-2.5-flash-latest:generateContent",
+        ))
+        .and(body_string_contains("convert the provided markdown plan"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(structured_task_response))
         .mount(&env.mock_server)
         .await;
 
-    // Mock 2: The 'implement_tasks' block - FIRST attempt (with syntax error)
+    // Mock 3: The 'implement_tasks' block - FIRST attempt (with syntax error)
     let impl_response_fail = json!({
         "candidates": [{
             "content": {
@@ -273,6 +318,9 @@ edition = "2021"
         }]
     });
     Mock::given(method("POST"))
+        .and(path_regex(
+            r"/v1beta/models/gemini-2.5-flash-latest:generateContent",
+        ))
         .and(body_string_contains("You are an expert pair programmer."))
         .and(body_string_contains("Current Task"))
         .respond_with(ResponseTemplate::new(200).set_body_json(impl_response_fail))
@@ -297,6 +345,9 @@ edition = "2021"
         }]
     });
     Mock::given(method("POST"))
+        .and(path_regex(
+            r"/v1beta/models/gemini-2.5-flash-latest:generateContent",
+        ))
         .and(body_string_contains("The last attempt failed validation.")) // From on_failure_prompt
         .and(body_string_contains("expected `;`")) // From cargo check stderr
         .respond_with(ResponseTemplate::new(200).set_body_json(impl_response_success))

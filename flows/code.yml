@@ -2,14 +2,14 @@ id: "code"
 description: "Analyzes an objective, creates a plan, and implements it."
 
 blocks:
-  - id: "generate_tasks"
-    description: "Generate a high-level list of task descriptions."
+  - id: "generate_markdown_plan"
+    description: "Generate a high-level implementation plan in markdown."
     prompt:
       composition:
         - type: static_text
           content: |
-            You are an expert software architect. Your role is to analyze a user's objective and the provided project context, and break it down into a high-level list of task descriptions.
-            You must call the `create_task_list` function with the generated list of tasks. Each task should be a descriptive, actionable step.
+            You are an expert software architect. Your role is to analyze a user's objective and the provided project context, and create a detailed, human-readable implementation plan in Markdown format.
+            The plan should outline the strategy, including new files to create, tests to add, and logic changes. This is a creative step to think through the solution before generating structured tasks.
         - type: file_contents
           scopes: [ "base", "prompt" ]
           prefix: "\n**Project File Context:**\n"
@@ -21,13 +21,28 @@ blocks:
           prefix: "\n**Coding Conventions:**\n"
     annotations:
       history: none
+      tools: [] # No tools, just text output
+
+  - id: "generate_structured_tasks"
+    description: "Convert the markdown plan into a structured list of tasks."
+    prompt:
+      composition:
+        - type: static_text
+          content: |
+            You are an expert system. Your role is to convert the provided markdown plan into a structured list of tasks using the `create_task_list` tool.
+            Each task should be a descriptive, actionable step that can be implemented independently.
+        - type: previous_output
+          block_id: "generate_markdown_plan"
+          prefix: "\n**Markdown Plan:**\n"
+    annotations:
+      history: none
       tools: [ "task_creator" ]
       structured_output_schema: "TaskList"
 
   - id: "implement_tasks"
     description: "Iterate through the generated tasks and implement them."
     looping:
-      over: "generate_tasks"
+      over: "generate_structured_tasks"
       as: "current_task"
     prompt:
       composition:
