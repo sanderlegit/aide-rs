@@ -355,8 +355,8 @@ Please use Google Search, prioritizing results from `docs.rs` and `crates.io`, t
     }
 
     fn create_google_search_tool(&self) -> ToolConfig {
-        ToolConfig::DynamicRetieval {
-            google_search_retrieval: DynamicRetrieval {
+        ToolConfig::DynamicRetrieval {
+            google_search: DynamicRetrieval {
                 dynamic_retrieval_config: DynamicRetrievalConfig {
                     mode: "MODE_DYNAMIC".to_string(),
                     dynamic_threshold: 0.5,
