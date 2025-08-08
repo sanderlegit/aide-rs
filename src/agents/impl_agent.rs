@@ -43,7 +43,7 @@ async fn summarize_error(error_output: &str) -> Result<String> {
         .ok_or_else(|| Error::Config("No candidates in summarization response".to_string()))?;
 
     if let Some(part) = candidate.content.parts.into_iter().next() {
-        if let PartResponse::Text(text) = part {
+        if let Some(text) = part.text {
             info!(summary = %text, "Successfully summarized error");
             return Ok(text);
         }

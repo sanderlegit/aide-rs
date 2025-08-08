@@ -101,7 +101,7 @@ impl GeminiClientWrapper {
         if let Some(candidates) = &response.candidates {
             for candidate in candidates {
                 for part in &candidate.content.parts {
-                    if let PartResponse::Text(text) = part {
+                    if let Some(text) = &part.text {
                         if !text.trim().is_empty() {
                             info!(
                                 response_text = %format!("\n---\n{}\n---", text.trim()),
