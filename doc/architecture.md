@@ -66,9 +66,8 @@ This abstraction standardizes how agents are invoked.
         c. **API Call**: It calls the Gemini API, which returns function calls to modify the filesystem. The agent applies these changes.
         d. **Validation**: It runs the formatter (if configured) and all `validation_steps` for the task.
         e. **Success/Failure**:
-            - If validation succeeds, the task is marked `Success`, the plan on disk is updated, and the agent moves to the next task.
+            - If validation succeeds, the task is marked `Success` and the plan on disk is updated. If `--auto-commit` is enabled, a Git commit is created for the task before moving to the next one.
             - If validation fails, the error output is captured. If the error is long, it's summarized via another API call (`summarize_error`). The error context is saved for the next attempt in the retry loop.
-    4.  **Auto-Commit**: If all tasks succeed and the `--auto-commit` flag is present, it uses `vcs::add_and_commit` to create a Git commit with a summary of the changes.
 
 ### 6. Supporting Modules
 

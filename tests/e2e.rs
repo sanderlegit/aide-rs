@@ -447,6 +447,7 @@ async fn test_plan_lancedb_prompt_sends_correct_schema() {
 #[tokio::test]
 async fn test_impl_workflow_with_error_summarization() {
     let env = TestEnv::new().await;
+    env.init_git_repo();
 
     // 1. Create a project with a file that will cause a validation error
     let long_error_str = "a very long error message...".repeat(100);
@@ -536,6 +537,15 @@ expected_exit_code = 0
     // 5. Assert file was fixed
     let new_content = fs::read_to_string(env.full_path("src/main.rs")).unwrap();
     assert!(new_content.contains("Fixed!"));
+
+    // 6. Assert that a new commit was created
+    let repo = Repository::open(env.path()).unwrap();
+    let head = repo.head().unwrap().peel_to_commit().unwrap();
+    let commit_message = head.message().unwrap();
+    assert_eq!(
+        commit_message,
+        "AI: Fix the compile error in main.rs"
+    );
 }
 
 #[tokio::test]

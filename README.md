@@ -110,12 +110,12 @@ If all tasks are completed successfully, the changes will be applied to your fil
 
 #### Auto-Committing
 
-To have the agent automatically create a Git commit after all tasks succeed, use the `--auto-commit` flag.
+To have the agent automatically create a Git commit after each task succeeds, use the `--auto-commit` flag.
 
 ```bash
 /path/to/aide-rs impl --plan .ai/plan_add_feature_1678886400.toml --auto-commit
 ```
-This will create a single commit with a message summarizing the completed tasks.
+This will create a new commit for each successfully completed task, with a message derived from the task's description.
 
 ## Development
 

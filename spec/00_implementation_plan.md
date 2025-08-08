@@ -61,7 +61,7 @@ The CLI will be defined using `clap`.
     *   **Description:** Invokes the `ImplAgent` to execute a plan. The agent will automatically resume from the last failed or pending task.
     *   **`--plan <PATH>`** (Required): Path to an implementation plan TOML file.
     *   **`--max-retries <N>`**: (Optional) The maximum number of attempts per task. Defaults to `5`.
-    *   **`--auto-commit`**: (Flag) If set, automatically creates a Git commit after all tasks are successfully completed.
+    *   **`--auto-commit`**: (Flag) If set, automatically creates a Git commit after each task is successfully completed.
 
 ### **5. State Management and Data Models (`agents/state.rs`)**
 
@@ -174,7 +174,7 @@ pub struct ValidationStep {
             vii. **Check Success:** If a command's exit code does not match `expected_exit_code`, the step fails. Capture its output, increment `task.attempts`, and `continue` to the next retry loop iteration.
             viii.If all validation steps pass: update `task.status` to `Success`, populate `task.result` with the agent's tips, save the entire `ImplementationPlan` back to disk, and `break` the retry loop.
         c. If the retry loop finishes without success, set `task.status` to `Failed` and save the plan. The entire process halts, informing the user which task failed.
-    4.  **Finalize:** If all tasks succeed and `--auto-commit` is set, use `vcs.rs` to create a Git commit with a message generated from the task descriptions.
+    4.  **Finalize:** After the loop, the agent's work is complete. If `--auto-commit` was used, the changes will have been committed incrementally.
 
 #### **6.3. File Filtering (`files.rs`)**
 

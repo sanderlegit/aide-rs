@@ -28,7 +28,7 @@ Verify that the compiled application works correctly from a user's perspective b
     *   Extend the `test_impl_workflow` or create a new test.
     *   Initialize a Git repository in the temporary directory.
     *   Run the `aide impl` command with the `--auto-commit` flag.
-    *   After the command succeeds, use the `git2` crate to open the repository and assert that a new commit has been created with a message derived from the plan's tasks.
+    *   After the command succeeds, use the `git2` crate to open the repository and assert that a new commit has been created for each successful task, with a message derived from that task's description.
 
 ## Test Coverage
 *   This phase provides comprehensive coverage for the primary user stories:
