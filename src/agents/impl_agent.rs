@@ -1,6 +1,6 @@
 use crate::{
     agents::{
-        state::{ImplementationPlan, PlanPrompt, Task, TaskResult, TaskStatus},
+        state::{ImplementationPlan, Task, TaskResult, TaskStatus},
         Agent,
     },
     error::{Error, Result},
@@ -313,12 +313,12 @@ impl Agent for ImplAgent {
 
         for i in 0..plan.tasks.len() {
             let task_succeeded = {
-                let task = &mut plan.tasks[i];
-
-                if task.status == TaskStatus::Success {
-                    info!(description = %task.description, "Skipping completed task");
+                if plan.tasks[i].status == TaskStatus::Success {
+                    info!(description = %plan.tasks[i].description, "Skipping completed task");
                     continue;
                 }
+
+                let mut task = plan.tasks[i].clone();
 
                 info!(description = %task.description, "Starting task");
                 task.status = TaskStatus::Pending;
@@ -447,6 +447,10 @@ impl Agent for ImplAgent {
                             last_error = Some(error_for_prompt);
                         }
                     }
+                }
+
+                if succeeded {
+                    plan.tasks[i] = task;
                 }
                 succeeded
             };
