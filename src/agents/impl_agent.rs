@@ -7,7 +7,8 @@ use crate::{
     files,
     gemini::GeminiClientWrapper,
     gemini_types::{
-        Content, ContentPart, FunctionCall, FunctionDeclaration, GenerateContentResponse, Role,
+        Content, ContentPart, DynamicRetrieval, DynamicRetrievalConfig, FunctionCall,
+        FunctionDeclaration, GenerateContentResponse, Role, ToolConfig,
     },
     vcs,
 };
@@ -23,8 +24,10 @@ use tracing::{error, info, warn};
 
 pub struct ImplAgent {
     gemini: GeminiClientWrapper,
+    enrich_gemini: GeminiClientWrapper,
     max_retries: u32,
     auto_commit: bool,
+    enrich_errors: bool,
 }
 
 fn run_command(command_str: &str) -> Result<(i32, String)> {
@@ -48,12 +51,16 @@ fn run_command(command_str: &str) -> Result<(i32, String)> {
 }
 
 impl ImplAgent {
-    pub fn new(max_retries: u32, auto_commit: bool) -> Result<Self> {
+    pub fn new(max_retries: u32, auto_commit: bool, enrich_errors: bool) -> Result<Self> {
         let gemini = GeminiClientWrapper::new_impl_agent()?;
+        // The plan agent uses a faster model, which is good for summarization/enrichment.
+        let enrich_gemini = GeminiClientWrapper::new_plan_agent()?;
         Ok(Self {
             gemini,
+            enrich_gemini,
             max_retries,
             auto_commit,
+            enrich_errors,
         })
     }
 
@@ -316,6 +323,66 @@ Implement the current task by calling the `edit_file` or `create_file` functions
     fn run_validation(&self, task: &Task) -> std::result::Result<(), String> {
         self.run_validation_steps(&task.validation_steps)
     }
+
+    async fn enrich_error_context(&self, error: &str) -> Result<String> {
+        info!("Enriching error context with Google Search.");
+        let search_prompt = format!(
+            "The following error occurred during a software development task:
+\"\"\"
+{error}
+\"\"\"
+Please use Google Search, prioritizing results from `docs.rs` and `crates.io`, to find relevant documentation, examples, or explanations that could help resolve this error. Provide a concise summary of your findings and include any relevant URLs."
+        );
+
+        let search_contents = vec![Content {
+            role: Role::User,
+            parts: vec![ContentPart::Text(search_prompt)],
+        }];
+
+        let search_tools = vec![self.create_google_search_tool()];
+
+        let search_response = self
+            .enrich_gemini
+            .generate_content(search_contents, Some(search_tools))
+            .await?;
+
+        let search_result_text = self.process_search_response(&search_response)?;
+
+        Ok(format!(
+            "Original error:\n{}\n\nResearch results:\n{}",
+            error, search_result_text
+        ))
+    }
+
+    fn create_google_search_tool(&self) -> ToolConfig {
+        ToolConfig::DynamicRetieval {
+            google_search_retrieval: DynamicRetrieval {
+                dynamic_retrieval_config: DynamicRetrievalConfig {
+                    mode: "MODE_DYNAMIC".to_string(),
+                    dynamic_threshold: 0.5,
+                },
+            },
+        }
+    }
+
+    fn process_search_response(&self, response: &GenerateContentResponse) -> Result<String> {
+        let candidate = response
+            .candidates
+            .as_ref()
+            .and_then(|c| c.first())
+            .ok_or_else(|| Error::Config("No candidates in search response".to_string()))?;
+
+        if let Some(part) = candidate.content.parts.first() {
+            if let Some(text) = &part.text {
+                info!(search_result = %text, "Successfully got search result");
+                return Ok(text.clone());
+            }
+        }
+
+        Err(Error::Config(
+            "Expected a text part in the search response".to_string(),
+        ))
+    }
 }
 
 #[async_trait]
@@ -474,7 +541,17 @@ impl Agent for ImplAgent {
                         }
                         Err(e) => {
                             warn!(description = %task.description, "Task attempt failed");
-                            last_error = Some(e);
+                            if self.enrich_errors {
+                                match self.enrich_error_context(&e).await {
+                                    Ok(enriched_error) => last_error = Some(enriched_error),
+                                    Err(enrich_err) => {
+                                        error!(error = %enrich_err, "Failed to enrich error context");
+                                        last_error = Some(e); // Fallback to original error
+                                    }
+                                }
+                            } else {
+                                last_error = Some(e);
+                            }
                         }
                     }
                 }

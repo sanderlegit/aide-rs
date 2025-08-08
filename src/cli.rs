@@ -25,5 +25,8 @@ pub enum Commands {
         max_retries: u32,
         #[arg(long)]
         auto_commit: bool,
+        /// Use Google Search to find docs and examples to enrich error messages.
+        #[arg(long)]
+        enrich_errors: bool,
     },
 }

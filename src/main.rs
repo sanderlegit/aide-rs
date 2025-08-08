@@ -70,14 +70,16 @@ async fn run() -> Result<()> {
             plan,
             max_retries,
             auto_commit,
+            enrich_errors,
         } => {
             info!(
                 ?plan,
                 ?max_retries,
                 ?auto_commit,
+                ?enrich_errors,
                 "Running Impl agent"
             );
-            let impl_agent = ImplAgent::new(max_retries, auto_commit)?;
+            let impl_agent = ImplAgent::new(max_retries, auto_commit, enrich_errors)?;
             impl_agent.run(plan).await?;
 
             info!("Implementation agent finished successfully.");
