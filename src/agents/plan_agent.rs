@@ -1,6 +1,6 @@
 use crate::{
     agents::{
-        state::{FileScope, ImplementationPlan, PlanPrompt, Task, TaskStatus, ValidationStep},
+        state::{ImplementationPlan, PlanPrompt, Task, TaskStatus, ValidationStep},
         Agent,
     },
     error::{Error, Result},

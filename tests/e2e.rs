@@ -484,6 +484,7 @@ async fn test_impl_workflow_with_error_summarization() {
     });
     Mock::given(method("POST"))
         .and(path_regex(r"/models/gemini-2.5-flash:generateContent.*"))
+        .and(body_string_contains("Summarize this compiler/tool error"))
         .respond_with(ResponseTemplate::new(200).set_body_json(summary_response))
         .mount(&env.mock_server)
         .await;
