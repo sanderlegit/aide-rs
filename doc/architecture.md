@@ -67,7 +67,7 @@ This abstraction standardizes how agents are invoked.
         d. **Validation**: It runs the formatter (if configured) and all `validation_steps` for the task.
         e. **Success/Failure**:
             - If validation succeeds, the task is marked `Success` and the plan on disk is updated. If `--auto-commit` is enabled, a Git commit is created for the task before moving to the next one.
-            - If validation fails, the error output is captured. If the error is long, it's summarized via another API call (`summarize_error`). The error context is saved for the next attempt in the retry loop.
+            - If validation fails, the error output is captured. If the error is long, it's summarized via another API call (`summarize_error`). If the `--enrich-errors` flag is active, the agent will also use Google Search to find relevant documentation for the error. The error context (potentially enriched) is saved for the next attempt in the retry loop.
 
 ### 6. Supporting Modules
 

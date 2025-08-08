@@ -62,6 +62,7 @@ The CLI will be defined using `clap`.
     *   **`--plan <PATH>`** (Required): Path to an implementation plan TOML file.
     *   **`--max-retries <N>`**: (Optional) The maximum number of attempts per task. Defaults to `5`.
     *   **`--auto-commit`**: (Flag) If set, automatically creates a Git commit after each task is successfully completed.
+    *   **`--enrich-errors`**: (Flag) If set, uses Google Search to find documentation for errors to improve the correction context.
 
 ### **5. State Management and Data Models (`agents/state.rs`)**
 
@@ -171,7 +172,7 @@ pub struct ValidationStep {
             iv.  **Call Gemini API**. Process the function calls to apply file edits.
             v.   **Run Formatter:** If `plan.original_prompt.formatter_command` is `Some`, execute it. If it fails, treat it as a validation failure and add its output to the correction context for the next loop.
             vi.  **Run Validation:** Sequentially execute each `ValidationStep`.
-            vii. **Check Success:** If a command's exit code does not match `expected_exit_code`, the step fails. Capture its output, increment `task.attempts`, and `continue` to the next retry loop iteration.
+            vii. **Check Success:** If a command's exit code does not match `expected_exit_code`, the step fails. Capture its output. If the `--enrich-errors` flag is active, use Google Search to find context for the error. Increment `task.attempts`, and `continue` to the next retry loop iteration with the enriched error context.
             viii.If all validation steps pass: update `task.status` to `Success`, populate `task.result` with the agent's tips, save the entire `ImplementationPlan` back to disk, and `break` the retry loop.
         c. If the retry loop finishes without success, set `task.status` to `Failed` and save the plan. The entire process halts, informing the user which task failed.
     4.  **Finalize:** After the loop, the agent's work is complete. If `--auto-commit` was used, the changes will have been committed incrementally.

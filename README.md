@@ -117,6 +117,14 @@ To have the agent automatically create a Git commit after each task succeeds, us
 ```
 This will create a new commit for each successfully completed task, with a message derived from the task's description.
 
+#### Enriching Errors with Google Search
+
+If the agent gets stuck on a complex error (e.g., a tricky compiler issue or a dependency conflict), you can use the `--enrich-errors` flag. This instructs the agent to use Google Search to find relevant documentation, examples, or solutions for the error it encountered, and then add that research to its context for the next attempt.
+
+```bash
+/path/to/aide-rs impl --plan .ai/plan_add_feature_1678886400.toml --enrich-errors
+```
+
 ## Development
 
 To run the test suite, which includes unit, integration, and end-to-end tests:
