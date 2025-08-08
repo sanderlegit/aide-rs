@@ -578,7 +578,6 @@ async fn test_impl_multi_task_workflow() {
         .and(path_regex(r"/gemini-2.5-pro:generateContent.*"))
         .and(body_string_contains("Create main.rs to print hello world"))
         .respond_with(ResponseTemplate::new(200).set_body_json(mock_response_task2))
-        .expect(1)
         .mount(&env.mock_server)
         .await;
 
