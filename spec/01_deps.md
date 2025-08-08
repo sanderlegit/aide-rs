@@ -43,7 +43,7 @@ dotenvy = "0.15.7"
 
 # Google Gemini API Client
 # Provides type definitions (e.g., for requests and responses) for the Gemini API. [4]
-gemini_client_rs = "0.1.0"
+gemini_client_rs = "0.6.0"
 
 # For using async functions in traits.
 async-trait = "0.1.88"

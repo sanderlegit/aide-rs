@@ -135,15 +135,21 @@ pub struct ValidationStep {
 #### **6.1. PlanAgent (`agents/plan_agent.rs`)**
 
 *   **Trait Impl:** `impl Agent<Input = PlanPrompt, Output = ImplementationPlan>`
-*   **Logic:**
+*   **Logic:** The `PlanAgent` operates in a two-step process to build a detailed plan.
     1.  Receives a `PlanPrompt`.
     2.  Uses `files.rs` to get a file list based on the prompt's `FileScope`.
-    3.  Constructs a system prompt for the "Expert Software Architect" persona.
-    4.  Defines a Gemini Function Declaration: `create_implementation_plan(tasks: Vec<Task>)`.
-    5.  The user prompt will be a formatted string containing the objective, file list, coding conventions, and validation commands, ending with: "Generate a detailed implementation plan by calling the `create_implementation_plan` function."
-    6.  The agent calls the Gemini API. The response must be a function call.
-    7.  It deserializes the function arguments into an `ImplementationPlan`, setting the status of each new task to `Pending`.
-    8.  The plan is saved to the specified output file.
+    3.  **Step 1: Generate Task Descriptions.**
+        *   Constructs a prompt for an "Expert Software Architect" persona, asking it to break down the user's objective into a high-level list of task descriptions.
+        *   Defines a Gemini Function Declaration: `create_task_descriptions(tasks: Vec<String>)`.
+        *   Calls the Gemini API and deserializes the resulting function call to get a list of strings.
+    4.  **Step 2: Detail Each Task.**
+        *   Iterates through the list of descriptions from the previous step.
+        *   For each description, it creates a new prompt asking the architect to define the specific `file_scoping` and `validation_steps` for that single task.
+        *   Defines a Gemini Function Declaration: `create_task_details(file_scoping: FileScope, validation_steps: Vec<ValidationStep>)`.
+        *   Calls the Gemini API and deserializes the function call arguments.
+    5.  **Step 3: Assemble Plan.**
+        *   Combines the descriptions and their corresponding details into a final `ImplementationPlan`.
+        *   The plan is saved to the specified output file.
 
 #### **6.2. ImplAgent (`agents/impl_agent.rs`)**
 

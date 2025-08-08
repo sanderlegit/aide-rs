@@ -49,11 +49,10 @@ This abstraction standardizes how agents are invoked.
     1.  Receives the `PlanPrompt`.
     2.  If `use_google_search_for_deps` is true, it first performs a Google Search-enabled API call to research libraries. The results are injected into the main prompt.
     3.  Uses `files::get_filtered_files` to gather the file context.
-    4.  Constructs a prompt for the Gemini API, instructing it to act as a software architect.
-    5.  Provides a `create_implementation_plan` function declaration to the API.
-    6.  Calls the Gemini API via the `GeminiClientWrapper`.
-    7.  The API returns a function call, which the agent deserializes into a list of `Task`s.
-    8.  The agent assembles the final `ImplementationPlan` and returns it.
+    4.  **Step 1: Generate Task Descriptions**: It constructs a prompt asking the Gemini API to act as an architect and break the objective into a high-level list of task descriptions. It provides a `create_task_descriptions` function declaration.
+    5.  **Step 2: Detail Each Task**: It iterates through the descriptions from the previous step. For each description, it constructs a new prompt asking the API to define the specific `file_scoping` and `validation_steps` for that task. It provides a `create_task_details` function declaration.
+    6.  The agent calls the Gemini API for each step, deserializing the function call arguments.
+    7.  The agent assembles the final `ImplementationPlan` from the collected details and returns it.
 
 ### 5. The `ImplAgent` (`src/agents/impl_agent.rs`)
 

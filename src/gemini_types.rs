@@ -124,7 +124,6 @@ pub struct PartResponse {
     pub function_call: Option<FunctionCall>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub function_response: Option<FunctionResponse>,
-    // This is the new field causing issues.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub thought_signature: Option<String>,
 }

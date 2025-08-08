@@ -24,7 +24,6 @@ Key Crates to Use:
 """
 
 # Use Google Search to find the latest versions of the crates.
-# # not supported
 use_google_search_for_deps = false
 
 # Provide detailed coding conventions for the agent to follow.

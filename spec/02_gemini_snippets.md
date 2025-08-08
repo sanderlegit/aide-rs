@@ -26,7 +26,7 @@ Installation
 Add the following to your Cargo.toml file:
 
 [dependencies]
-gemini_client_rs = "0.1.0" # Replace with the actual version
+gemini_client_rs = "0.6.0" # Replace with the actual version
 tokio = { version = "1", features = ["full"] }
 dotenvy = "0.15"
 
