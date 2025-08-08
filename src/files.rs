@@ -10,6 +10,10 @@ pub fn get_filtered_files(base_dir: &Path, scope: &FileScope) -> Result<Vec<Path
     // Manually build a gitignore matcher to ensure it's always respected.
     let mut gitignore_builder = GitignoreBuilder::new(&canonical_base_dir);
     gitignore_builder.add(canonical_base_dir.join(".gitignore"));
+    let global_filter_path = canonical_base_dir.join(".ai/filter=all");
+    if global_filter_path.exists() {
+        gitignore_builder.add(global_filter_path);
+    }
     let gitignore = gitignore_builder.build()?;
 
     // Build glob matchers for our include/exclude scope.

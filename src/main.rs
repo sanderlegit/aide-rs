@@ -31,7 +31,22 @@ async fn run() -> Result<()> {
             prompt,
             output_plan,
         } => {
-            info!(?prompt, ?output_plan, "Running Plan agent");
+            let output_plan = output_plan.unwrap_or_else(|| {
+                let now_timestamp = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                let prompt_name = prompt
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("prompt");
+                std::path::PathBuf::from(format!(
+                    ".ai/plan_{}_{}.toml",
+                    prompt_name, now_timestamp
+                ))
+            });
+
+            info!(?prompt, output_plan = ?output_plan, "Running Plan agent");
 
             // 1. Load prompt
             let prompt_content = std::fs::read_to_string(&prompt)?;
@@ -42,11 +57,11 @@ async fn run() -> Result<()> {
             let implementation_plan = plan_agent.run(plan_prompt).await?;
 
             // 3. Save plan
-            let plan_json = serde_json::to_string_pretty(&implementation_plan)?;
+            let plan_toml = toml::to_string_pretty(&implementation_plan)?;
             if let Some(parent) = output_plan.parent() {
                 std::fs::create_dir_all(parent)?;
             }
-            std::fs::write(&output_plan, plan_json)?;
+            std::fs::write(&output_plan, plan_toml)?;
 
             info!("Implementation plan saved to {:?}", output_plan);
         }

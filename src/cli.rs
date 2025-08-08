@@ -14,8 +14,8 @@ pub enum Commands {
     Plan {
         #[arg(short, long, value_name = "PATH")]
         prompt: PathBuf,
-        #[arg(long, default_value = ".ai/implementation_plan.json")]
-        output_plan: PathBuf,
+        #[arg(long, value_name = "PATH")]
+        output_plan: Option<PathBuf>,
     },
     /// Executes an implementation plan.
     Impl {

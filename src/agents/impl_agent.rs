@@ -53,80 +53,6 @@ async fn summarize_error(error_output: &str) -> Result<String> {
     ))
 }
 
-async fn select_context_files(
-    task_description: &str,
-    all_files: &[PathBuf],
-) -> Result<Vec<PathBuf>> {
-    info!("Selecting context files for task...");
-    let gemini = GeminiClientWrapper::new_summarize_agent()?; // Use the lighter agent
-
-    let file_list = all_files
-        .iter()
-        .map(|p| p.to_string_lossy())
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    let prompt = format!(
-        r#"
-Given the following task description and a list of all files in the project, select the files that are most relevant for completing the task. Only select files that already exist.
-
-**Task:**
-{task_description}
-
-**Available Files:**
-{file_list}
-
-Call the `select_context_files` function with the paths of the files you have selected.
-"#,
-    );
-
-    let tool = json!({
-        "name": "select_context_files",
-        "description": "Selects a list of files to use as context for a task.",
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "files": {
-                    "type": "ARRAY",
-                    "description": "The list of file paths to include in the context.",
-                    "items": { "type": "STRING" }
-                }
-            },
-            "required": ["files"]
-        }
-    });
-
-    let contents = vec![Content {
-        role: Role::User,
-        parts: vec![ContentPart::Text(prompt)],
-    }];
-    let tool_config = json!([{"functionDeclarations": [tool]}]);
-
-    let response = gemini.generate_content(contents, Some(tool_config)).await?;
-
-    let candidate = response
-        .candidates
-        .and_then(|mut c| c.pop())
-        .ok_or_else(|| Error::Config("No candidates in file selection response".to_string()))?;
-
-    if let Some(part) = candidate.content.parts.into_iter().next() {
-        if let Some(FunctionCall { name, arguments }) = part.function_call {
-            if name == "select_context_files" {
-                #[derive(Deserialize)]
-                struct SelectFilesArgs {
-                    files: Vec<String>,
-                }
-                let args: SelectFilesArgs = serde_json::from_value(arguments)?;
-                info!(files = ?args.files, "Selected context files");
-                return Ok(args.files.into_iter().map(PathBuf::from).collect());
-            }
-        }
-    }
-
-    Err(Error::Config(
-        "Expected a function call to `select_context_files`".to_string(),
-    ))
-}
 
 pub struct ImplAgent {
     gemini: GeminiClientWrapper,
@@ -395,7 +321,7 @@ impl Agent for ImplAgent {
 
     async fn run(&self, plan_path: Self::Input) -> Result<Self::Output> {
         let plan_content = std::fs::read_to_string(&plan_path)?;
-        let mut plan: ImplementationPlan = serde_json::from_str(&plan_content)?;
+        let mut plan: ImplementationPlan = toml::from_str(&plan_content)?;
 
         let mut initial_error_context: Option<String> = None;
         info!("Running initial validation of the current project state...");
@@ -442,11 +368,9 @@ impl Agent for ImplAgent {
 
                     let workdir = Path::new(".");
 
-                    // Dynamically select which files to use as context for this specific task.
-                    let all_project_files =
-                        files::get_filtered_files(workdir, &plan.original_prompt.file_scoping)?;
+                    // Use all files from the original prompt's scope as context.
                     let files_for_context =
-                        select_context_files(&task.description, &all_project_files).await?;
+                        files::get_filtered_files(workdir, &plan.original_prompt.file_scoping)?;
 
                     let mut file_contents = Vec::new();
                     for path in &files_for_context {
@@ -556,14 +480,14 @@ impl Agent for ImplAgent {
             };
 
             if task_succeeded {
-                let plan_json = serde_json::to_string_pretty(&plan)?;
-                std::fs::write(&plan_path, plan_json)?;
+                let plan_toml = toml::to_string_pretty(&plan)?;
+                std::fs::write(&plan_path, plan_toml)?;
             } else {
                 plan.tasks[i].status = TaskStatus::Failed;
                 info!(status = ?plan.tasks[i].status, "Task status updated");
                 error!(description = %plan.tasks[i].description, "Task failed after all retries");
-                let plan_json = serde_json::to_string_pretty(&plan)?;
-                std::fs::write(&plan_path, plan_json)?;
+                let plan_toml = toml::to_string_pretty(&plan)?;
+                std::fs::write(&plan_path, plan_toml)?;
                 return Err(Error::Config(format!(
                     "Task '{}' failed after {} attempts.",
                     plan.tasks[i].description, self.max_retries

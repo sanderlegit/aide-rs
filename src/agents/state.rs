@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PlanPrompt {
     pub objective: String,
+    #[serde(default)]
     pub file_scoping: FileScope,
     pub coding_conventions: String,
     pub formatter_command: Option<String>,
