@@ -30,7 +30,7 @@ impl FlowRunner {
     pub fn new(logger: RunLogger) -> Result<Self> {
         // TODO: The model should probably be configurable per-flow or per-block
         let gemini_client =
-            GeminiClientWrapper::new("gemini-1.5-flash-latest".to_string(), logger.clone())?;
+            GeminiClientWrapper::new("gemini-2.5-flash-latest".to_string(), logger.clone())?;
         Ok(Self {
             logger,
             prompt_builder: PromptBuilder::new(),
@@ -50,12 +50,15 @@ impl FlowRunner {
         for block in &flow.blocks {
             if let Some(looping_strategy) = &block.looping {
                 // This block should be run in a loop.
-                let list_data = self.block_outputs.get(&looping_strategy.over).ok_or_else(|| {
-                    Error::Config(format!(
-                        "Looping error: block output '{}' not found",
-                        looping_strategy.over
-                    ))
-                })?;
+                let list_data =
+                    self.block_outputs
+                        .get(&looping_strategy.over)
+                        .ok_or_else(|| {
+                            Error::Config(format!(
+                                "Looping error: block output '{}' not found",
+                                looping_strategy.over
+                            ))
+                        })?;
 
                 // The output of `create_task_list` is a `TaskList` struct, which is a JSON object `{"tasks": [...]}`.
                 // We need to get the array from the `tasks` field.
@@ -134,10 +137,21 @@ impl FlowRunner {
             // 1. Determine which prompt to use
             let prompt_def = if attempt > 0 {
                 // This is a retry, use the on_failure_prompt
-                block.verification.as_ref().and_then(|v| match &v.strategy {
-                        VerificationStrategy::Command { on_failure_prompt, .. } => Some(on_failure_prompt),
+                block
+                    .verification
+                    .as_ref()
+                    .and_then(|v| match &v.strategy {
+                        VerificationStrategy::Command {
+                            on_failure_prompt, ..
+                        } => Some(on_failure_prompt),
                         VerificationStrategy::Prompt { .. } => None, // Not implemented yet
-                    }).ok_or_else(|| Error::Config(format!("Block '{}' is in a retry loop but has no on_failure_prompt.", block.id)))?
+                    })
+                    .ok_or_else(|| {
+                        Error::Config(format!(
+                            "Block '{}' is in a retry loop but has no on_failure_prompt.",
+                            block.id
+                        ))
+                    })?
             } else {
                 // First attempt
                 &block.prompt
@@ -187,13 +201,11 @@ impl FlowRunner {
             let tools_config = if tool_schemas.is_empty() {
                 None
             } else {
-                Some(vec![
-                    crate::gemini_types::ToolConfig::FunctionDeclaration(
-                        crate::gemini_types::ToolConfigFunctionDeclaration {
-                            function_declarations: tool_schemas,
-                        },
-                    ),
-                ])
+                Some(vec![crate::gemini_types::ToolConfig::FunctionDeclaration(
+                    crate::gemini_types::ToolConfigFunctionDeclaration {
+                        function_declarations: tool_schemas,
+                    },
+                )])
             };
 
             self.logger.log_prompt(PromptLog {

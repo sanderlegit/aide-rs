@@ -66,7 +66,7 @@ async fn test_e2e_plan_flow() {
 
     Mock::given(method("POST"))
         .and(path_regex(
-            r"/v1beta/models/gemini-1.5-flash-latest:generateContent",
+            r"/v1beta/models/gemini-2.5-flash-latest:generateContent",
         ))
         .and(body_string_contains("Create a hello world app"))
         .and(body_string_contains("fn main() {}"))
