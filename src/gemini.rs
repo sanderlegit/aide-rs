@@ -84,7 +84,7 @@ impl GeminiClientWrapper {
 
         let time_taken = start_time.elapsed();
         self.logger.log_response(ResponseLog {
-            agent_type: self.model_name.clone(),
+            model_name: self.model_name.clone(),
             response: response.clone(),
             time_taken_ms: time_taken.as_millis(),
         });

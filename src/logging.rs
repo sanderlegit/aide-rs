@@ -123,7 +123,7 @@ impl RunLogger {
         }
     }
 
-    fn log_summary(&self, message: &str) {
+    pub fn log_summary(&self, message: &str) {
         if let Ok(mut file) = self.summary_file.lock() {
             let _ = writeln!(file, "{}", message);
         }

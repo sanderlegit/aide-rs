@@ -32,10 +32,12 @@ pub struct Content {
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
-#[serde(skip_serializing_if = "Option::is_none")]
 pub struct ContentPart {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub function_call: Option<FunctionCall>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub function_response: Option<FunctionResponse>,
 }
 

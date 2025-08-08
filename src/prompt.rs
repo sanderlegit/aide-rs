@@ -1,4 +1,4 @@
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::files;
 use crate::flows::types::{FileScope, Prompt, PromptPart};
 use std::collections::HashMap;
@@ -109,7 +109,7 @@ impl PromptBuilder {
     async fn get_prompt_file_scope(&mut self, path: &Path) -> Result<FileScope> {
         let toml_value = self.get_prompt_toml(path).await?;
         if let Some(scope_value) = toml_value.get("file_scoping") {
-            let scope: FileScope = scope_value.clone().try_deserialize()?;
+            let scope: FileScope = scope_value.clone().try_into()?;
             Ok(scope)
         } else {
             Ok(FileScope::default())
