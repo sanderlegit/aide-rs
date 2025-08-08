@@ -2,8 +2,9 @@ use assert_cmd::Command;
 use serde_json::json;
 use std::fs;
 use std::path::PathBuf;
-use wiremock::matchers::{body_string_contains, method, path_regex, not};
+use wiremock::matchers::{body_string_contains, method, path_regex};
 use wiremock::{Mock, ResponseTemplate};
+use wiremock_logical_matchers::not;
 
 mod common;
 use common::TestEnv;
@@ -149,7 +150,9 @@ edition = "2021"
         .and(path_regex(
             r"/v1beta/models/gemini-2.5-flash-latest:generateContent",
         ))
-        .and(body_string_contains("create a detailed, human-readable implementation plan"))
+        .and(body_string_contains(
+            "create a detailed, human-readable implementation plan",
+        ))
         .and(not(body_string_contains("Current Task"))) // Differentiates from implement_tasks
         .and(body_string_contains("Add a hello world function")) // From objective
         .respond_with(ResponseTemplate::new(200).set_body_json(markdown_plan_response))
@@ -179,7 +182,9 @@ edition = "2021"
             r"/v1beta/models/gemini-2.5-flash-latest:generateContent",
         ))
         .and(body_string_contains("convert the provided markdown plan"))
-        .and(body_string_contains("Plan: Add a function to `src/lib.rs`."))
+        .and(body_string_contains(
+            "Plan: Add a function to `src/lib.rs`.",
+        ))
         .respond_with(ResponseTemplate::new(200).set_body_json(structured_task_response))
         .mount(&env.mock_server)
         .await;
@@ -207,7 +212,9 @@ edition = "2021"
         ))
         .and(body_string_contains("You are an expert pair programmer."))
         .and(body_string_contains("Current Task")) // From implement_tasks prompt
-        .and(body_string_contains("Add hello_world function to src/lib.rs"))
+        .and(body_string_contains(
+            "Add hello_world function to src/lib.rs",
+        ))
         .respond_with(ResponseTemplate::new(200).set_body_json(impl_response))
         .mount(&env.mock_server)
         .await;
@@ -281,9 +288,13 @@ edition = "2021"
         .and(path_regex(
             r"/v1beta/models/gemini-2.5-flash-latest:generateContent",
         ))
-        .and(body_string_contains("create a detailed, human-readable implementation plan"))
+        .and(body_string_contains(
+            "create a detailed, human-readable implementation plan",
+        ))
         .and(not(body_string_contains("Current Task"))) // Differentiates from implement_tasks
-        .and(body_string_contains("Add a public function `go()` to lib.rs"))
+        .and(body_string_contains(
+            "Add a public function `go()` to lib.rs",
+        ))
         .respond_with(ResponseTemplate::new(200).set_body_json(markdown_plan_response))
         .mount(&env.mock_server)
         .await;
@@ -338,7 +349,9 @@ edition = "2021"
         ))
         .and(body_string_contains("You are an expert pair programmer."))
         .and(body_string_contains("Current Task"))
-        .and(body_string_contains("Add a public function `go()` to lib.rs"))
+        .and(body_string_contains(
+            "Add a public function `go()` to lib.rs",
+        ))
         .respond_with(ResponseTemplate::new(200).set_body_json(impl_response_fail))
         .mount(&env.mock_server)
         .await;
