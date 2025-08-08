@@ -3,7 +3,7 @@ use dotenvy::dotenv;
 use gemini_client_rs::types::{Content, GenerateContentResponse, PartResponse};
 use reqwest::Client;
 use std::env;
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 
 pub struct GeminiClientWrapper {
     client: Client,
