@@ -1,5 +1,6 @@
 use crate::agents::aider::AiderWrapper;
-use crate::error::Result;
+use crate::agents::AiderRunResult;
+use crate::error::{Error, Result};
 use crate::gemini::GeminiClientWrapper;
 use crate::logging::RunLogger;
 use crate::session::Session;
@@ -42,16 +43,41 @@ impl Orchestrator {
             files.join("\n")
         );
 
-        // For now, we will just print the plan. Later this will call Gemini and then Aider.
-        println!("\n--- RESEARCH PLAN ---\n");
-        println!("Session ID: {}", session.id);
-        println!("Objective: {}", objective);
-        println!("Files: {:?}", files);
-        println!("Prompt for Gemini:\n{}", research_prompt);
-        println!("\n--- END RESEARCH PLAN ---\n");
+        let contents = vec![crate::gemini_types::Content {
+            parts: vec![crate::gemini_types::ContentPart::new_text(research_prompt)],
+            role: crate::gemini_types::Role::User,
+        }];
 
-        self.logger
-            .log_summary("Research strategy completed (mock).");
+        let response = self.gemini.generate_content(contents, None).await?;
+
+        let research_text = response
+            .candidates
+            .and_then(|mut c| c.pop())
+            .and_then(|c| c.content.parts.into_iter().next())
+            .and_then(|p| p.text)
+            .unwrap_or_else(|| "No response text from Gemini.".to_string());
+
+        let research_file_path = session.dir.join("research.md");
+        std::fs::write(&research_file_path, &research_text)?;
+
+        self.logger.log_summary(&format!(
+            "Research summary saved to {}",
+            research_file_path.display()
+        ));
+
+        // Optional: launch aider to refine
+        info!("Launching aider to review and refine the research document.");
+        self.aider
+            .run(
+                &session,
+                vec![research_file_path.to_str().unwrap().to_string()],
+                "Here is the research document I generated. Please review it.",
+                false,
+                None,
+            )
+            .await?;
+
+        self.logger.log_summary("Research strategy completed.");
         Ok(())
     }
 
@@ -60,23 +86,67 @@ impl Orchestrator {
         let session = Session::new("plan", &objective)?;
         info!(objective, ?files, "Starting plan strategy.");
 
+        let mut file_context = String::new();
+        for file_path in &files {
+            match std::fs::read_to_string(file_path) {
+                Ok(content) => {
+                    file_context
+                        .push_str(&format!("\n---\nFile: {}\n---\n{}\n", file_path, content));
+                }
+                Err(e) => {
+                    // Log a warning but continue, as some files might not be critical for planning
+                    tracing::warn!(file_path, error = %e, "Failed to read file for planning context");
+                }
+            }
+        }
+
         let plan_prompt = format!(
             "Please help me plan the tasks for my implementation. I need to do the following:
             '{}'
 
-            Based on that, and the provided file context, please create a markdown task list.",
-            objective
+            Based on that, and the provided file context, please create a markdown task list.
+            {}",
+            objective, file_context
         );
 
-        // For now, we will just print the plan. Later this will call Gemini and then Aider.
-        println!("\n--- PLAN ---\n");
-        println!("Session ID: {}", session.id);
-        println!("Objective: {}", objective);
-        println!("Files: {:?}", files);
-        println!("Prompt for Gemini -> Aider:\n{}", plan_prompt);
-        println!("\n--- END PLAN ---\n");
+        let contents = vec![crate::gemini_types::Content {
+            parts: vec![crate::gemini_types::ContentPart::new_text(plan_prompt)],
+            role: crate::gemini_types::Role::User,
+        }];
 
-        self.logger.log_summary("Plan strategy completed (mock).");
+        let response = self.gemini.generate_content(contents, None).await?;
+
+        let plan_text = response
+            .candidates
+            .and_then(|mut c| c.pop())
+            .and_then(|c| c.content.parts.into_iter().next())
+            .and_then(|p| p.text)
+            .unwrap_or_else(|| "No response text from Gemini.".to_string());
+
+        let plan_file_path = session.dir.join("plan.md");
+        std::fs::write(&plan_file_path, &plan_text)?;
+
+        self.logger
+            .log_summary(&format!("Plan saved to {}", plan_file_path.display()));
+
+        let mut files_for_aider = files;
+        files_for_aider.push(plan_file_path.to_str().unwrap().to_string());
+
+        info!("Launching aider to review and refine the plan.");
+        self.aider
+            .run(
+                &session,
+                files_for_aider,
+                &format!(
+                    "Here is the plan I generated, stored in `{}`. Please review it and help me refine it.",
+                    plan_file_path.display()
+                ),
+                false,
+                None,
+            )
+            .await?;
+
+        self.logger.log_summary("Plan strategy completed.");
         Ok(())
     }
 
@@ -91,7 +161,7 @@ impl Orchestrator {
         let session = Session::new("implement", &objective)?;
         info!(objective, ?files, %validate_cmd, %auto, "Starting implement strategy.");
 
-        let implement_prompt = format!(
+        let mut current_objective = format!(
             "Hello, can you help me with my implementation? I need to do the following:
             '{}'
 
@@ -100,18 +170,58 @@ impl Orchestrator {
             objective, validate_cmd
         );
 
-        // For now, we will just print the plan. Later this will call Aider.
-        println!("\n--- IMPLEMENTATION PLAN ---\n");
-        println!("Session ID: {}", session.id);
-        println!("Objective: {}", objective);
-        println!("Files: {:?}", files);
-        println!("Auto-mode: {}", auto);
-        println!("Validation Command: {}", validate_cmd);
-        println!("Initial prompt for Aider:\n{}", implement_prompt);
-        println!("\n--- END IMPLEMENTATION PLAN ---\n");
+        if !auto {
+            self.aider
+                .run(&session, files, &current_objective, false, None)
+                .await?;
+            self.logger
+                .log_summary("Implement strategy completed (interactive).");
+            return Ok(());
+        }
+
+        // Automated loop
+        let max_retries = 5;
+        for i in 0..max_retries {
+            info!(attempt = i + 1, max_attempts = max_retries, "Running aider in auto mode.");
+
+            let result = self
+                .aider
+                .run(
+                    &session,
+                    files.clone(),
+                    &current_objective,
+                    true,
+                    Some(validate_cmd.clone()),
+                )
+                .await?;
+
+            if result.success {
+                self.logger.log_summary(&format!(
+                    "Aider succeeded on attempt {}/{}.",
+                    i + 1,
+                    max_retries
+                ));
+                // TODO: Commit changes
+                return Ok(());
+            }
+
+            self.logger.log_summary(&format!(
+                "Aider failed on attempt {}/{}. Analyzing failure...",
+                i + 1,
+                max_retries
+            ));
+
+            // TODO: Implement Gemini-based debugging. For now, just feed back the error.
+            current_objective = format!(
+                "The last attempt failed. Here is the output from the validation command:\n\nSTDOUT:\n{}\n\nSTDERR:\n{}\n\nPlease try to fix it.",
+                result.stdout, result.stderr
+            );
+        }
 
         self.logger
-            .log_summary("Implement strategy completed (mock).");
-        Ok(())
+            .log_summary("Implement strategy failed after max retries.");
+        Err(Error::ToolFailed(
+            "Aider failed to complete the objective after maximum retries.".to_string(),
+        ))
     }
 }
