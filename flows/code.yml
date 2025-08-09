@@ -11,13 +11,7 @@ blocks:
           content: |
             You are an expert software architect. Your role is to analyze a user's objective and the provided project context, and create a detailed, human-readable implementation plan in Markdown format.
             The plan should outline the strategy, including new files to create, tests to add, and logic changes. This is a creative step to think through the solution before generating structured tasks.
-        - type: file_list
-          scopes: [ "base", "ai"]
-          prefix: "\n**Available Project Files:**\n"
-        - type: file_contents
-          scopes: [ "base", "prompt" ]
-          prefix: "\n**Project File Context:**\n"
-          hide_in_stdout: true
+            **Do not write any code or code diffs.** The output should be a prose description of the plan, not the implementation itself.
         - type: prompt_file_field
           field: "objective"
           prefix: "\n**Objective:**\n"
@@ -46,10 +40,6 @@ blocks:
         - type: prompt_file_field
           field: "objective"
           prefix: "\n**Objective:**\n"
-          hide_in_stdout: true
-        - type: prompt_file_field
-          field: "coding_conventions"
-          prefix: "\n**Coding Conventions:**\n"
           hide_in_stdout: true
         - type: previous_output
           block_id: "generate_markdown_plan"
