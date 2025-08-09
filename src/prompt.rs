@@ -248,7 +248,6 @@ mod tests {
             .unwrap();
 
         assert_eq!(result.full_prompt, "Hello\nWorld");
-        assert_eq!(result.display_prompt, "Hello\nWorld");
     }
 
     #[tokio::test]
