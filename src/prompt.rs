@@ -5,10 +5,9 @@ use serde_yaml::Value;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-/// Represents a fully constructed prompt, with a version for display.
+/// Represents a fully constructed prompt.
 pub struct BuiltPrompt {
     pub full_prompt: String,
-    pub display_prompt: String,
 }
 
 /// Constructs a final prompt string from a `Prompt` definition.
@@ -32,11 +31,9 @@ impl PromptBuilder {
         current_block_id: &str,
         verification_output: &Option<serde_json::Value>,
     ) -> Result<BuiltPrompt> {
-        let is_debug = std::env::var("RUST_LOG").map_or(false, |v| v.contains("debug"));
         let mut full_parts = Vec::new();
-        let mut display_parts = Vec::new();
         for part in &prompt_def.composition {
-            let (content, hide) = self
+            let (content, _hide) = self
                 .process_part(
                     part,
                     prompt_path,
@@ -45,21 +42,10 @@ impl PromptBuilder {
                     verification_output,
                 )
                 .await?;
-            full_parts.push(content.clone());
-            if !hide || is_debug {
-                display_parts.push(content);
-            } else if !content.trim().is_empty() {
-                let line_count = content.lines().count();
-                display_parts.push(format!(
-                    "... ({} lines of hidden content from '{}' in complete.log.jsonl) ...",
-                    line_count,
-                    part.name()
-                ));
-            }
+            full_parts.push(content);
         }
         Ok(BuiltPrompt {
             full_prompt: full_parts.join("\n"),
-            display_prompt: display_parts.join("\n"),
         })
     }
 

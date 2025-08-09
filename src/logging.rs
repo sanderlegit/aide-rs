@@ -19,8 +19,6 @@ pub struct PromptLog {
     pub model_name: String,
     pub system_prompt: String,
     pub user_prompt: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub display_prompt: Option<String>,
     pub tools: serde_json::Value,
 }
 
@@ -174,21 +172,11 @@ impl RunLogger {
     }
 
     pub fn log_prompt(&self, log: &PromptLog) {
-        let summary = if let Some(display) = &log.display_prompt {
-            display.clone()
-        } else {
-            // Fallback for prompts that don't use the new system, or for older logs.
-            format!(
-                "> {}\n... (full prompt in complete.log.jsonl)",
-                log.user_prompt.lines().next().unwrap_or("").trim()
-            )
-        };
-
         self.log_summary(&format!(
             "[{}] PROMPT to {}:\n{}\n",
             Utc::now().to_rfc3339(),
             log.model_name,
-            summary
+            &log.user_prompt
         ));
         self.log_complete(log);
     }
@@ -247,13 +235,13 @@ impl RunLogger {
 
     pub fn log_tool_call(&self, log: ToolCallLog) {
         self.log_summary(&format!(
-            "[{}] TOOL CALL: {} ({}ms)\n--- ARGS ---\n{}\n--- RESULT ---\nSuccess: {}\nStdout: {}\nStderr: {}\n---\n",
+            "[{}] TOOL CALL: {} ({}ms)\n--- ARGS ---\n{}\n--- RESULT ---\nSuccess: {}\nOutput:\n{}\nStderr: {}\n---\n",
             Utc::now().to_rfc3339(),
             log.tool_name,
             log.time_taken_ms,
             serde_json::to_string_pretty(&log.tool_args).unwrap_or_default(),
             log.result.success,
-            log.result.stdout,
+            serde_json::to_string_pretty(&log.result.output_json).unwrap_or_default(),
             log.result.stderr
         ));
         self.log_complete(log);
