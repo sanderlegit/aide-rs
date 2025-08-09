@@ -4,6 +4,7 @@ use crate::error::{Error, Result};
 use crate::gemini::GeminiClientWrapper;
 use crate::logging::RunLogger;
 use crate::session::Session;
+use crate::vcs;
 use tracing::info;
 
 /// The main orchestrator for managing AI workflows.
@@ -201,7 +202,14 @@ impl Orchestrator {
                     i + 1,
                     max_retries
                 ));
-                // TODO: Commit changes
+                let commit_message = format!("Implement: {}", objective);
+                self.logger.log_summary(&format!(
+                    "Committing changes with message: {}",
+                    commit_message
+                ));
+                let repo_path = std::env::current_dir()?;
+                let file_paths = files.iter().map(std::path::PathBuf::from).collect::<Vec<_>>();
+                vcs::add_and_commit(&repo_path, &file_paths, &commit_message)?;
                 return Ok(());
             }
 
