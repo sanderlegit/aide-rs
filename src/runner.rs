@@ -188,7 +188,7 @@ impl FlowRunner {
                 temp_block_outputs.insert(key.to_string(), (*value).clone());
             }
 
-            let prompt_string = self
+            let built_prompt = self
                 .prompt_builder
                 .build(
                     prompt_def,
@@ -205,7 +205,7 @@ impl FlowRunner {
 
             let user_content = Content {
                 role: Role::User,
-                parts: vec![ContentPart::new_text(prompt_string.clone())],
+                parts: vec![ContentPart::new_text(built_prompt.full_prompt.clone())],
             };
             self.history.push(user_content);
 
@@ -234,7 +234,8 @@ impl FlowRunner {
             self.logger.log_prompt(PromptLog {
                 model_name: gemini_client.model_name().to_string(),
                 system_prompt: "".to_string(), // We are using a user-style prompt for now
-                user_prompt: prompt_string,
+                user_prompt: built_prompt.full_prompt,
+                display_prompt: Some(built_prompt.display_prompt),
                 tools: json!(tools_config),
             });
 

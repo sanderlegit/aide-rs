@@ -39,13 +39,19 @@ pub struct Prompt {
 #[serde(tag = "type")]
 pub enum PromptPart {
     #[serde(rename = "static_text")]
-    StaticText { content: String },
+    StaticText {
+        content: String,
+        #[serde(default)]
+        hide_in_stdout: bool,
+    },
     #[serde(rename = "file_contents")]
     FileContents {
         #[serde(default)]
         scopes: Vec<String>, // Names of scope files in `ctx/` dir, e.g., ["base", "ai"]. "prompt" is a special name for the scope from the user's prompt file.
         #[serde(default)]
         prefix: String,
+        #[serde(default)]
+        hide_in_stdout: bool,
     },
     #[serde(rename = "file_list")]
     FileList {
@@ -53,11 +59,23 @@ pub enum PromptPart {
         scopes: Vec<String>,
         #[serde(default)]
         prefix: String,
+        #[serde(default)]
+        hide_in_stdout: bool,
     },
     #[serde(rename = "prompt_file_field")]
-    PromptFileField { field: String, prefix: String },
+    PromptFileField {
+        field: String,
+        prefix: String,
+        #[serde(default)]
+        hide_in_stdout: bool,
+    },
     #[serde(rename = "previous_output")]
-    PreviousOutput { block_id: String, prefix: String },
+    PreviousOutput {
+        block_id: String,
+        prefix: String,
+        #[serde(default)]
+        hide_in_stdout: bool,
+    },
 }
 
 /// Modifies the execution behavior of a block.

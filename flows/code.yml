@@ -17,6 +17,7 @@ blocks:
         - type: file_contents
           scopes: [ "base", "prompt" ]
           prefix: "\n**Project File Context:**\n"
+          hide_in_stdout: true
         - type: prompt_file_field
           field: "objective"
           prefix: "\n**Objective:**\n"
@@ -41,6 +42,7 @@ blocks:
         - type: file_contents
           scopes: [ "base", "prompt" ]
           prefix: "\n**Project File Context:**\n"
+          hide_in_stdout: true
         - type: previous_output
           block_id: "generate_markdown_plan"
           prefix: "\n**Markdown Plan:**\n"
@@ -68,6 +70,7 @@ blocks:
         - type: file_contents
           scopes: [ "base" ]
           prefix: "\n**Project File Context:**\n"
+          hide_in_stdout: true
         - type: previous_output # This is the current task description from the loop
           block_id: "current_task"
           prefix: "\n**Current Task:**\n"

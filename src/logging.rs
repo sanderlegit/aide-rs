@@ -19,6 +19,8 @@ pub struct PromptLog {
     pub model_name: String,
     pub system_prompt: String,
     pub user_prompt: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_prompt: Option<String>,
     pub tools: serde_json::Value,
 }
 
@@ -131,10 +133,19 @@ impl RunLogger {
         }
     }
 
-    pub fn log_prompt(&self, log: PromptLog) {
-        let summary = log.user_prompt.lines().next().unwrap_or("").trim();
+    pub fn log_prompt(&self, mut log: PromptLog) {
+        let summary = if let Some(display) = log.display_prompt.take() {
+            display
+        } else {
+            // Fallback for prompts that don't use the new system, or for older logs.
+            format!(
+                "> {}\n... (full prompt in complete.log.jsonl)",
+                log.user_prompt.lines().next().unwrap_or("").trim()
+            )
+        };
+
         self.log_summary(&format!(
-            "[{}] PROMPT to {}:\n> {}\n... (full prompt in complete.log.jsonl)\n",
+            "[{}] PROMPT to {}:\n{}\n",
             Utc::now().to_rfc3339(),
             log.model_name,
             summary

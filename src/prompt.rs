@@ -5,6 +5,12 @@ use serde_yaml::Value;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+/// Represents a fully constructed prompt, with a version for display.
+pub struct BuiltPrompt {
+    pub full_prompt: String,
+    pub display_prompt: String,
+}
+
 /// Constructs a final prompt string from a `Prompt` definition.
 #[derive(Default)]
 pub struct PromptBuilder {
@@ -25,10 +31,11 @@ impl PromptBuilder {
         block_outputs: &HashMap<String, serde_json::Value>,
         current_block_id: &str,
         verification_output: &Option<serde_json::Value>,
-    ) -> Result<String> {
-        let mut parts = Vec::new();
+    ) -> Result<BuiltPrompt> {
+        let mut full_parts = Vec::new();
+        let mut display_parts = Vec::new();
         for part in &prompt_def.composition {
-            let content = self
+            let (content, hide) = self
                 .process_part(
                     part,
                     prompt_path,
@@ -37,9 +44,21 @@ impl PromptBuilder {
                     verification_output,
                 )
                 .await?;
-            parts.push(content);
+            full_parts.push(content.clone());
+            if !hide {
+                display_parts.push(content);
+            } else if !content.trim().is_empty() {
+                let line_count = content.lines().count();
+                display_parts.push(format!(
+                    "... ({} lines of hidden content in complete.log.jsonl) ...",
+                    line_count
+                ));
+            }
         }
-        Ok(parts.join("\n"))
+        Ok(BuiltPrompt {
+            full_prompt: full_parts.join("\n"),
+            display_prompt: display_parts.join("\n"),
+        })
     }
 
     async fn process_part(
@@ -49,18 +68,29 @@ impl PromptBuilder {
         block_outputs: &HashMap<String, serde_json::Value>,
         current_block_id: &str,
         verification_output: &Option<serde_json::Value>,
-    ) -> Result<String> {
+    ) -> Result<(String, bool)> {
         match part {
-            PromptPart::StaticText { content } => Ok(content.clone()),
-            PromptPart::PromptFileField { field, prefix } => {
+            PromptPart::StaticText {
+                content,
+                hide_in_stdout,
+            } => Ok((content.clone(), *hide_in_stdout)),
+            PromptPart::PromptFileField {
+                field,
+                prefix,
+                hide_in_stdout,
+            } => {
                 let yaml_value = self.get_prompt_yaml(prompt_path).await?;
                 let field_value = yaml_value
                     .get(field)
                     .and_then(|v| v.as_str())
                     .unwrap_or("");
-                Ok(format!("{}{}", prefix, field_value))
+                Ok((format!("{}{}", prefix, field_value), *hide_in_stdout))
             }
-            PromptPart::PreviousOutput { block_id, prefix } => {
+            PromptPart::PreviousOutput {
+                block_id,
+                prefix,
+                hide_in_stdout,
+            } => {
                 let output = if block_id == current_block_id {
                     // Special case: reference to current block's verification output
                     verification_output
@@ -93,9 +123,13 @@ impl PromptBuilder {
                             format!("Error: Output for block '{}' not found.", block_id)
                         })
                 };
-                Ok(format!("{}{}", prefix, output))
+                Ok((format!("{}{}", prefix, output), *hide_in_stdout))
             }
-            PromptPart::FileList { scopes, prefix } => {
+            PromptPart::FileList {
+                scopes,
+                prefix,
+                hide_in_stdout,
+            } => {
                 let mut final_scope = FileScope::default();
                 let base_dir = PathBuf::from(".");
 
@@ -124,9 +158,13 @@ impl PromptBuilder {
                     content.push_str(&format!("- ./{}", display_path.display()));
                     content.push('\n');
                 }
-                Ok(content)
+                Ok((content, *hide_in_stdout))
             }
-            PromptPart::FileContents { scopes, prefix } => {
+            PromptPart::FileContents {
+                scopes,
+                prefix,
+                hide_in_stdout,
+            } => {
                 let mut final_scope = FileScope::default();
                 let base_dir = PathBuf::from(".");
 
@@ -164,7 +202,7 @@ impl PromptBuilder {
                         file_content
                     ));
                 }
-                Ok(content)
+                Ok((content, *hide_in_stdout))
             }
         }
     }
