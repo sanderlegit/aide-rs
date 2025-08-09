@@ -74,7 +74,7 @@ pub struct ValidationLog {
 
 #[derive(Clone)]
 pub struct RunLogger {
-    _log_dir: PathBuf,
+    pub log_dir: PathBuf,
     summary_log_path: PathBuf,
     complete_log_path: PathBuf,
     performance_log_path: PathBuf,
@@ -115,7 +115,7 @@ impl RunLogger {
         ));
 
         let logger = Self {
-            _log_dir: log_dir,
+            log_dir,
             summary_log_path,
             complete_log_path,
             performance_log_path,

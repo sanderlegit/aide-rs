@@ -51,8 +51,9 @@ impl PromptBuilder {
             } else if !content.trim().is_empty() {
                 let line_count = content.lines().count();
                 display_parts.push(format!(
-                    "... ({} lines of hidden content in complete.log.jsonl) ...",
-                    line_count
+                    "... ({} lines of hidden content from '{}' in complete.log.jsonl) ...",
+                    line_count,
+                    part.name()
                 ));
             }
         }

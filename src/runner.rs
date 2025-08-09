@@ -149,15 +149,19 @@ impl FlowRunner {
                 self.execute_block(block, flow, prompt_path, None).await?
             };
 
-            if let Some(save_path) = &block.annotations.save_output_to {
+            if let Some(save_path_str) = &block.annotations.save_output_to {
+                // The path from the flow file is relative. We want to save it inside the run's log directory.
+                let save_path = self.logger.log_dir.join(save_path_str);
+
                 let output_json = serde_json::to_string_pretty(&final_output)?;
-                if let Some(parent) = Path::new(save_path).parent() {
+                if let Some(parent) = save_path.parent() {
                     tokio::fs::create_dir_all(parent).await?;
                 }
-                tokio::fs::write(save_path, output_json).await?;
+                tokio::fs::write(&save_path, output_json).await?;
                 self.logger.log_summary(&format!(
                     "Saved output of block '{}' to '{}'",
-                    block.id, save_path
+                    block.id,
+                    save_path.display()
                 ));
             }
 
@@ -329,10 +333,28 @@ impl FlowRunner {
                     .await?;
 
                 let Some(candidate) = response.candidates.and_then(|mut c| c.pop()) else {
+                    warn!(
+                        "Gemini response contained no candidates. This may be due to safety filters. Full response: {:?}",
+                        response
+                    );
                     return Err(Error::ApiError(
                         "No candidates received from Gemini API".to_string(),
                     ));
                 };
+
+                if candidate.content.parts.is_empty() {
+                    warn!(
+                        "Gemini returned empty response. Finish reason: {:?}, Safety ratings: {:?}",
+                        candidate.finish_reason, candidate.safety_ratings
+                    );
+                    block_output = json!({
+                        "error": "Gemini returned empty content, possibly due to safety filters.",
+                        "finish_reason": candidate.finish_reason,
+                        "safety_ratings": candidate.safety_ratings,
+                    });
+                    // Don't push this to history, just break and let verification handle it.
+                    break;
+                }
 
                 attempt_history.push(candidate.content.clone());
 

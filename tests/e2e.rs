@@ -853,8 +853,15 @@ edition = "2021"
     );
 
     // Assert that the tasks file was created
-    let tasks_path = env.full_path(".ai/tasks.json");
-    assert!(tasks_path.exists());
+    let log_dir = env.full_path(".ai/logs");
+    let mut entries = fs::read_dir(log_dir).unwrap();
+    let run_dir = entries.next().unwrap().unwrap().path();
+    let tasks_path = run_dir.join(".ai/tasks.json");
+    assert!(
+        tasks_path.exists(),
+        "tasks.json not found in log dir: {}",
+        tasks_path.display()
+    );
     let tasks_content = fs::read_to_string(&tasks_path).unwrap();
     assert!(tasks_content.contains("add-hello"));
 
@@ -906,7 +913,7 @@ edition = "2021"
         .arg("--prompt")
         .arg("my_chained_prompt.yml")
         .arg("--input-file")
-        .arg(".ai/tasks.json")
+        .arg(&tasks_path)
         .arg("--input-id")
         .arg("generate_tasks");
 

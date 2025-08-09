@@ -78,6 +78,18 @@ pub enum PromptPart {
     },
 }
 
+impl PromptPart {
+    pub fn name(&self) -> &'static str {
+        match self {
+            PromptPart::StaticText { .. } => "Static Text",
+            PromptPart::FileContents { .. } => "File Contents",
+            PromptPart::FileList { .. } => "File List",
+            PromptPart::PromptFileField { .. } => "Prompt Field",
+            PromptPart::PreviousOutput { .. } => "Previous Output",
+        }
+    }
+}
+
 /// Modifies the execution behavior of a block.
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Annotations {

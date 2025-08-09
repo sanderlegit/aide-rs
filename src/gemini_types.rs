@@ -20,6 +20,7 @@ pub struct GenerateContentRequest {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Content {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub parts: Vec<ContentPart>,
     pub role: Role,
 }
