@@ -76,6 +76,13 @@ impl PromptBuilder {
                     block_outputs
                         .get(block_id)
                         .map(|v| {
+                            // If the value is a JSON object that looks like a Task from a loop,
+                            // just extract the description field to keep the prompt clean.
+                            if v.is_object() {
+                                if let Some(desc) = v.get("description").and_then(|d| d.as_str()) {
+                                    return desc.to_string();
+                                }
+                            }
                             if let Some(s) = v.as_str() {
                                 s.to_string()
                             } else {
