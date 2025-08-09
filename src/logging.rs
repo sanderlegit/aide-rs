@@ -132,12 +132,12 @@ impl RunLogger {
     }
 
     pub fn log_prompt(&self, log: PromptLog) {
+        let summary = log.user_prompt.lines().next().unwrap_or("").trim();
         self.log_summary(&format!(
-            "[{}] PROMPT to {}:\n--- SYSTEM ---\n{}\n--- USER ---\n{}\n---\n",
+            "[{}] PROMPT to {}:\n> {}\n... (full prompt in complete.log.jsonl)\n",
             Utc::now().to_rfc3339(),
             log.model_name,
-            log.system_prompt,
-            log.user_prompt
+            summary
         ));
         self.log_complete(log);
     }

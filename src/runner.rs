@@ -248,11 +248,9 @@ impl FlowRunner {
 
                 for part in candidate.content.parts {
                     if let Some(text) = part.text {
-                        info!(%text, "Got text response from model");
                         block_output = json!(text);
                     }
                     if let Some(call) = part.function_call {
-                        info!(tool_call = %call.name, "Got function call from model");
                         let start_time = Instant::now();
                         let result = tool_executor.execute(&call).await;
                         let time_taken = start_time.elapsed();

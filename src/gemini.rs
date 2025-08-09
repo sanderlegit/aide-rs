@@ -94,22 +94,6 @@ impl GeminiClientWrapper {
             time_taken_ms: time_taken.as_millis(),
         });
 
-        // Log text parts of response at info level for visibility
-        if let Some(candidates) = &response.candidates {
-            for candidate in candidates {
-                for part in &candidate.content.parts {
-                    if let Some(text) = &part.text {
-                        if !text.trim().is_empty() {
-                            info!(
-                                response_text = %format!("\n---\n{}\n---", text.trim()),
-                                "Gemini response text part"
-                            );
-                        }
-                    }
-                }
-            }
-        }
-
         Ok(response)
     }
 }
