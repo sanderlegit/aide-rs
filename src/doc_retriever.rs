@@ -138,8 +138,15 @@ pub fn get_item_docs(
                 "trait_implementations": impls,
             }))
         }
+        ItemEnum::Function(func) => Ok(json!({
+            "type": "function",
+            "crate": crate_name,
+            "path": path,
+            "documentation": item.docs.clone().unwrap_or_default(),
+            "signature": clean_fn_signature(&func.sig.output, &func.sig.inputs, item.name.as_deref().unwrap_or("")),
+        })),
         _ => Err(Error::Config(format!(
-            "Path '{}' is not a module, struct, or enum.",
+            "Path '{}' is not a module, struct, enum, or function.",
             path
         ))),
     }
@@ -285,6 +292,9 @@ edition = "2021"
         let lib_rs = r#"
 //! Crate documentation.
 
+/// A free function.
+pub fn a_free_function() {}
+
 pub mod my_module {
     //! Module documentation.
 
@@ -356,5 +366,16 @@ pub mod my_module {
         assert_eq!(methods[0]["name"], "new");
         assert_eq!(methods[0]["documentation"], "A method on MyStruct.");
         assert_eq!(methods[0]["signature"], "pub fn new() -> Self");
+
+        // Test getting function docs
+        let function_result =
+            get_item_docs("test_crate", "test_crate::a_free_function", Some(&crate_root)).unwrap();
+        assert_eq!(function_result["type"], "function");
+        assert_eq!(function_result["path"], "test_crate::a_free_function");
+        assert_eq!(function_result["documentation"], "A free function.");
+        assert_eq!(
+            function_result["signature"],
+            "pub fn a_free_function()"
+        );
     }
 }
