@@ -4,7 +4,6 @@ use std::fs;
 use std::path::PathBuf;
 use wiremock::matchers::{body_string_contains, method, path};
 use wiremock::{Mock, ResponseTemplate};
-use wiremock_logical_matchers::not;
 
 mod common;
 use common::TestEnv;
@@ -216,6 +215,7 @@ edition = "2021"
         .and(body_string_contains(
             "implement the current task as part of a larger plan",
         )) // Unique to code.yml
+        .and(body_string_contains("**Current Task to Implement:**"))
         .and(body_string_contains(
             "Add hello_world function to src/lib.rs",
         ))
@@ -359,6 +359,7 @@ edition = "2021"
         .and(body_string_contains(
             "implement the current task as part of a larger plan",
         )) // Unique to code.yml
+        .and(body_string_contains("**Current Task to Implement:**"))
         .and(body_string_contains(
             "Add a public function `go()` to lib.rs",
         ))
