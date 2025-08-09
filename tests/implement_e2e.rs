@@ -1,5 +1,3 @@
-mod common;
-
 use crate::common::TestEnv;
 use assert_cmd::Command;
 use std::fs;
