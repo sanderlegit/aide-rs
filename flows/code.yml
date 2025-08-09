@@ -13,6 +13,13 @@ blocks:
             The plan should focus only on the delta required to achieve the objective. Do not describe work that has already been completed.
             The plan should outline the strategy, including new files to create, tests to add, and logic changes. This is a creative step to think through the solution before generating structured tasks.
             **Do not write any code or code diffs.** The output should be a prose description of the plan, not the implementation itself.
+        - type: file_list
+          scopes: [ "base", "prompt" ]
+          prefix: "\n**Available Project Files:**\n"
+        - type: file_contents
+          scopes: [ "base", "prompt" ]
+          prefix: "\n**Project File Context:**\n"
+          hide_in_stdout: true
         - type: prompt_file_field
           field: "objective"
           prefix: "\n**Objective:**\n"
@@ -33,7 +40,7 @@ blocks:
             You are an expert system. Your role is to convert the provided markdown plan into a structured list of tasks using the `create_task_list` tool.
             Each task should be a descriptive, actionable step that can be implemented independently.
         - type: file_list
-          scopes: [ "base", "ai"]
+          scopes: [ "base", "prompt" ]
           prefix: "\n**Available Project Files:**\n"
         - type: file_contents
           scopes: [ "base", "prompt" ]
