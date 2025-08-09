@@ -4,17 +4,16 @@ An AI-powered software development agent that automates coding tasks by generati
 
 ## Overview
 
-`aide-rs` is a command-line tool that uses Google's Gemini models to understand a software development objective, create a step-by-step plan, and then implement that plan by editing files. It operates using a flexible, flow-based architecture.
+`aide-rs` is an AI-powered software development agent that acts as a smart orchestrator for `aider`. It uses large language models to manage and execute high-level strategies (e.g., Research, Plan, Implement), preparing context and then delegating the core task of code modification to `aider`.
 
-A "Flow" is a declarative YAML file that defines a sequence of prompt-driven steps, allowing for complex workflows like planning, coding, and self-correction to be easily defined and customized.
+Instead of a simple prompt-and-response loop, `aide-rs` manages complex, multi-step workflows, providing `aider` with rich context from research, documentation, and even compilation errors.
 
 ## Features
 
--   **Declarative Workflows**: Define agent behavior in simple YAML files instead of hardcoding it.
--   **Self-Correction**: Flows can define verification steps (like running `cargo check`) and retry logic on failure.
--   **Structured Tool Use**: Relies on Gemini's Function Calling capabilities for reliable operations like file modifications and task generation.
--   **Scoped Context**: Uses a system of mergeable YAML files (`ctx/*.yml`) and `.gitignore` to provide the agent with precise file context.
--   **Extensible**: Easily create new flows and tools to automate any development task.
+-   **Strategy-Based Workflows**: Executes high-level strategies like `research`, `plan`, and `implement` to accomplish complex tasks.
+-   **Aider-Centric**: Delegates all code editing to `aider`, leveraging its powerful features for interactive, git-aware development.
+-   **Automated Debugging Loop**: In automated mode, `aide-rs` can run a validation command (e.g., `make test`), analyze failures, use an LLM to look up relevant documentation, and re-run `aider` with the new context to fix the issue.
+-   **Session-Based Artifacts**: Each run is isolated in its own session directory, containing all logs, research notes, and `aider` history for full traceability.
 
 ## Prerequisites
 
