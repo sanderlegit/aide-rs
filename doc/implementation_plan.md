@@ -12,7 +12,7 @@ This phase focuses on building out the core components of the `FlowRunner` so th
     -   Handle `static_text`, `prompt_file_field`, and `previous_output` composition types.
     -   Implement `file_contents` logic:
         -   Load and merge named scopes from `ctx/*.yml`.
-        -   Load scope from the user's TOML prompt file.
+        -   Load scope from the user's YAML prompt file.
         -   Use the `files.rs` module to get the final list of files.
         -   Read file contents and format them into a single string.
     -   **Unit Tests**: Add tests for each composition type and for scope merging.

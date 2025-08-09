@@ -22,7 +22,7 @@ The new system revolves around three key concepts:
 -   **Flow Runner**: The Rust component (`src/runner.rs`) responsible for parsing a Flow YAML file and executing its Blocks sequentially, managing state, history, and tool calls.
 
 A typical end-to-end `code` flow execution process is as follows:
-1.  User invokes `aide-rs run code --prompt <initial_context.toml>`.
+1.  User invokes `aide-rs run code --prompt <initial_context.yml>`.
 2.  The `Flow Runner` loads `flows/code.yml`.
 3.  **Block 1: High-Level Planning.** The first block prompts the LLM to generate a detailed, human-readable implementation plan in Markdown format. This is a creative step to outline the strategy, including new files, tests, and logic changes.
 4.  **Block 2: Structured Task Generation.** The Markdown plan from the previous block is used as input. This block's prompt asks the LLM to convert the plan into a structured list of high-level task descriptions (e.g., a `Vec<TaskDescription>`). This is achieved by calling a tool like `create_task_list`.
@@ -81,7 +81,7 @@ The `prompt` object defines the components that will be assembled into the final
     -   `type: static_text`: Simply includes a hardcoded string.
         -   `content`: The string to include.
     -   `type: file_contents`: Includes the content of files by merging a list of named scopes.
-        -   `scopes`: A list of scope names. For each name, the runner loads `ctx/<name>.yaml`. The special name `"prompt"` refers to the `[file_scoping]` table from the user's initial `.toml` prompt file. Scopes are merged in order, with later scopes overriding earlier ones.
+        -   `scopes`: A list of scope names. For each name, the runner loads `ctx/<name>.yaml`. The special name `"prompt"` refers to the `file_scoping` key from the user's initial `.yml` prompt file. Scopes are merged in order, with later scopes overriding earlier ones.
         -   `prefix`: A string to prepend to the file context.
     -   `type: prompt_file_field`: Includes a specific field from the user's initial prompt file.
         -   `field`: The name of the field (e.g., `objective`).

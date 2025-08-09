@@ -1,9 +1,9 @@
 use crate::error::Result;
 use crate::files;
 use crate::flows::types::{FileScope, Prompt, PromptPart};
+use serde_yaml::Value;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use toml::Value;
 
 /// Constructs a final prompt string from a `Prompt` definition.
 #[derive(Default)]
@@ -53,8 +53,8 @@ impl PromptBuilder {
         match part {
             PromptPart::StaticText { content } => Ok(content.clone()),
             PromptPart::PromptFileField { field, prefix } => {
-                let toml_value = self.get_prompt_toml(prompt_path).await?;
-                let field_value = toml_value
+                let yaml_value = self.get_prompt_yaml(prompt_path).await?;
+                let field_value = yaml_value
                     .get(field)
                     .and_then(|v| v.as_str())
                     .unwrap_or("");
@@ -125,20 +125,20 @@ impl PromptBuilder {
         }
     }
 
-    async fn get_prompt_toml(&mut self, path: &Path) -> Result<&Value> {
+    async fn get_prompt_yaml(&mut self, path: &Path) -> Result<&Value> {
         if !self.prompt_file_cache.contains_key(path) {
             let content = tokio::fs::read_to_string(path).await?;
-            let toml_value: Value = toml::from_str(&content)?;
+            let yaml_value: Value = serde_yaml::from_str(&content)?;
             self.prompt_file_cache
-                .insert(path.to_path_buf(), toml_value);
+                .insert(path.to_path_buf(), yaml_value);
         }
         Ok(self.prompt_file_cache.get(path).unwrap())
     }
 
     async fn get_prompt_file_scope(&mut self, path: &Path) -> Result<FileScope> {
-        let toml_value = self.get_prompt_toml(path).await?;
-        if let Some(scope_value) = toml_value.get("file_scoping") {
-            let scope: FileScope = scope_value.clone().try_into()?;
+        let yaml_value = self.get_prompt_yaml(path).await?;
+        if let Some(scope_value) = yaml_value.get("file_scoping") {
+            let scope: FileScope = serde_yaml::from_value(scope_value.clone())?;
             Ok(scope)
         } else {
             Ok(FileScope::default())
@@ -167,7 +167,7 @@ mod tests {
                 },
             ],
         };
-        let prompt_path = Path::new("dummy.toml");
+        let prompt_path = Path::new("dummy.yml");
         let block_outputs = HashMap::new();
 
         let result = builder
@@ -181,9 +181,9 @@ mod tests {
     #[tokio::test]
     async fn test_build_prompt_with_fields_and_outputs() {
         let dir = tempdir().unwrap();
-        let prompt_file_path = dir.path().join("prompt.toml");
+        let prompt_file_path = dir.path().join("prompt.yml");
         let mut file = File::create(&prompt_file_path).unwrap();
-        writeln!(file, "objective = \"Test Objective\"").unwrap();
+        writeln!(file, "objective: Test Objective").unwrap();
 
         let mut builder = PromptBuilder::new();
         let prompt_def = Prompt {
@@ -236,7 +236,7 @@ mod tests {
                 prefix: "Verification Failed: ".to_string(),
             }],
         };
-        let prompt_path = Path::new("dummy.toml");
+        let prompt_path = Path::new("dummy.yml");
         let block_outputs = HashMap::new();
         let verification_output = Some(json!({ "error": "cargo check failed" }));
 
@@ -291,7 +291,7 @@ mod tests {
                 prefix: "Code:\n".to_string(),
             }],
         };
-        let prompt_path = Path::new("dummy.toml");
+        let prompt_path = Path::new("dummy.yml");
         let block_outputs = HashMap::new();
 
         let result = builder

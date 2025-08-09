@@ -11,14 +11,8 @@ pub enum Error {
     #[error("JSON serialization/deserialization error: {0}")]
     SerdeJson(#[from] serde_json::Error),
 
-    #[error("TOML deserialization error: {0}")]
-    TomlDe(#[from] toml::de::Error),
-
     #[error("YAML parsing error: {0}")]
     Yaml(#[from] serde_yaml::Error),
-
-    #[error("TOML serialization error: {0}")]
-    TomlSer(#[from] toml::ser::Error),
 
     #[error("File filtering error: {0}")]
     Ignore(#[from] ignore::Error),

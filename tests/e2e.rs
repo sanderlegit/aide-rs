@@ -38,11 +38,11 @@ async fn test_e2e_plan_flow() {
 
     // 2. Create the prompt file
     env.create_file(
-        "my_prompt.toml",
+        "my_prompt.yml",
         r#"
-        objective = "Create a hello world app"
-        [file_scoping]
-        include = ["src/**/*.rs"]
+        objective: "Create a hello world app"
+        file_scoping:
+          include: ["src/**/*.rs"]
         "#,
     );
 
@@ -86,7 +86,7 @@ async fn test_e2e_plan_flow() {
     cmd.arg("run")
         .arg("plan")
         .arg("--prompt")
-        .arg("my_prompt.toml");
+        .arg("my_prompt.yml");
 
     // 6. Assert the command succeeds and logs correctly
     let output = cmd.output().unwrap();
@@ -118,11 +118,11 @@ async fn test_e2e_code_flow_single_task() {
 
     // 2. Create prompt and initial project files
     env.create_file(
-        "my_code_prompt.toml",
+        "my_code_prompt.yml",
         r#"
-        objective = "Add a hello world function to lib.rs"
-        [file_scoping]
-        include = ["src/lib.rs"]
+        objective: "Add a hello world function to lib.rs"
+        file_scoping:
+          include: ["src/lib.rs"]
         "#,
     );
     // Need Cargo.toml for cargo check to work
@@ -226,7 +226,7 @@ edition = "2021"
     cmd.arg("run")
         .arg("code")
         .arg("--prompt")
-        .arg("my_code_prompt.toml");
+        .arg("my_code_prompt.yml");
 
     // 5. Assert success and file modification
     let output = cmd.output().unwrap();
@@ -259,11 +259,13 @@ async fn test_e2e_code_flow_with_retry() {
 
     // 2. Create prompt and initial project files
     env.create_file(
-        "my_retry_prompt.toml",
+        "my_retry_prompt.yml",
         r#"
-        objective = "Add a public function `go()` to lib.rs"
-        [file_scoping]
-        include = ["src/lib.rs", "Cargo.toml"]
+        objective: "Add a public function `go()` to lib.rs"
+        file_scoping:
+          include:
+            - "src/lib.rs"
+            - "Cargo.toml"
         "#,
     );
     // Need Cargo.toml for cargo check to work
@@ -390,7 +392,7 @@ edition = "2021"
     cmd.arg("run")
         .arg("code")
         .arg("--prompt")
-        .arg("my_retry_prompt.toml");
+        .arg("my_retry_prompt.yml");
 
     // 5. Assert success and file modification
     let output = cmd.output().unwrap();

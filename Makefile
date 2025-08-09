@@ -39,7 +39,7 @@ clippy:
 
 # `make run`: Runs the application.
 # Note: This will require additional arguments for the CLI.
-# Example: make run ARGS="plan --prompt prompts/example.toml"
+# Example: make run ARGS="run plan --prompt prompts/lancedb_example.yml"
 run:
 	$(CARGO) run -- $(ARGS)
 

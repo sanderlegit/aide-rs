@@ -55,26 +55,26 @@ A "Flow" is a declarative YAML file that defines a sequence of prompt-driven ste
 
 ### Step 1: Define Your Objective
 
-First, create a simple TOML file that describes your high-level goal and the files the agent should be aware of.
+First, create a simple YAML file that describes your high-level goal and the files the agent should be aware of.
 
-**`my_feature.toml`:**
-```toml
-objective = """
-Add a new function `hello_world()` to `src/lib.rs` that prints 'Hello, World!' to the console.
-Then, call this new function from `main.rs`.
-"""
+**`my_feature.yml`:**
+```yaml
+objective: |
+  Add a new function `hello_world()` to `src/lib.rs` that prints 'Hello, World!' to the console.
+  Then, call this new function from `main.rs`.
 
 # Define the files the agent should look at for context.
 # It uses glob patterns and respects .gitignore.
-[file_scoping]
-include = ["src/**/*.rs", "Cargo.toml"]
-exclude = []
+file_scoping:
+  include:
+    - "src/**/*.rs"
+    - "Cargo.toml"
+  exclude: []
 
 # Provide coding conventions for the agent to follow.
-coding_conventions = """
-All public functions must have a doc comment.
-Follow standard Rust formatting (`cargo fmt`).
-"""
+coding_conventions: |
+  All public functions must have a doc comment.
+  Follow standard Rust formatting (`cargo fmt`).
 ```
 
 ### Step 2: Run a Flow
@@ -89,7 +89,7 @@ The `plan` flow analyzes your objective and creates a structured list of tasks, 
 
 ```bash
 # Make sure you are in the root of your target git repository
-aide-rs run plan --prompt my_feature.toml
+aide-rs run plan --prompt my_feature.yml
 ```
 This will output the plan to your console and save it to the `.ai/` directory.
 
@@ -99,7 +99,7 @@ The `code` flow will analyze the objective, create a plan, and then immediately 
 
 ```bash
 # This will execute the plan, edit files, and run validation.
-aide-rs run code --prompt my_feature.toml
+aide-rs run code --prompt my_feature.yml
 ```
 
 If all tasks are completed successfully, the changes will be applied to your files.

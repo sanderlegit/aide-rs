@@ -1,5 +1,4 @@
 pub mod cli;
-pub mod config;
 pub mod doc_retriever;
 pub mod error;
 pub mod files;
