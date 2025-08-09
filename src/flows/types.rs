@@ -60,6 +60,8 @@ pub struct Annotations {
     pub tools: Vec<String>,
     #[serde(default)]
     pub structured_output_schema: Option<String>,
+    #[serde(default)]
+    pub save_output_to: Option<String>,
 }
 
 /// Defines how to validate a block's output and whether to loop on failure.

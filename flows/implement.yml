@@ -1,0 +1,39 @@
+id: "implement"
+description: "Implements a list of tasks from a file."
+
+blocks:
+  - id: "implement_tasks"
+    description: "Iterate through the provided tasks and implement them."
+    looping:
+      over: "generate_tasks"
+      as: "current_task"
+    prompt:
+      composition:
+        - type: static_text
+          content: |
+            You are an expert pair programmer. Your goal is to implement the current task.
+            Analyze the task description and the provided code. Use the available tools to modify files.
+            If you are unsure about an API, use the `doc_retriever` tool to get documentation.
+            Once you have made your changes, explain your solution.
+        - type: file_contents
+          scopes: [ "base", "prompt" ]
+          prefix: "\n**Project File Context:**\n"
+        - type: previous_output # This is the current task description from the loop
+          block_id: "current_task"
+          prefix: "\n**Current Task:**\n"
+    annotations:
+      history: full
+      tools: [ "file_system", "doc_retriever" ]
+    verification:
+      max_retries: 3
+      strategy:
+        type: command
+        command: "cargo check"
+        expected_exit_code: 0
+        on_failure_prompt:
+          composition:
+            - type: static_text
+              content: "The last attempt failed validation. Please analyze the error, fix the code, and explain the fix."
+            - type: previous_output # This would be the output of the failed `cargo check`
+              block_id: "implement_tasks" # Special reference to the verification output
+              prefix: "\n**Validation Error:**\n"

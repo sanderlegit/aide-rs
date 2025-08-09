@@ -40,6 +40,10 @@ impl FlowRunner {
         })
     }
 
+    pub fn load_input(&mut self, id: &str, value: serde_json::Value) {
+        self.block_outputs.insert(id.to_string(), value);
+    }
+
     pub async fn run(&mut self, flow: &Flow, prompt_path: &Path) -> Result<()> {
         self.logger.log_summary(&format!(
             "Starting flow '{}' with prompt '{}'...",
@@ -48,7 +52,7 @@ impl FlowRunner {
         ));
 
         for block in &flow.blocks {
-            if let Some(looping_strategy) = &block.looping {
+            let final_output = if let Some(looping_strategy) = &block.looping {
                 // This block should be run in a loop.
                 let list_data =
                     self.block_outputs
@@ -102,15 +106,27 @@ impl FlowRunner {
                 }
 
                 // The output of the looping block is the list of outputs from each iteration.
-                let final_output = serde_json::to_value(iteration_outputs)?;
-                self.block_outputs.insert(block.id.clone(), final_output);
+                serde_json::to_value(iteration_outputs)?
             } else {
                 // This is a standard, non-looping block.
-                let block_output = self.execute_block(block, prompt_path, None).await?;
-                self.block_outputs
-                    .insert(block.id.clone(), block_output.clone());
-                info!(block_id = %block.id, output = %serde_json::to_string_pretty(&block_output).unwrap_or_default(), "Stored block output");
+                self.execute_block(block, prompt_path, None).await?
+            };
+
+            if let Some(save_path) = &block.annotations.save_output_to {
+                let output_json = serde_json::to_string_pretty(&final_output)?;
+                if let Some(parent) = Path::new(save_path).parent() {
+                    tokio::fs::create_dir_all(parent).await?;
+                }
+                tokio::fs::write(save_path, output_json).await?;
+                self.logger.log_summary(&format!(
+                    "Saved output of block '{}' to '{}'",
+                    block.id, save_path
+                ));
             }
+
+            self.block_outputs
+                .insert(block.id.clone(), final_output.clone());
+            info!(block_id = %block.id, output = %serde_json::to_string_pretty(&final_output).unwrap_or_default(), "Stored block output");
         }
 
         self.logger

@@ -19,6 +19,14 @@ pub enum Commands {
         /// Path to the initial prompt or context file for the flow.
         #[arg(short, long, value_name = "PATH")]
         prompt: PathBuf,
+
+        /// Path to a JSON file to load as input for a block.
+        #[arg(long, value_name = "PATH")]
+        input_file: Option<PathBuf>,
+
+        /// The block ID to associate with the input file's content.
+        #[arg(long, value_name = "ID", requires = "input_file")]
+        input_id: Option<String>,
     },
     /// Lists all available flows.
     List,

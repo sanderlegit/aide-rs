@@ -33,7 +33,12 @@ async fn run() -> Result<()> {
     info!(command = ?cli.command, "Executing command");
 
     match cli.command {
-        Commands::Run { flow_name, prompt } => {
+        Commands::Run {
+            flow_name,
+            prompt,
+            input_file,
+            input_id,
+        } => {
             let logger = RunLogger::new()?;
             info!(%flow_name, ?prompt, "Running flow");
 
@@ -48,6 +53,13 @@ async fn run() -> Result<()> {
             let flow: Flow = serde_yaml::from_str(&flow_content)?;
 
             let mut runner = FlowRunner::new(logger)?;
+
+            if let (Some(file_path), Some(id)) = (input_file, input_id) {
+                let content = fs::read_to_string(file_path)?;
+                let json_value: serde_json::Value = serde_json::from_str(&content)?;
+                runner.load_input(&id, json_value);
+            }
+
             runner.run(&flow, &prompt).await?;
         }
         Commands::List => {

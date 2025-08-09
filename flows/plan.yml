@@ -23,3 +23,4 @@ blocks:
       history: none
       tools: [ "task_creator" ]
       structured_output_schema: "TaskList"
+      save_output_to: ".ai/tasks.json"
