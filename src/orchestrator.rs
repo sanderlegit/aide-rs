@@ -37,7 +37,8 @@ impl Orchestrator {
         let gemini = GeminiClientWrapper::new("gemini-1.5-pro".to_string(), logger.clone())?;
         let aider = AiderWrapper;
         // For now, enable all tools. Later this could be configured per-strategy.
-        let tool_executor = ToolExecutor::new(&["doc_retriever".to_string()]);
+        let tool_executor =
+            ToolExecutor::new(&["doc_retriever".to_string(), "file_system".to_string()]);
         Ok(Self {
             logger,
             gemini,
