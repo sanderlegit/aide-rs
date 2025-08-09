@@ -24,7 +24,7 @@ pub struct PromptLog {
     pub tools: serde_json::Value,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ResponseLog {
     pub model_name: String,
@@ -52,6 +52,17 @@ pub struct ToolResultLog {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
+pub struct PerformanceLog {
+    pub model_name: String,
+    pub prompt_tokens: u32,
+    pub candidates_tokens: u32,
+    pub total_tokens: u32,
+    pub time_taken_ms: u128,
+    pub running_total_tokens: u32,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct ValidationLog {
     pub command: String,
     pub exit_code: i32,
@@ -66,9 +77,12 @@ pub struct RunLogger {
     _log_dir: PathBuf,
     summary_log_path: PathBuf,
     complete_log_path: PathBuf,
+    performance_log_path: PathBuf,
     // Using Mutex for interior mutability to be able to write from `&self` methods.
     summary_file: Arc<Mutex<File>>,
     complete_file: Arc<Mutex<File>>,
+    performance_file: Arc<Mutex<File>>,
+    total_tokens_used: Arc<Mutex<u32>>,
 }
 
 impl RunLogger {
@@ -79,6 +93,7 @@ impl RunLogger {
 
         let summary_log_path = log_dir.join("summary.log");
         let complete_log_path = log_dir.join("complete.log.jsonl");
+        let performance_log_path = log_dir.join("performance.log.jsonl");
 
         let summary_file = Arc::new(Mutex::new(
             OpenOptions::new()
@@ -92,19 +107,32 @@ impl RunLogger {
                 .append(true)
                 .open(&complete_log_path)?,
         ));
+        let performance_file = Arc::new(Mutex::new(
+            OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&performance_log_path)?,
+        ));
 
         let logger = Self {
             _log_dir: log_dir,
             summary_log_path,
             complete_log_path,
+            performance_log_path,
             summary_file,
             complete_file,
+            performance_file,
+            total_tokens_used: Arc::new(Mutex::new(0)),
         };
 
         logger.log_summary(&format!("Log run started at: {}\n", run_id));
         logger.log_summary(&format!(
             "Full logs at: {}\n",
             logger.complete_log_path.display()
+        ));
+        logger.log_summary(&format!(
+            "Performance logs at: {}\n",
+            logger.performance_log_path.display()
         ));
         logger.log_summary(&format!(
             "Summary log at: {}\n\n",
@@ -121,6 +149,18 @@ impl RunLogger {
         };
         if let Ok(json_string) = serde_json::to_string(&entry) {
             if let Ok(mut file) = self.complete_file.lock() {
+                let _ = writeln!(file, "{}", json_string);
+            }
+        }
+    }
+
+    fn log_performance<T: Serialize>(&self, payload: T) {
+        let entry = LogEntry {
+            timestamp: Utc::now(),
+            payload,
+        };
+        if let Ok(json_string) = serde_json::to_string(&entry) {
+            if let Ok(mut file) = self.performance_file.lock() {
                 let _ = writeln!(file, "{}", json_string);
             }
         }
@@ -187,7 +227,22 @@ impl RunLogger {
                 &function_calls
             }
         ));
-        self.log_complete(log);
+        self.log_complete(log.clone());
+
+        if let Some(usage) = &log.response.usage_metadata {
+            let mut total_used = self.total_tokens_used.lock().unwrap();
+            *total_used += usage.total_token_count;
+
+            let perf_log = PerformanceLog {
+                model_name: log.model_name.clone(),
+                prompt_tokens: usage.prompt_token_count,
+                candidates_tokens: usage.candidates_token_count,
+                total_tokens: usage.total_token_count,
+                time_taken_ms: log.time_taken_ms,
+                running_total_tokens: *total_used,
+            };
+            self.log_performance(perf_log);
+        }
     }
 
     pub fn log_tool_call(&self, log: ToolCallLog) {
