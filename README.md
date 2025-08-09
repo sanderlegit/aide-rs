@@ -77,6 +77,12 @@ coding_conventions: |
   Follow standard Rust formatting (`cargo fmt`).
 ```
 
+The fields in this file are not fixed; their usage is determined by the flow being executed. The built-in flows (`plan`, `code`, `implement`) are designed to use the following standard fields:
+
+-   `objective` (string, required): The primary goal for the agent. This is the most important field.
+-   `coding_conventions` (string, optional): A set of rules or style guides for the agent to follow when writing code.
+-   `file_scoping` (object, optional): Defines a set of file `include` and `exclude` glob patterns specific to this prompt. This scope is merged with the scopes defined in the flow itself, allowing you to narrow or expand the context for a particular task.
+
 ### Step 2: Run the `plan` Flow
 
 The `plan` flow analyzes your objective and creates a structured list of tasks, but does not execute them. This gives you a chance to review the agent's proposed changes before any code is written.
