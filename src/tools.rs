@@ -41,12 +41,6 @@ impl ToolExecutor {
     /// Expands a toolset name into a vector of concrete tool implementations.
     fn get_tools_by_name(name: &str) -> Vec<Arc<dyn Tool>> {
         match name {
-            "task_creator" => vec![Arc::new(TaskCreatorTool)],
-            "file_system" => vec![
-                Arc::new(CreateFileTool),
-                Arc::new(EditFileTool),
-                Arc::new(ReadFileTool),
-            ],
             "doc_retriever" => vec![Arc::new(DocRetrieverTool)],
             _ => vec![],
         }
@@ -71,157 +65,6 @@ impl ToolExecutor {
 }
 
 // --- Tool Definitions ---
-
-// --- Task Creator Tool ---
-pub struct TaskCreatorTool;
-
-#[async_trait]
-impl Tool for TaskCreatorTool {
-    fn name(&self) -> String {
-        "create_task_list".to_string()
-    }
-
-    fn schema(&self) -> FunctionDeclaration {
-        FunctionDeclaration {
-            name: self.name(),
-            description: "Creates a structured list of tasks from a high-level plan. This should be the final step of planning.".to_string(),
-            parameters: serde_json::from_str(r#"{
-                "type": "object",
-                "properties": {
-                    "tasks": {
-                        "type": "array",
-                        "description": "The list of tasks.",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "id": {
-                                    "type": "string",
-                                    "description": "A short, unique identifier for the task, e.g., 'impl-rocket-route'."
-                                },
-                                "description": {
-                                    "type": "string",
-                                    "description": "A detailed description of what needs to be done for this task."
-                                }
-                            },
-                            "required": ["id", "description"]
-                        }
-                    }
-                },
-                "required": ["tasks"]
-            }"#).unwrap(),
-        }
-    }
-
-    async fn execute(&self, args: serde_json::Value) -> Result<serde_json::Value> {
-        // The tool's job is just to validate and return the arguments,
-        // which the runner will then use as the structured output.
-        let task_list: TaskList = serde_json::from_value(args)?;
-        Ok(serde_json::to_value(task_list)?)
-    }
-}
-
-// --- File System Tools ---
-
-#[derive(Deserialize)]
-struct FilePathArgs {
-    path: String,
-}
-
-#[derive(Deserialize)]
-struct WriteFileArgs {
-    path: String,
-    content: String,
-}
-
-pub struct CreateFileTool;
-#[async_trait]
-impl Tool for CreateFileTool {
-    fn name(&self) -> String {
-        "create_file".to_string()
-    }
-    fn schema(&self) -> FunctionDeclaration {
-        FunctionDeclaration {
-            name: self.name(),
-            description: "Creates a new file with the given content. Fails if the file already exists.".to_string(),
-            parameters: serde_json::from_str(r#"{
-                "type": "object",
-                "properties": {
-                    "path": { "type": "string", "description": "The path to the file to create." },
-                    "content": { "type": "string", "description": "The initial content of the file." }
-                },
-                "required": ["path", "content"]
-            }"#).unwrap(),
-        }
-    }
-    async fn execute(&self, args: serde_json::Value) -> Result<serde_json::Value> {
-        let write_args: WriteFileArgs = serde_json::from_value(args)?;
-        let path = PathBuf::from(&write_args.path);
-        if path.exists() {
-            return Err(Error::Config(format!(
-                "File '{}' already exists. Use edit_file to modify it.",
-                write_args.path
-            )));
-        }
-        if let Some(parent) = path.parent() {
-            tokio::fs::create_dir_all(parent).await?;
-        }
-        tokio::fs::write(&path, &write_args.content).await?;
-        Ok(json!({ "status": "success", "path": write_args.path }))
-    }
-}
-
-pub struct EditFileTool;
-#[async_trait]
-impl Tool for EditFileTool {
-    fn name(&self) -> String {
-        "edit_file".to_string()
-    }
-    fn schema(&self) -> FunctionDeclaration {
-        FunctionDeclaration {
-            name: self.name(),
-            description: "Edits an existing file by replacing its entire content.".to_string(),
-            parameters: serde_json::from_str(r#"{
-                "type": "object",
-                "properties": {
-                    "path": { "type": "string", "description": "The path to the file to edit." },
-                    "content": { "type": "string", "description": "The new content of the file." }
-                },
-                "required": ["path", "content"]
-            }"#).unwrap(),
-        }
-    }
-    async fn execute(&self, args: serde_json::Value) -> Result<serde_json::Value> {
-        let write_args: WriteFileArgs = serde_json::from_value(args)?;
-        tokio::fs::write(&write_args.path, &write_args.content).await?;
-        Ok(json!({ "status": "success", "path": write_args.path }))
-    }
-}
-
-pub struct ReadFileTool;
-#[async_trait]
-impl Tool for ReadFileTool {
-    fn name(&self) -> String {
-        "read_file".to_string()
-    }
-    fn schema(&self) -> FunctionDeclaration {
-        FunctionDeclaration {
-            name: self.name(),
-            description: "Reads the entire content of a file.".to_string(),
-            parameters: serde_json::from_str(r#"{
-                "type": "object",
-                "properties": {
-                    "path": { "type": "string", "description": "The path to the file to read." }
-                },
-                "required": ["path"]
-            }"#).unwrap(),
-        }
-    }
-    async fn execute(&self, args: serde_json::Value) -> Result<serde_json::Value> {
-        let read_args: FilePathArgs = serde_json::from_value(args)?;
-        let content = tokio::fs::read_to_string(&read_args.path).await?;
-        Ok(json!({ "path": read_args.path, "content": content }))
-    }
-}
 
 // --- Doc Retriever Tool ---
 
@@ -269,39 +112,18 @@ mod tests {
     use super::*;
     use crate::error::Error;
     use serde_json::json;
-    use tempfile::tempdir;
 
     #[tokio::test]
     async fn test_tool_executor_new_and_schemas() {
-        let executor = ToolExecutor::new(&["file_system".to_string(), "task_creator".to_string()]);
+        let executor = ToolExecutor::new(&["doc_retriever".to_string()]);
         let schemas = executor.schemas();
-        assert_eq!(schemas.len(), 4); // create, edit, read, create_task_list
-        assert!(schemas.iter().any(|s| s.name == "create_file"));
-        assert!(schemas.iter().any(|s| s.name == "edit_file"));
-        assert!(schemas.iter().any(|s| s.name == "read_file"));
-        assert!(schemas.iter().any(|s| s.name == "create_task_list"));
-    }
-
-    #[tokio::test]
-    async fn test_tool_executor_execute_dispatch() {
-        let executor = ToolExecutor::new(&["task_creator".to_string()]);
-        let args = json!({
-            "tasks": [
-                { "id": "task1", "description": "First task" }
-            ]
-        });
-        let call = FunctionCall {
-            name: "create_task_list".to_string(),
-            arguments: args.clone(),
-        };
-
-        let result = executor.execute(&call).await.unwrap();
-        assert_eq!(result, args);
+        assert_eq!(schemas.len(), 1);
+        assert!(schemas.iter().any(|s| s.name == "doc_retriever"));
     }
 
     #[tokio::test]
     async fn test_tool_executor_execute_not_found() {
-        let executor = ToolExecutor::new(&["file_system".to_string()]);
+        let executor = ToolExecutor::new(&[]);
         let call = FunctionCall {
             name: "non_existent_tool".to_string(),
             arguments: json!({}),
@@ -314,70 +136,5 @@ mod tests {
         } else {
             panic!("Expected Config error");
         }
-    }
-
-    #[tokio::test]
-    async fn test_create_file_tool() {
-        let dir = tempdir().unwrap();
-        let file_path = dir.path().join("test.txt");
-        let tool = CreateFileTool;
-        let args = json!({
-            "path": file_path.to_str().unwrap(),
-            "content": "hello world"
-        });
-
-        let result = tool.execute(args).await.unwrap();
-        assert_eq!(result["status"], "success");
-        assert_eq!(result["path"], file_path.to_str().unwrap());
-
-        let content = tokio::fs::read_to_string(&file_path).await.unwrap();
-        assert_eq!(content, "hello world");
-
-        // Test failure on existing file
-        let args_fail = json!({
-            "path": file_path.to_str().unwrap(),
-            "content": "fail"
-        });
-        let result_fail = tool.execute(args_fail).await;
-        assert!(result_fail.is_err());
-    }
-
-    #[tokio::test]
-    async fn test_edit_file_tool() {
-        let dir = tempdir().unwrap();
-        let file_path = dir.path().join("test.txt");
-        tokio::fs::write(&file_path, "initial content")
-            .await
-            .unwrap();
-
-        let tool = EditFileTool;
-        let args = json!({
-            "path": file_path.to_str().unwrap(),
-            "content": "new content"
-        });
-
-        let result = tool.execute(args).await.unwrap();
-        assert_eq!(result["status"], "success");
-
-        let content = tokio::fs::read_to_string(&file_path).await.unwrap();
-        assert_eq!(content, "new content");
-    }
-
-    #[tokio::test]
-    async fn test_read_file_tool() {
-        let dir = tempdir().unwrap();
-        let file_path = dir.path().join("test.txt");
-        tokio::fs::write(&file_path, "read me").await.unwrap();
-
-        let tool = ReadFileTool;
-        let args = json!({ "path": file_path.to_str().unwrap() });
-
-        let result = tool.execute(args).await.unwrap();
-        assert_eq!(result["content"], "read me");
-
-        // Test failure on non-existent file
-        let args_fail = json!({ "path": "nonexistent.txt" });
-        let result_fail = tool.execute(args_fail).await;
-        assert!(result_fail.is_err());
     }
 }

@@ -54,9 +54,6 @@ chrono = { version = "0.4", features = ["serde"] }
 rustdoc-json = "0.9.7"
 rustdoc-types = "0.55.0"
 
-# For showing diffs
-similar = "2.5.0"
-
 [[bin]]
 name = "aide-rs"
 path = "src/main.rs"

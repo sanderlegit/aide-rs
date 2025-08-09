@@ -37,6 +37,9 @@ pub enum Error {
 
     #[error("Block verification failed: {0}")]
     VerificationFailed(String),
+
+    #[error("Tool execution failed: {0}")]
+    ToolFailed(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

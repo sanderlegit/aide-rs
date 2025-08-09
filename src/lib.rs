@@ -1,12 +1,12 @@
+pub mod agents;
 pub mod cli;
 pub mod doc_retriever;
 pub mod error;
 pub mod files;
-pub mod flows;
 pub mod gemini;
 pub mod gemini_types;
 pub mod logging;
-pub mod prompt;
-pub mod runner;
+pub mod orchestrator;
+pub mod session;
 pub mod tools;
 pub mod vcs;
