@@ -65,7 +65,12 @@ async fn test_e2e_plan_flow() {
                 }],
                 "role": "model"
             }
-        }]
+        }],
+        "usageMetadata": {
+            "promptTokenCount": 10,
+            "candidatesTokenCount": 20,
+            "totalTokenCount": 30
+        }
     });
 
     Mock::given(method("POST"))
@@ -103,6 +108,32 @@ async fn test_e2e_plan_flow() {
     );
     assert!(stderr.contains("Executing block: 'generate_tasks'..."));
     assert!(stderr.contains("TOOL CALL: create_task_list"));
+
+    // 7. Assert that the performance log was created and is correct
+    let log_dir = env.full_path(".ai/logs");
+    let mut entries = fs::read_dir(log_dir).unwrap();
+    let run_dir = entries.next().unwrap().unwrap().path(); // Get the first (and only) run directory
+    let perf_log_path = run_dir.join("performance.log.jsonl");
+    assert!(perf_log_path.exists(), "Performance log was not created.");
+
+    let perf_log_content = fs::read_to_string(perf_log_path).unwrap();
+    assert!(
+        !perf_log_content.is_empty(),
+        "Performance log is empty."
+    );
+
+    // Parse the first line of the performance log
+    let first_line = perf_log_content.lines().next().unwrap();
+    let log_entry: serde_json::Value = serde_json::from_str(first_line).unwrap();
+
+    // Check the payload
+    let payload = &log_entry["payload"];
+    assert_eq!(payload["modelName"], "gemini-1.5-flash-latest");
+    assert_eq!(payload["promptTokens"], 10);
+    assert_eq!(payload["candidatesTokens"], 20);
+    assert_eq!(payload["totalTokens"], 30);
+    assert_eq!(payload["runningTotalTokens"], 30);
+    assert!(payload["timeTakenMs"].is_number());
 }
 
 #[tokio::test]
