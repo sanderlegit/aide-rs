@@ -1,6 +1,6 @@
 id: "code"
 description: "Analyzes an objective, creates a plan, and implements it."
-model: "gemini-2.5-pro"
+model: "gemini-1.5-flash-latest"
 
 blocks:
   - id: "generate_markdown_plan"

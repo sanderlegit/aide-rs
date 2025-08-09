@@ -118,6 +118,11 @@ async fn test_e2e_code_flow_single_task() {
     fs::create_dir_all(env.full_path("ctx")).unwrap();
     let base_scope_content = fs::read_to_string("ctx/base.yaml").unwrap();
     env.create_file("ctx/base.yaml", &base_scope_content);
+    let ai_scope_content = fs::read_to_string("ctx/ai.yaml").unwrap();
+    env.create_file("ctx/ai.yaml", &ai_scope_content);
+    fs::create_dir_all(env.full_path("doc")).unwrap();
+    let arch_doc_content = fs::read_to_string("doc/refactor_architecture.md").unwrap();
+    env.create_file("doc/refactor_architecture.md", &arch_doc_content);
 
     // 2. Create prompt and initial project files
     env.create_file(
@@ -264,6 +269,11 @@ async fn test_e2e_code_flow_with_retry() {
     fs::create_dir_all(env.full_path("ctx")).unwrap();
     let base_scope_content = fs::read_to_string("ctx/base.yaml").unwrap();
     env.create_file("ctx/base.yaml", &base_scope_content);
+    let ai_scope_content = fs::read_to_string("ctx/ai.yaml").unwrap();
+    env.create_file("ctx/ai.yaml", &ai_scope_content);
+    fs::create_dir_all(env.full_path("doc")).unwrap();
+    let arch_doc_content = fs::read_to_string("doc/refactor_architecture.md").unwrap();
+    env.create_file("doc/refactor_architecture.md", &arch_doc_content);
 
     // 2. Create prompt and initial project files
     env.create_file(
