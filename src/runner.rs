@@ -420,7 +420,7 @@ impl FlowRunner {
 
                     let user_content = Content {
                         role: Role::User,
-                        parts: vec![ContentPart::new_text(prompt_string)],
+                        parts: vec![ContentPart::new_text(prompt_string.full_prompt)],
                     };
 
                     // Verification prompts are ephemeral and not part of the main history.
