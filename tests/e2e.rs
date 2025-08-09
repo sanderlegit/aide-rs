@@ -155,9 +155,8 @@ edition = "2021"
             "/v1beta/models/gemini-1.5-flash-latest:generateContent",
         ))
         .and(body_string_contains(
-            "create a detailed, human-readable implementation plan",
-        ))
-        .and(not(body_string_contains("Current Task"))) // Differentiates from implement_tasks
+            "This is a creative step to think through the solution",
+        )) // Unique to the markdown plan block
         .and(body_string_contains("Add a hello world function to lib.rs")) // From objective
         .respond_with(ResponseTemplate::new(200).set_body_json(markdown_plan_response))
         .mount(&env.mock_server)
@@ -300,9 +299,8 @@ edition = "2021"
             "/v1beta/models/gemini-1.5-flash-latest:generateContent",
         ))
         .and(body_string_contains(
-            "create a detailed, human-readable implementation plan",
-        ))
-        .and(not(body_string_contains("Current Task"))) // Differentiates from implement_tasks
+            "This is a creative step to think through the solution",
+        )) // Unique to the markdown plan block
         .and(body_string_contains(
             "Add a public function `go()` to lib.rs",
         ))
