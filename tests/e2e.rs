@@ -97,7 +97,11 @@ async fn test_e2e_plan_flow() {
     );
 
     let stderr = String::from_utf8(output.stderr).unwrap();
-    assert!(stderr.contains("Flow 'plan' finished."));
+    assert!(
+        stderr.contains("Flow 'plan' finished."),
+        "Flow did not finish. Stderr:\n---\n{}\n---",
+        stderr
+    );
     assert!(stderr.contains("Executing block: 'generate_tasks'..."));
     assert!(stderr.contains("TOOL CALL: create_task_list"));
 }
@@ -237,7 +241,11 @@ edition = "2021"
     );
 
     let stderr = String::from_utf8(output.stderr).unwrap();
-    assert!(stderr.contains("Flow 'code' finished."));
+    assert!(
+        stderr.contains("Flow 'code' finished."),
+        "Flow did not finish. Stderr:\n---\n{}\n---",
+        stderr
+    );
 
     let final_content = fs::read_to_string(env.full_path("src/lib.rs")).unwrap();
     assert!(final_content.contains("pub fn hello_world"));
@@ -403,7 +411,11 @@ edition = "2021"
     );
 
     let stderr = String::from_utf8(output.stderr).unwrap();
-    assert!(stderr.contains("Flow 'code' finished."));
+    assert!(
+        stderr.contains("Flow 'code' finished."),
+        "Flow did not finish. Stderr:\n---\n{}\n---",
+        stderr
+    );
     assert!(stderr.contains("Verification failed for block 'implement_tasks'. Retrying"));
 
     let final_content = fs::read_to_string(env.full_path("src/lib.rs")).unwrap();
@@ -549,7 +561,11 @@ edition = "2021"
 
     // 7. Assert success and file modification
     let stderr = String::from_utf8(impl_output.stderr).unwrap();
-    assert!(stderr.contains("Flow 'implement' finished."));
+    assert!(
+        stderr.contains("Flow 'implement' finished."),
+        "Flow did not finish. Stderr:\n---\n{}\n---",
+        stderr
+    );
 
     let final_content = fs::read_to_string(env.full_path("src/lib.rs")).unwrap();
     assert!(final_content.contains("pub fn hello_world"));

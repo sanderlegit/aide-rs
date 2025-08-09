@@ -5,6 +5,7 @@ use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use tracing::info;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct LogEntry<T> {
@@ -124,6 +125,7 @@ impl RunLogger {
     }
 
     pub fn log_summary(&self, message: &str) {
+        info!("{}", message);
         if let Ok(mut file) = self.summary_file.lock() {
             let _ = writeln!(file, "{}", message);
         }
