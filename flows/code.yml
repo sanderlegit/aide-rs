@@ -51,10 +51,19 @@ blocks:
       composition:
         - type: static_text
           content: |
-            You are an expert pair programmer. Your goal is to implement the current task.
-            Analyze the task description and the provided code. Use the available tools to modify files.
+            You are an expert pair programmer. Your goal is to implement the current task as part of a larger plan.
+            Analyze the overall objective, the plan, the current task description, and the provided code. Use the available tools to modify files.
             If you are unsure about an API, use the `doc_retriever` tool to get documentation.
             Once you have made your changes, explain your solution.
+        - type: prompt_file_field
+          field: "objective"
+          prefix: "\n**Overall Objective:**\n"
+        - type: prompt_file_field
+          field: "coding_conventions"
+          prefix: "\n**Coding Conventions:**\n"
+        - type: previous_output
+          block_id: "generate_markdown_plan"
+          prefix: "\n**Overall Plan:**\n"
         - type: file_list
           scopes: [ "base", "prompt" ]
           prefix: "\n**Available Project Files:**\n"
@@ -63,7 +72,7 @@ blocks:
           prefix: "\n**Project File Context:**\n"
         - type: previous_output # This is the current task description from the loop
           block_id: "current_task"
-          prefix: "\n**Current Task:**\n"
+          prefix: "\n**Current Task to Implement:**\n"
     annotations:
       history: full
       tools: [ "file_system", "doc_retriever" ]
@@ -76,7 +85,25 @@ blocks:
         on_failure_prompt:
           composition:
             - type: static_text
-              content: "The last attempt failed validation. Please analyze the error, fix the code, and explain the fix."
+              content: "The last attempt failed validation. Please analyze the error, fix the code, and explain the fix. Remember the overall objective and coding conventions."
+            - type: prompt_file_field
+              field: "objective"
+              prefix: "\n**Overall Objective:**\n"
+            - type: prompt_file_field
+              field: "coding_conventions"
+              prefix: "\n**Coding Conventions:**\n"
+            - type: previous_output
+              block_id: "generate_markdown_plan"
+              prefix: "\n**Overall Plan:**\n"
+            - type: file_list
+              scopes: [ "base", "prompt" ]
+              prefix: "\n**Available Project Files:**\n"
+            - type: file_contents
+              scopes: [ "base", "prompt" ]
+              prefix: "\n**Project File Context:**\n"
+            - type: previous_output
+              block_id: "current_task"
+              prefix: "\n**Current Task to Implement:**\n"
             - type: previous_output # This would be the output of the failed `cargo check`
               block_id: "implement_tasks" # Special reference to the verification output
               prefix: "\n**Validation Error:**\n"
