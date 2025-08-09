@@ -4,7 +4,6 @@ include:
   - "Cargo.toml"
   - "README.md"
   - "docs/**/*.md"
-  - "flows/**/*.yml"
   - "Makefile"
 exclude:
   - ".git"
