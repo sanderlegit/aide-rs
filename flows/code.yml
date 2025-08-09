@@ -81,7 +81,7 @@ blocks:
       max_retries: 10
       strategy:
         type: command
-        command: "make test"
+        command: "cargo check"
         expected_exit_code: 0
         on_failure_prompt:
           composition:

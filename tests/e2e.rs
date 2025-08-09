@@ -357,6 +357,9 @@ edition = "2021"
         }]
     });
     Mock::given(method("POST"))
+        .and(path(
+            "/v1beta/models/gemini-1.5-flash-latest:generateContent",
+        ))
         .and(body_string_contains("create a detailed, human-readable implementation plan"))
         .respond_with(ResponseTemplate::new(200).set_body_json(markdown_plan_response))
         .mount(&env.mock_server)
@@ -376,6 +379,9 @@ edition = "2021"
         }]
     });
     Mock::given(method("POST"))
+        .and(path(
+            "/v1beta/models/gemini-1.5-flash-latest:generateContent",
+        ))
         .and(body_string_contains("convert the provided markdown plan"))
         .respond_with(ResponseTemplate::new(200).set_body_json(structured_task_response))
         .mount(&env.mock_server)
@@ -399,6 +405,9 @@ edition = "2021"
         }]
     });
     Mock::given(method("POST"))
+        .and(path(
+            "/v1beta/models/gemini-1.5-flash-latest:generateContent",
+        ))
         .and(body_string_contains("Your goal is to implement the current task."))
         .and(body_string_contains("Call test_crate::do_stuff"))
         .respond_with(ResponseTemplate::new(200).set_body_json(doc_retriever_call_response))
@@ -423,6 +432,9 @@ edition = "2021"
         }]
     });
     Mock::given(method("POST"))
+        .and(path(
+            "/v1beta/models/gemini-1.5-flash-latest:generateContent",
+        ))
         .and(body_string_contains("functionResponse")) // The history now contains the tool result
         .and(body_string_contains("Does important stuff.")) // The doc string from the tool result
         .respond_with(ResponseTemplate::new(200).set_body_json(edit_file_call_response))
