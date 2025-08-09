@@ -62,6 +62,7 @@ async fn test_implement_auto_failure_and_retry() {
     let mock_response = json!({
         "candidates": [{
             "content": {
+                "role": "model",
                 "parts": [{
                     "functionCall": {
                         "name": "doc_retriever",
