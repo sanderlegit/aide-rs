@@ -34,7 +34,7 @@ async fn run() -> Result<()> {
             orchestrator.research(objective, files).await?;
         }
         Commands::Plan { objective, files } => {
-            orchestrator.plan(objective, files).await?;
+            let _ = orchestrator.plan(objective, files, true).await?;
         }
         Commands::Implement {
             objective,
@@ -45,6 +45,9 @@ async fn run() -> Result<()> {
             orchestrator
                 .implement(objective, files, validate_cmd, auto)
                 .await?;
+        }
+        Commands::Run { prompt_file } => {
+            orchestrator.run(prompt_file).await?;
         }
     }
 

@@ -39,4 +39,9 @@ pub enum Commands {
         #[arg(long)]
         auto: bool,
     },
+    /// Execute a non-interactive, multi-stage workflow from a config file.
+    Run {
+        /// A YAML file defining the objective and configuration for the run.
+        prompt_file: String,
+    },
 }

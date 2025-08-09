@@ -5,7 +5,22 @@ use crate::logging::RunLogger;
 use crate::session::Session;
 use crate::tools::ToolExecutor;
 use crate::vcs;
+use serde::Deserialize;
+use std::path::PathBuf;
 use tracing::{error, info};
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RunConfig {
+    objective: String,
+    files: Vec<String>,
+    #[serde(default = "default_validate_cmd")]
+    validate_cmd: String,
+}
+
+fn default_validate_cmd() -> String {
+    "make test".to_string()
+}
 
 /// The main orchestrator for managing AI workflows.
 pub struct Orchestrator {
@@ -54,7 +69,7 @@ impl Orchestrator {
         }];
 
         let research_tool = crate::gemini_types::Tool {
-            google_search_retrieval: Some(crate::gemini_types::GoogleSearchRetrieval::default()),
+            google_search: Some(crate::gemini_types::GoogleSearch::default()),
             ..Default::default()
         };
         let tools = Some(vec![research_tool]);
@@ -93,7 +108,12 @@ impl Orchestrator {
     }
 
     #[tracing::instrument(skip(self))]
-    pub async fn plan(&self, objective: String, files: Vec<String>) -> Result<()> {
+    pub async fn plan(
+        &self,
+        objective: String,
+        files: Vec<String>,
+        interactive: bool,
+    ) -> Result<PathBuf> {
         let session = Session::new("plan", &objective)?;
         info!(objective, ?files, "Starting plan strategy.");
 
@@ -140,25 +160,27 @@ impl Orchestrator {
         self.logger
             .log_summary(&format!("Plan saved to {}", plan_file_path.display()));
 
-        let mut files_for_aider = files;
-        files_for_aider.push(plan_file_path.to_str().unwrap().to_string());
+        if interactive {
+            let mut files_for_aider = files;
+            files_for_aider.push(plan_file_path.to_str().unwrap().to_string());
 
-        info!("Launching aider to review and refine the plan.");
-        self.aider
-            .run(
-                &session,
-                files_for_aider,
-                &format!(
-                    "Here is the plan I generated, stored in `{}`. Please review it and help me refine it.",
-                    plan_file_path.display()
-                ),
-                false,
-                None,
-            )
-            .await?;
+            info!("Launching aider to review and refine the plan.");
+            self.aider
+                .run(
+                    &session,
+                    files_for_aider,
+                    &format!(
+                        "Here is the plan I generated, stored in `{}`. Please review it and help me refine it.",
+                        plan_file_path.display()
+                    ),
+                    false,
+                    None,
+                )
+                .await?;
+        }
 
         self.logger.log_summary("Plan strategy completed.");
-        Ok(())
+        Ok(plan_file_path)
     }
 
     #[tracing::instrument(skip(self))]
@@ -291,5 +313,41 @@ impl Orchestrator {
         Err(Error::ToolFailed(
             "Aider failed to complete the objective after maximum retries.".to_string(),
         ))
+    }
+
+    #[tracing::instrument(skip(self))]
+    pub async fn run(&self, prompt_file: String) -> Result<()> {
+        info!(prompt_file, "Starting run from config file.");
+
+        let file_content = std::fs::read_to_string(&prompt_file)?;
+        let config: RunConfig = serde_yaml::from_str(&file_content)?;
+
+        info!(objective = %config.objective, "Running plan strategy.");
+        let plan_file_path = self
+            .plan(config.objective.clone(), config.files.clone(), false)
+            .await?;
+
+        let implement_objective = format!(
+            "Implement the tasks described in the plan file `{}`. The original objective was: {}",
+            plan_file_path.display(),
+            config.objective
+        );
+
+        let mut implement_files = config.files;
+        implement_files.push(plan_file_path.to_str().unwrap().to_string());
+
+        info!("Running implement strategy.");
+        self.implement(
+            implement_objective,
+            implement_files,
+            config.validate_cmd,
+            true, // always auto for `run` command
+        )
+        .await?;
+
+        self.logger
+            .log_summary(&format!("Run from {} completed.", prompt_file));
+
+        Ok(())
     }
 }
