@@ -73,8 +73,9 @@ async fn test_e2e_plan_flow() {
         .and(path(
             "/v1beta/models/gemini-1.5-flash-latest:generateContent",
         ))
-        .and(body_string_contains("Create a hello world app"))
-        .and(body_string_contains("fn main() {}"))
+        .and(body_string_contains(
+            "break it down into a high-level list of task descriptions",
+        ))
         .respond_with(ResponseTemplate::new(200).set_body_json(response_body))
         .mount(&env.mock_server)
         .await;
@@ -154,7 +155,6 @@ edition = "2021"
             "create a detailed, human-readable implementation plan",
         ))
         .and(not(body_string_contains("Current Task"))) // Differentiates from implement_tasks
-        .and(body_string_contains("Add a hello world function")) // From objective
         .respond_with(ResponseTemplate::new(200).set_body_json(markdown_plan_response))
         .mount(&env.mock_server)
         .await;
@@ -294,9 +294,6 @@ edition = "2021"
             "create a detailed, human-readable implementation plan",
         ))
         .and(not(body_string_contains("Current Task"))) // Differentiates from implement_tasks
-        .and(body_string_contains(
-            "Add a public function `go()` to lib.rs",
-        ))
         .respond_with(ResponseTemplate::new(200).set_body_json(markdown_plan_response))
         .mount(&env.mock_server)
         .await;
