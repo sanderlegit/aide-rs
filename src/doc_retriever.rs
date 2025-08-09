@@ -312,33 +312,34 @@ pub mod my_module {
 
     #[test]
     #[ignore] // Ignoring due to issues with temp dirs in test environment
-    fn test_get_module_docs() {
+    fn test_get_item_docs() {
         let (_dir, crate_root) = setup_test_crate();
-        let result =
+
+        // Test getting module docs
+        let module_result =
             get_item_docs("test_crate", "test_crate::my_module", Some(&crate_root)).unwrap();
 
-        assert_eq!(result["type"], "module");
-        assert_eq!(result["crate"], "test_crate");
-        assert_eq!(result["path"], "test_crate::my_module");
-        assert_eq!(result["documentation"], "Module documentation.");
-        assert_eq!(result["structs"], json!(["MyStruct"]));
-        assert_eq!(result["enums"], json!(["MyEnum"]));
-        assert!(result["functions"].as_array().unwrap().is_empty());
-    }
+        assert_eq!(module_result["type"], "module");
+        assert_eq!(module_result["crate"], "test_crate");
+        assert_eq!(module_result["path"], "test_crate::my_module");
+        assert_eq!(module_result["documentation"], "Module documentation.");
+        assert_eq!(module_result["structs"], json!(["MyStruct"]));
+        assert_eq!(module_result["enums"], json!(["MyEnum"]));
+        assert!(module_result["functions"].as_array().unwrap().is_empty());
 
-    #[test]
-    #[ignore] // Ignoring due to issues with temp dirs in test environment
-    fn test_get_type_docs_struct() {
-        let (_dir, crate_root) = setup_test_crate();
-        let result =
-            get_item_docs("test_crate", "test_crate::my_module::MyStruct", Some(&crate_root))
-                .unwrap();
+        // Test getting struct docs
+        let struct_result = get_item_docs(
+            "test_crate",
+            "test_crate::my_module::MyStruct",
+            Some(&crate_root),
+        )
+        .unwrap();
 
-        assert_eq!(result["type"], "struct");
-        assert_eq!(result["crate"], "test_crate");
-        assert_eq!(result["path"], "test_crate::my_module::MyStruct");
-        assert_eq!(result["documentation"], "Struct documentation.");
-        let methods = result["methods"].as_array().unwrap();
+        assert_eq!(struct_result["type"], "struct");
+        assert_eq!(struct_result["crate"], "test_crate");
+        assert_eq!(struct_result["path"], "test_crate::my_module::MyStruct");
+        assert_eq!(struct_result["documentation"], "Struct documentation.");
+        let methods = struct_result["methods"].as_array().unwrap();
         assert_eq!(methods.len(), 1);
         assert_eq!(methods[0]["name"], "new");
         assert_eq!(methods[0]["documentation"], "A method on MyStruct.");
