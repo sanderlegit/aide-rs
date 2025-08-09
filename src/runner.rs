@@ -274,54 +274,88 @@ impl FlowRunner {
             let tool_executor = ToolExecutor::new(&block.annotations.tools);
             let tool_schemas = tool_executor.schemas();
 
+            // Create a history specific to this attempt. It starts with the global history
+            // but is modified locally. It only becomes the new global history on success.
+            let mut attempt_history = self.history.clone();
             let user_content = Content {
                 role: Role::User,
                 parts: vec![ContentPart::new_text(built_prompt.full_prompt.clone())],
             };
-            self.history.push(user_content);
+            attempt_history.push(user_content);
 
-            let history_for_request = match &block.annotations.history {
-                History::Mode(HistoryMode::Full) => self.history.clone(),
-                History::Mode(HistoryMode::None) => vec![self.history.last().cloned().unwrap()],
-                History::LastN { last_n } => {
-                    let n = *last_n as usize;
-                    let len = self.history.len();
-                    if len > n {
-                        self.history.iter().skip(len - n).cloned().collect()
-                    } else {
-                        self.history.clone()
-                    }
-                }
-            };
-
-            let tools_config = if tool_schemas.is_empty() {
+            let tools_config_for_log = if tool_schemas.is_empty() {
                 None
             } else {
                 Some(vec![crate::gemini_types::Tool {
-                    function_declarations: tool_schemas,
+                    function_declarations: tool_schemas.clone(),
                 }])
             };
-
             self.logger.log_prompt(&PromptLog {
                 model_name: gemini_client.model_name().to_string(),
                 system_prompt: "".to_string(), // We are using a user-style prompt for now
                 user_prompt: built_prompt.full_prompt,
                 display_prompt: Some(built_prompt.display_prompt),
-                tools: json!(tools_config),
+                tools: json!(tools_config_for_log),
             });
 
-            let response = gemini_client
-                .generate_content(history_for_request, tools_config)
-                .await?;
-
-            if let Some(candidate) = response.candidates.and_then(|mut c| c.pop()) {
-                self.history.push(candidate.content.clone());
-                block_output = json!(null); // Reset block output for this attempt
-
-                for part in candidate.content.parts {
-                    if let Some(text) = part.text {
-                        block_output = json!(text);
+            // Start conversation loop for this attempt
+            loop {
+                let history_for_request = match &block.annotations.history {
+                    History::Mode(HistoryMode::Full) => attempt_history.clone(),
+                    History::Mode(HistoryMode::None) => {
+                        vec![attempt_history.last().cloned().unwrap()]
                     }
+                    History::LastN { last_n } => {
+                        let n = *last_n as usize;
+                        let len = attempt_history.len();
+                        if len > n {
+                            attempt_history.iter().skip(len - n).cloned().collect()
+                        } else {
+                            attempt_history.clone()
+                        }
+                    }
+                };
+
+                let tools_config = if tool_schemas.is_empty() {
+                    None
+                } else {
+                    Some(vec![crate::gemini_types::Tool {
+                        function_declarations: tool_schemas.clone(),
+                    }])
+                };
+
+                let response = gemini_client
+                    .generate_content(history_for_request, tools_config)
+                    .await?;
+
+                let Some(candidate) = response.candidates.and_then(|mut c| c.pop()) else {
+                    return Err(Error::ApiError(
+                        "No candidates received from Gemini API".to_string(),
+                    ));
+                };
+
+                attempt_history.push(candidate.content.clone());
+
+                let has_function_call = candidate
+                    .content
+                    .parts
+                    .iter()
+                    .any(|p| p.function_call.is_some());
+
+                if !has_function_call {
+                    // No tool call, this is the final response for this turn.
+                    block_output = candidate
+                        .content
+                        .parts
+                        .iter()
+                        .find_map(|p| p.text.as_ref())
+                        .map(|s| json!(s))
+                        .unwrap_or(json!(null));
+                    break; // Exit conversation loop
+                }
+
+                // We have at least one function call.
+                for part in candidate.content.parts {
                     if let Some(call) = part.function_call {
                         let start_time = Instant::now();
                         let result = tool_executor.execute(&call).await;
@@ -378,16 +412,13 @@ impl FlowRunner {
                             }),
                             ..Default::default()
                         };
-                        self.history.push(Content {
+                        attempt_history.push(Content {
                             role: Role::Tool,
                             parts: vec![tool_response_part],
                         });
                     }
                 }
-            } else {
-                return Err(Error::ApiError(
-                    "No candidates received from Gemini API".to_string(),
-                ));
+                // Continue the loop to send the tool response back to the model.
             }
 
             // 4. Run verification logic
@@ -400,7 +431,8 @@ impl FlowRunner {
                     )
                     .await?;
                 if result.success {
-                    // Success, break the retry loop
+                    // Success, commit the history and break the retry loop
+                    self.history = attempt_history;
                     break;
                 } else {
                     // Failure, store verification output for the next prompt
@@ -420,7 +452,8 @@ impl FlowRunner {
                     ));
                 }
             } else {
-                // No verification, so we're done with this block.
+                // No verification, so we're done with this block. Commit history.
+                self.history = attempt_history;
                 break;
             }
         }
