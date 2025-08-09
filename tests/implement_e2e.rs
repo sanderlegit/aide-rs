@@ -1,4 +1,6 @@
-use crate::common::TestEnv;
+mod common;
+
+use common::TestEnv;
 use assert_cmd::Command;
 use std::fs;
 use std::process::Command as StdCommand;
