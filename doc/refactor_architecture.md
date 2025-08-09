@@ -104,6 +104,7 @@ Annotations control the "runtime" behavior of a block.
     -   `google_search`: Enables grounding with Google Search.
     -   `task_creator`: A tool to define a structured list of tasks.
 -   `structured_output_schema` (string, optional): The name of a Rust struct that the LLM's output (likely from a tool call) should be deserialized into. This enables strongly-typed outputs.
+-   `commit_on_success` (boolean, default: false): If `true`, the `FlowRunner` will automatically create a git commit with all files modified during the block's execution (including retries) after the block completes successfully. The list of changed files is reset after the commit.
 
 #### 3.3.1. Tool Constraints
 

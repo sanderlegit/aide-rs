@@ -5,6 +5,7 @@ use crate::gemini_types::{Content, ContentPart, Role};
 use crate::logging::{PromptLog, RunLogger, ToolCallLog, ToolResultLog, ValidationLog};
 use crate::prompt::PromptBuilder;
 use crate::tools::ToolExecutor;
+use crate::vcs;
 use serde_json::json;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -130,6 +131,35 @@ impl FlowRunner {
             self.block_outputs
                 .insert(block.id.clone(), final_output.clone());
             info!(block_id = %block.id, output = %serde_json::to_string_pretty(&final_output).unwrap_or_default(), "Stored block output");
+
+            if block.annotations.commit_on_success {
+                let changed_files = self.changed_files();
+                if !changed_files.is_empty() {
+                    self.logger.log_summary(&format!(
+                        "Block '{}' succeeded, committing {} changed file(s)...",
+                        block.id,
+                        changed_files.len()
+                    ));
+                    let commit_message = format!(
+                        "aide-rs: auto-commit after block '{}' in flow '{}'",
+                        block.id, flow.id
+                    );
+                    vcs::add_and_commit(
+                        &std::env::current_dir()?,
+                        &changed_files,
+                        &commit_message,
+                    )?;
+                    self.logger
+                        .log_summary(&format!("Committed {} file(s).", changed_files.len()));
+                    // After committing, clear the list of changed files for the next block.
+                    self.changed_files.clear();
+                } else {
+                    self.logger.log_summary(&format!(
+                        "Block '{}' succeeded, but no files were changed. Skipping commit.",
+                        block.id
+                    ));
+                }
+            }
         }
 
         self.logger
