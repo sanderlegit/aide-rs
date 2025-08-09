@@ -225,6 +225,12 @@ impl Tool for ReadFileTool {
 
 // --- Doc Retriever Tool ---
 
+#[derive(Deserialize)]
+struct DocRetrieverArgs {
+    crate_name: String,
+    path: Option<String>,
+}
+
 pub struct DocRetrieverTool;
 #[async_trait]
 impl Tool for DocRetrieverTool {
@@ -239,16 +245,22 @@ impl Tool for DocRetrieverTool {
                 "type": "object",
                 "properties": {
                     "crate_name": { "type": "string", "description": "The name of the crate." },
-                    "path": { "type": "string", "description": "Optional. The full path to the item (e.g., 'my_crate::my_module::MyStruct')." }
+                    "path": { "type": "string", "description": "Optional. The full path to the item (e.g., 'my_crate::my_module::MyStruct'). If omitted, returns crate-level docs." }
                 },
                 "required": ["crate_name"]
             }"#).unwrap(),
         }
     }
-    async fn execute(&self, _args: serde_json::Value) -> Result<serde_json::Value> {
-        Err(Error::Config(
-            "doc_retriever tool not fully implemented yet".to_string(),
-        ))
+    async fn execute(&self, args: serde_json::Value) -> Result<serde_json::Value> {
+        let doc_args: DocRetrieverArgs = serde_json::from_value(args)?;
+        let current_dir = std::env::current_dir()?;
+        let current_dir_path = Some(current_dir.as_path());
+
+        if let Some(path) = doc_args.path {
+            crate::doc_retriever::get_item_docs(&doc_args.crate_name, &path, current_dir_path)
+        } else {
+            crate::doc_retriever::get_crate_docs(&doc_args.crate_name, current_dir_path)
+        }
     }
 }
 

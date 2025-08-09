@@ -1,4 +1,4 @@
-use aide_rs::doc_retriever::{get_crate_docs, get_module_docs, get_type_docs};
+use aide_rs::doc_retriever::{get_crate_docs, get_item_docs};
 use aide_rs::error::Result;
 use clap::{Parser, Subcommand};
 use serde_json::json;
@@ -20,15 +20,8 @@ enum Commands {
         #[arg(long)]
         name: String,
     },
-    /// Get module-level documentation.
-    Module {
-        #[arg(long = "crate")]
-        crate_name: String,
-        #[arg(long)]
-        path: String,
-    },
-    /// Get type-level documentation (struct or enum).
-    Type {
+    /// Get documentation for a specific item (module, struct, enum).
+    Item {
         #[arg(long = "crate")]
         crate_name: String,
         #[arg(long)]
@@ -40,8 +33,7 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
     let result = match cli.command {
         Commands::Crate { name } => get_crate_docs(&name, None),
-        Commands::Module { crate_name, path } => get_module_docs(&crate_name, &path, None),
-        Commands::Type { crate_name, path } => get_type_docs(&crate_name, &path, None),
+        Commands::Item { crate_name, path } => get_item_docs(&crate_name, &path, None),
     };
 
     match result {

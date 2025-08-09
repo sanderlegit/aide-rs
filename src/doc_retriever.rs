@@ -78,7 +78,7 @@ fn find_item_by_path<'a>(krate: &'a Crate, path: &str) -> Result<&'a Item> {
         .ok_or_else(|| Error::Config(format!("Path not found in crate: {}", path)))
 }
 
-pub fn get_module_docs(
+pub fn get_item_docs(
     crate_name: &str,
     path: &str,
     current_dir: Option<&Path>,
@@ -87,50 +87,48 @@ pub fn get_module_docs(
     let krate: Crate = serde_json::from_reader(std::fs::File::open(json_path)?)?;
 
     let item = find_item_by_path(&krate, path)?;
-    if let ItemEnum::Module(module) = &item.inner {
-        let (structs, enums, functions) = get_module_item_names(&krate, module);
-        Ok(json!({
-            "type": "module",
-            "crate": crate_name,
-            "path": path,
-            "documentation": item.docs.clone().unwrap_or_default(),
-            "structs": structs,
-            "enums": enums,
-            "functions": functions,
-        }))
-    } else {
-        Err(Error::Config(format!("Path is not a module: {}", path)))
-    }
-}
-
-pub fn get_type_docs(
-    crate_name: &str,
-    path: &str,
-    current_dir: Option<&Path>,
-) -> Result<serde_json::Value> {
-    let json_path = generate_docs(crate_name, current_dir)?;
-    let krate: Crate = serde_json::from_reader(std::fs::File::open(json_path)?)?;
-
-    let item = find_item_by_path(&krate, path)?;
-    let (type_name, methods, impls) = match &item.inner {
-        ItemEnum::Struct(s) => ("struct", get_methods(&krate, s), get_impls(&krate, &item.id)),
-        ItemEnum::Enum(e) => ("enum", get_methods(&krate, e), get_impls(&krate, &item.id)),
-        _ => {
-            return Err(Error::Config(format!(
-                "Path is not a struct or enum: {}",
-                path
-            )))
+    match &item.inner {
+        ItemEnum::Module(module) => {
+            let (structs, enums, functions) = get_module_item_names(&krate, module);
+            Ok(json!({
+                "type": "module",
+                "crate": crate_name,
+                "path": path,
+                "documentation": item.docs.clone().unwrap_or_default(),
+                "structs": structs,
+                "enums": enums,
+                "functions": functions,
+            }))
         }
-    };
-
-    Ok(json!({
-        "type": type_name,
-        "crate": crate_name,
-        "path": path,
-        "documentation": item.docs.clone().unwrap_or_default(),
-        "methods": methods,
-        "trait_implementations": impls,
-    }))
+        ItemEnum::Struct(s) => {
+            let (type_name, methods, impls) =
+                ("struct", get_methods(&krate, s), get_impls(&krate, &item.id));
+            Ok(json!({
+                "type": type_name,
+                "crate": crate_name,
+                "path": path,
+                "documentation": item.docs.clone().unwrap_or_default(),
+                "methods": methods,
+                "trait_implementations": impls,
+            }))
+        }
+        ItemEnum::Enum(e) => {
+            let (type_name, methods, impls) =
+                ("enum", get_methods(&krate, e), get_impls(&krate, &item.id));
+            Ok(json!({
+                "type": type_name,
+                "crate": crate_name,
+                "path": path,
+                "documentation": item.docs.clone().unwrap_or_default(),
+                "methods": methods,
+                "trait_implementations": impls,
+            }))
+        }
+        _ => Err(Error::Config(format!(
+            "Path '{}' is not a module, struct, or enum.",
+            path
+        ))),
+    }
 }
 
 fn get_module_item_names(krate: &Crate, module: &Module) -> (Vec<String>, Vec<String>, Vec<String>) {
