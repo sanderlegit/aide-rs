@@ -188,7 +188,7 @@ edition = "2021"
     });
     Mock::given(method("POST"))
         .and(path(
-            "/v1beta/models/gemini-1.5-flash-latest:generateContent",
+            "/v1beta/models/gemini-2.5-pro:generateContent",
         ))
         .and(body_string_contains(
             "This is a creative step to think through the solution",
@@ -218,7 +218,7 @@ edition = "2021"
     });
     Mock::given(method("POST"))
         .and(path(
-            "/v1beta/models/gemini-1.5-flash-latest:generateContent",
+            "/v1beta/models/gemini-2.5-pro:generateContent",
         ))
         .and(body_string_contains("convert the provided markdown plan"))
         .and(body_string_contains(
@@ -247,7 +247,7 @@ edition = "2021"
     });
     Mock::given(method("POST"))
         .and(path(
-            "/v1beta/models/gemini-1.5-flash-latest:generateContent",
+            "/v1beta/models/gemini-2.5-pro:generateContent",
         ))
         .and(body_string_contains(
             "Your goal is to implement the current task.",
@@ -364,7 +364,7 @@ edition = "2021"
     });
     Mock::given(method("POST"))
         .and(path(
-            "/v1beta/models/gemini-1.5-flash-latest:generateContent",
+            "/v1beta/models/gemini-2.5-pro:generateContent",
         ))
         .and(body_string_contains("create a detailed, human-readable implementation plan"))
         .respond_with(ResponseTemplate::new(200).set_body_json(markdown_plan_response))
@@ -386,7 +386,7 @@ edition = "2021"
     });
     Mock::given(method("POST"))
         .and(path(
-            "/v1beta/models/gemini-1.5-flash-latest:generateContent",
+            "/v1beta/models/gemini-2.5-pro:generateContent",
         ))
         .and(body_string_contains("convert the provided markdown plan"))
         .respond_with(ResponseTemplate::new(200).set_body_json(structured_task_response))
@@ -412,7 +412,7 @@ edition = "2021"
     });
     Mock::given(method("POST"))
         .and(path(
-            "/v1beta/models/gemini-1.5-flash-latest:generateContent",
+            "/v1beta/models/gemini-2.5-pro:generateContent",
         ))
         .and(body_string_contains("Your goal is to implement the current task."))
         .and(body_string_contains("Call test_crate::do_stuff"))
@@ -439,7 +439,7 @@ edition = "2021"
     });
     Mock::given(method("POST"))
         .and(path(
-            "/v1beta/models/gemini-1.5-flash-latest:generateContent",
+            "/v1beta/models/gemini-2.5-pro:generateContent",
         ))
         .and(body_string_contains("functionResponse")) // The history now contains the tool result
         .and(body_string_contains("Does important stuff.")) // The doc string from the tool result
@@ -534,7 +534,7 @@ edition = "2021"
     });
     Mock::given(method("POST"))
         .and(path(
-            "/v1beta/models/gemini-1.5-flash-latest:generateContent",
+            "/v1beta/models/gemini-2.5-pro:generateContent",
         ))
         .and(body_string_contains(
             "This is a creative step to think through the solution",
@@ -566,7 +566,7 @@ edition = "2021"
     });
     Mock::given(method("POST"))
         .and(path(
-            "/v1beta/models/gemini-1.5-flash-latest:generateContent",
+            "/v1beta/models/gemini-2.5-pro:generateContent",
         ))
         .and(body_string_contains("convert the provided markdown plan"))
         .respond_with(ResponseTemplate::new(200).set_body_json(structured_task_response))
@@ -592,7 +592,7 @@ edition = "2021"
     });
     Mock::given(method("POST"))
         .and(path(
-            "/v1beta/models/gemini-1.5-flash-latest:generateContent",
+            "/v1beta/models/gemini-2.5-pro:generateContent",
         ))
         .and(body_string_contains(
             "Your goal is to implement the current task.",
@@ -624,7 +624,7 @@ edition = "2021"
     });
     Mock::given(method("POST"))
         .and(path(
-            "/v1beta/models/gemini-1.5-flash-latest:generateContent",
+            "/v1beta/models/gemini-2.5-pro:generateContent",
         ))
         .and(body_string_contains("The last attempt failed validation.")) // From on_failure_prompt
         .and(body_string_contains("expected `;`")) // From cargo check stderr
