@@ -75,7 +75,7 @@ async fn test_e2e_plan_flow() {
 
     Mock::given(method("POST"))
         .and(path(
-            "/v1beta/models/gemini-1.5-flash-latest:generateContent",
+            "/v1beta/models/gemini-2.5-pro:generateContent",
         ))
         .and(body_string_contains("Create a hello world app"))
         .and(body_string_contains("fn main() {}"))
@@ -128,7 +128,7 @@ async fn test_e2e_plan_flow() {
 
     // Check the payload
     let payload = &log_entry["payload"];
-    assert_eq!(payload["modelName"], "gemini-1.5-flash-latest");
+    assert_eq!(payload["modelName"], "gemini-2.5-pro");
     assert_eq!(payload["promptTokens"], 10);
     assert_eq!(payload["candidatesTokens"], 20);
     assert_eq!(payload["totalTokens"], 30);
@@ -723,7 +723,7 @@ edition = "2021"
 
     Mock::given(method("POST"))
         .and(path(
-            "/v1beta/models/gemini-1.5-flash-latest:generateContent",
+            "/v1beta/models/gemini-2.5-pro:generateContent",
         ))
         .and(body_string_contains(
             "break it down into a high-level list of task descriptions",
@@ -774,7 +774,7 @@ edition = "2021"
     });
     Mock::given(method("POST"))
         .and(path(
-            "/v1beta/models/gemini-1.5-flash-latest:generateContent",
+            "/v1beta/models/gemini-2.5-pro:generateContent",
         ))
         .and(body_string_contains(
             "implement a single task from a pre-approved plan",

@@ -224,7 +224,7 @@ impl FlowRunner {
                 .model
                 .as_deref()
                 .or(flow.model.as_deref())
-                .unwrap_or("gemini-1.5-flash-latest")
+                .unwrap_or("gemini-2.5-pro")
                 .to_string();
             let gemini_client = GeminiClientWrapper::new(model_name, self.logger.clone())?;
 
