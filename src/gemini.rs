@@ -61,6 +61,7 @@ impl GeminiClientWrapper {
             self.base_url, self.model_name, self.api_key
         );
 
+        debug!(url = %url, "Requesting URL");
         let response = self.client.post(&url).json(&request_body).send().await?;
 
         if !response.status().is_success() {

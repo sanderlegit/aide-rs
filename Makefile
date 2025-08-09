@@ -28,6 +28,11 @@ check:
 test:
 	$(CARGO) test -- --test-threads=1
 
+# `make test-debug`: Runs tests with debug logging enabled.
+# This is useful for debugging failing e2e tests.
+test-debug:
+	RUST_LOG=debug $(CARGO) test -- --test-threads=1 --nocapture
+
 # `make fmt`: Checks if the code is formatted according to Rust style guidelines.
 fmt:
 	$(CARGO) fmt --all -- --check
