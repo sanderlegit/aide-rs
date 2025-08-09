@@ -1,6 +1,6 @@
 use crate::error::{Error, Result};
 use crate::gemini_types::{Content, GenerateContentRequest, GenerateContentResponse, Tool};
-use crate::logging::{ResponseLog, RunLogger};
+use crate::logging::{RequestLog, ResponseLog, RunLogger};
 use dotenvy::dotenv;
 use reqwest::Client;
 use std::env;
@@ -49,6 +49,11 @@ impl GeminiClientWrapper {
             contents,
             tools,
         };
+
+        self.logger.log_request(&RequestLog {
+            model_name: self.model_name.clone(),
+            request: request_body.clone(),
+        });
 
         info!(
             "Sending request to Gemini model '{}' at '{}'.",

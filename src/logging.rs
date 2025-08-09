@@ -24,6 +24,13 @@ pub struct PromptLog {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct RequestLog {
+    pub model_name: String,
+    pub request: crate::gemini_types::GenerateContentRequest,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct ResponseLog {
     pub model_name: String,
     pub response: crate::gemini_types::GenerateContentResponse,
@@ -74,10 +81,12 @@ pub struct ValidationLog {
 pub struct RunLogger {
     pub log_dir: PathBuf,
     summary_log_path: PathBuf,
+    requests_log_path: PathBuf,
     complete_log_path: PathBuf,
     performance_log_path: PathBuf,
     // Using Mutex for interior mutability to be able to write from `&self` methods.
     summary_file: Arc<Mutex<File>>,
+    requests_file: Arc<Mutex<File>>,
     complete_file: Arc<Mutex<File>>,
     performance_file: Arc<Mutex<File>>,
     total_tokens_used: Arc<Mutex<u32>>,
@@ -90,6 +99,7 @@ impl RunLogger {
         std::fs::create_dir_all(&log_dir)?;
 
         let summary_log_path = log_dir.join("summary.log");
+        let requests_log_path = log_dir.join("requests.log");
         let complete_log_path = log_dir.join("complete.log.jsonl");
         let performance_log_path = log_dir.join("performance.log.jsonl");
 
@@ -98,6 +108,12 @@ impl RunLogger {
                 .create(true)
                 .append(true)
                 .open(&summary_log_path)?,
+        ));
+        let requests_file = Arc::new(Mutex::new(
+            OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&requests_log_path)?,
         ));
         let complete_file = Arc::new(Mutex::new(
             OpenOptions::new()
@@ -115,9 +131,11 @@ impl RunLogger {
         let logger = Self {
             log_dir,
             summary_log_path,
+            requests_log_path,
             complete_log_path,
             performance_log_path,
             summary_file,
+            requests_file,
             complete_file,
             performance_file,
             total_tokens_used: Arc::new(Mutex::new(0)),
@@ -127,6 +145,10 @@ impl RunLogger {
         logger.log_summary(&format!(
             "Full logs at: {}\n",
             logger.complete_log_path.display()
+        ));
+        logger.log_summary(&format!(
+            "Request logs at: {}\n",
+            logger.requests_log_path.display()
         ));
         logger.log_summary(&format!(
             "Performance logs at: {}\n",
@@ -181,6 +203,20 @@ impl RunLogger {
         self.log_complete(log);
     }
 
+    pub fn log_request(&self, log: &RequestLog) {
+        let request_str = serde_json::to_string_pretty(&log.request).unwrap_or_default();
+        let message = format!(
+            "[{}] REQUEST to {}:\n{}\n",
+            Utc::now().to_rfc3339(),
+            log.model_name,
+            request_str
+        );
+        if let Ok(mut file) = self.requests_file.lock() {
+            let _ = writeln!(file, "{}", message);
+        }
+        self.log_complete(log);
+    }
+
     pub fn log_response(&self, log: ResponseLog) {
         let text_parts = log.response.candidates.as_ref().map_or(String::new(), |c| {
             c.iter()
@@ -199,7 +235,7 @@ impl RunLogger {
                 .join("\n")
         });
 
-        self.log_summary(&format!(
+        let summary_message = format!(
             "[{}] RESPONSE from {} ({}ms):\n--- TEXT ---\n{}\n--- CALLS ---\n{}\n---\n",
             Utc::now().to_rfc3339(),
             log.model_name,
@@ -214,7 +250,11 @@ impl RunLogger {
             } else {
                 &function_calls
             }
-        ));
+        );
+        self.log_summary(&summary_message);
+        if let Ok(mut file) = self.requests_file.lock() {
+            let _ = writeln!(file, "{}", summary_message);
+        }
         self.log_complete(log.clone());
 
         if let Some(usage) = &log.response.usage_metadata {
@@ -234,7 +274,7 @@ impl RunLogger {
     }
 
     pub fn log_tool_call(&self, log: ToolCallLog) {
-        self.log_summary(&format!(
+        let summary_message = format!(
             "[{}] TOOL CALL: {} ({}ms)\n--- ARGS ---\n{}\n--- RESULT ---\nSuccess: {}\nOutput:\n{}\nStderr: {}\n---\n",
             Utc::now().to_rfc3339(),
             log.tool_name,
@@ -243,12 +283,16 @@ impl RunLogger {
             log.result.success,
             serde_json::to_string_pretty(&log.result.output_json).unwrap_or_default(),
             log.result.stderr
-        ));
+        );
+        self.log_summary(&summary_message);
+        if let Ok(mut file) = self.requests_file.lock() {
+            let _ = writeln!(file, "{}", summary_message);
+        }
         self.log_complete(log);
     }
 
     pub fn log_validation(&self, log: ValidationLog) {
-        self.log_summary(&format!(
+        let summary_message = format!(
             "[{}] VALIDATION: `{}` ({}ms)\n--- RESULT ---\nSuccess: {}\nExit Code: {}\nStdout: {}\nStderr: {}\n---\n",
             Utc::now().to_rfc3339(),
             log.command,
@@ -257,7 +301,11 @@ impl RunLogger {
             log.exit_code,
             log.stdout,
             log.stderr
-        ));
+        );
+        self.log_summary(&summary_message);
+        if let Ok(mut file) = self.requests_file.lock() {
+            let _ = writeln!(file, "{}", summary_message);
+        }
         self.log_complete(log);
     }
 }
