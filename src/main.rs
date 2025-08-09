@@ -5,6 +5,7 @@ use aide_rs::{
     flows::types::{FileScope, Flow},
     logging::RunLogger,
     runner::FlowRunner,
+    vcs,
 };
 use clap::Parser;
 use std::{fs, path::PathBuf};
@@ -39,6 +40,7 @@ async fn run() -> Result<()> {
             input_file,
             input_id,
             model,
+            auto_commit,
         } => {
             let logger = RunLogger::new()?;
             info!(%flow_name, ?prompt, "Running flow");
@@ -57,7 +59,7 @@ async fn run() -> Result<()> {
                 flow.model = Some(model_override);
             }
 
-            let mut runner = FlowRunner::new(logger)?;
+            let mut runner = FlowRunner::new(logger.clone())?;
 
             if let (Some(file_path), Some(id)) = (input_file, input_id) {
                 let content = fs::read_to_string(file_path)?;
@@ -66,6 +68,29 @@ async fn run() -> Result<()> {
             }
 
             runner.run(&flow, &prompt).await?;
+
+            if auto_commit {
+                let changed_files = runner.changed_files();
+                if !changed_files.is_empty() {
+                    logger.log_summary(&format!(
+                        "Auto-committing {} changed file(s)...",
+                        changed_files.len()
+                    ));
+                    let commit_message = format!(
+                        "aide-rs: auto-commit for flow '{}' with prompt '{}'",
+                        flow.id,
+                        prompt.display()
+                    );
+                    vcs::add_and_commit(
+                        &std::env::current_dir()?,
+                        &changed_files,
+                        &commit_message,
+                    )?;
+                    logger.log_summary(&format!("Committed {} file(s).", changed_files.len()));
+                } else {
+                    logger.log_summary("No files changed, skipping commit.");
+                }
+            }
         }
         Commands::List => {
             info!("Listing available flows");

@@ -31,6 +31,10 @@ pub enum Commands {
         /// Overrides the model specified in the flow file.
         #[arg(long, value_name = "MODEL_NAME")]
         model: Option<String>,
+
+        /// Automatically commit the changes upon successful completion of the flow.
+        #[arg(long)]
+        auto_commit: bool,
     },
     /// Lists all available flows.
     List,

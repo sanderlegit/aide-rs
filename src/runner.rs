@@ -6,8 +6,8 @@ use crate::logging::{PromptLog, RunLogger, ToolCallLog, ToolResultLog, Validatio
 use crate::prompt::PromptBuilder;
 use crate::tools::ToolExecutor;
 use serde_json::json;
-use std::collections::HashMap;
-use std::path::Path;
+use std::collections::{HashMap, HashSet};
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 use tracing::{debug, info, warn};
 
@@ -23,6 +23,7 @@ pub struct FlowRunner {
     block_outputs: HashMap<String, serde_json::Value>,
     // The full conversation history.
     history: Vec<Content>,
+    changed_files: HashSet<PathBuf>,
 }
 
 impl FlowRunner {
@@ -34,11 +35,16 @@ impl FlowRunner {
             prompt_builder: PromptBuilder::new(),
             block_outputs: HashMap::new(),
             history: Vec::new(),
+            changed_files: HashSet::new(),
         })
     }
 
     pub fn load_input(&mut self, id: &str, value: serde_json::Value) {
         self.block_outputs.insert(id.to_string(), value);
+    }
+
+    pub fn changed_files(&self) -> Vec<PathBuf> {
+        self.changed_files.iter().cloned().collect()
     }
 
     pub async fn run(&mut self, flow: &Flow, prompt_path: &Path) -> Result<()> {
@@ -289,6 +295,16 @@ impl FlowRunner {
                             result: tool_result_log,
                             time_taken_ms: time_taken.as_millis(),
                         });
+
+                        if (call.name == "create_file" || call.name == "edit_file")
+                            && tool_output.get("status").and_then(|s| s.as_str()) == Some("success")
+                        {
+                            if let Some(path_str) =
+                                tool_output.get("path").and_then(|p| p.as_str())
+                            {
+                                self.changed_files.insert(PathBuf::from(path_str));
+                            }
+                        }
 
                         block_output = tool_output.clone();
 
