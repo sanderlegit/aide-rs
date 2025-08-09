@@ -214,8 +214,9 @@ edition = "2021"
         .and(path(
             "/v1beta/models/gemini-1.5-flash-latest:generateContent",
         ))
-        .and(body_string_contains("You are an expert pair programmer."))
-        .and(body_string_contains("Current Task")) // From implement_tasks prompt
+        .and(body_string_contains(
+            "implement the current task as part of a larger plan",
+        )) // Unique to code.yml
         .and(body_string_contains(
             "Add hello_world function to src/lib.rs",
         ))
@@ -357,8 +358,9 @@ edition = "2021"
         .and(path(
             "/v1beta/models/gemini-1.5-flash-latest:generateContent",
         ))
-        .and(body_string_contains("You are an expert pair programmer."))
-        .and(body_string_contains("Current Task"))
+        .and(body_string_contains(
+            "implement the current task as part of a larger plan",
+        )) // Unique to code.yml
         .and(body_string_contains(
             "Add a public function `go()` to lib.rs",
         ))
