@@ -32,6 +32,7 @@ impl PromptBuilder {
         current_block_id: &str,
         verification_output: &Option<serde_json::Value>,
     ) -> Result<BuiltPrompt> {
+        let is_debug = std::env::var("RUST_LOG").map_or(false, |v| v.contains("debug"));
         let mut full_parts = Vec::new();
         let mut display_parts = Vec::new();
         for part in &prompt_def.composition {
@@ -45,7 +46,7 @@ impl PromptBuilder {
                 )
                 .await?;
             full_parts.push(content.clone());
-            if !hide {
+            if !hide || is_debug {
                 display_parts.push(content);
             } else if !content.trim().is_empty() {
                 let line_count = content.lines().count();
@@ -243,9 +244,11 @@ mod tests {
             composition: vec![
                 PromptPart::StaticText {
                     content: "Hello".to_string(),
+                    hide_in_stdout: false,
                 },
                 PromptPart::StaticText {
                     content: "World".to_string(),
+                    hide_in_stdout: false,
                 },
             ],
         };
@@ -257,7 +260,8 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(result, "Hello\nWorld");
+        assert_eq!(result.full_prompt, "Hello\nWorld");
+        assert_eq!(result.display_prompt, "Hello\nWorld");
     }
 
     #[tokio::test]
@@ -273,10 +277,12 @@ mod tests {
                 PromptPart::PromptFileField {
                     field: "objective".to_string(),
                     prefix: "Objective: ".to_string(),
+                    hide_in_stdout: false,
                 },
                 PromptPart::PreviousOutput {
                     block_id: "prev_block".to_string(),
                     prefix: "Previous: ".to_string(),
+                    hide_in_stdout: false,
                 },
             ],
         };
@@ -301,7 +307,7 @@ mod tests {
         let expected_output = json!({ "result": "some output" });
         let expected_json_string = serde_json::to_string_pretty(&expected_output).unwrap();
         assert_eq!(
-            result,
+            result.full_prompt,
             format!(
                 "Objective: Test Objective\nPrevious: {}",
                 expected_json_string
@@ -316,6 +322,7 @@ mod tests {
             composition: vec![PromptPart::PreviousOutput {
                 block_id: "current_block".to_string(),
                 prefix: "Verification Failed: ".to_string(),
+                hide_in_stdout: false,
             }],
         };
         let prompt_path = Path::new("dummy.yml");
@@ -336,7 +343,7 @@ mod tests {
         let expected_output = json!({ "error": "cargo check failed" });
         let expected_json_string = serde_json::to_string_pretty(&expected_output).unwrap();
         assert_eq!(
-            result,
+            result.full_prompt,
             format!("Verification Failed: {}", expected_json_string)
         );
     }
@@ -371,6 +378,7 @@ mod tests {
             composition: vec![PromptPart::FileContents {
                 scopes: vec!["test_scope".to_string()],
                 prefix: "Code:\n".to_string(),
+                hide_in_stdout: false,
             }],
         };
         let prompt_path = Path::new("dummy.yml");
@@ -387,6 +395,6 @@ mod tests {
         // The order of files is sorted by `get_filtered_files`.
         let expected =
             "Code:\n\n--- FILE: ./lib.rs ---\n// lib\n\n--- FILE: ./main.rs ---\nfn main() {}\n\n";
-        assert_eq!(result, expected);
+        assert_eq!(result.full_prompt, expected);
     }
 }
