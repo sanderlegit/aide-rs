@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tracing::debug;
 
 /// A trait for any tool that can be executed by the agent.
 #[async_trait]
@@ -93,13 +94,22 @@ impl Tool for DocRetrieverTool {
     }
     async fn execute(&self, args: serde_json::Value) -> Result<serde_json::Value> {
         let doc_args: DocRetrieverArgs = serde_json::from_value(args)?;
-        let current_dir = std::env::current_dir()?;
-        let current_dir_path = Some(current_dir.as_path());
+        let base_dir = std::env::current_dir()?;
+        // In the test environment, the crate we want to document is in a subdirectory
+        // named after the crate itself. We'll check for that directory and use it as
+        // the context for `rustdoc-json`, falling back to the current directory.
+        let crate_dir = base_dir.join(&doc_args.crate_name);
+        let doc_path = if crate_dir.is_dir() {
+            crate_dir
+        } else {
+            base_dir
+        };
+        debug!(path = %doc_path.display(), "Using path for doc retrieval");
 
         if let Some(path) = doc_args.path {
-            crate::doc_retriever::get_item_docs(&doc_args.crate_name, &path, current_dir_path)
+            crate::doc_retriever::get_item_docs(&doc_args.crate_name, &path, Some(&doc_path))
         } else {
-            crate::doc_retriever::get_crate_docs(&doc_args.crate_name, current_dir_path)
+            crate::doc_retriever::get_crate_docs(&doc_args.crate_name, Some(&doc_path))
         }
     }
 }
