@@ -15,6 +15,9 @@ blocks:
             Analyze the task description and the provided code. Use the available tools to modify files.
             If you are unsure about an API, use the `doc_retriever` tool to get documentation.
             Once you have made your changes, explain your solution.
+        - type: file_list
+          scopes: [ "base", "prompt" ]
+          prefix: "\n**Available Project Files:**\n"
         - type: file_contents
           scopes: [ "base", "prompt" ]
           prefix: "\n**Project File Context:**\n"

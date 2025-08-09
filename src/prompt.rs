@@ -88,6 +88,37 @@ impl PromptBuilder {
                 };
                 Ok(format!("{}{}", prefix, output))
             }
+            PromptPart::FileList { scopes, prefix } => {
+                let mut final_scope = FileScope::default();
+                let base_dir = PathBuf::from(".");
+
+                for scope_name in scopes {
+                    let scope = if scope_name == "prompt" {
+                        self.get_prompt_file_scope(prompt_path).await?
+                    } else {
+                        let scope_path = PathBuf::from(format!("ctx/{}.yaml", scope_name));
+                        FileScope::from_yaml_file(&scope_path)?
+                    };
+                    final_scope.merge(scope);
+                }
+
+                let files = files::get_filtered_files(&base_dir, &final_scope)?;
+                let mut content = String::new();
+                if !prefix.is_empty() {
+                    content.push_str(prefix);
+                    content.push('\n');
+                }
+
+                let canonical_base = base_dir.canonicalize()?;
+                for file_path in files {
+                    let display_path = file_path
+                        .strip_prefix(&canonical_base)
+                        .unwrap_or(&file_path);
+                    content.push_str(&format!("- ./{}", display_path.display()));
+                    content.push('\n');
+                }
+                Ok(content)
+            }
             PromptPart::FileContents { scopes, prefix } => {
                 let mut final_scope = FileScope::default();
                 let base_dir = PathBuf::from(".");

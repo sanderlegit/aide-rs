@@ -10,6 +10,9 @@ blocks:
           content: |
             You are an expert software architect. Your role is to analyze a user's objective and the provided project context, and break it down into a high-level list of task descriptions.
             You must call the `create_task_list` function with the generated list of tasks. Each task should be a descriptive, actionable step.
+        - type: file_list
+          scopes: [ "base", "prompt" ]
+          prefix: "\n**Available Project Files:**\n"
         - type: file_contents
           scopes: [ "base", "prompt" ] # Use the base scope and the one from the user prompt
           prefix: "\n**Project File Context:**\n"

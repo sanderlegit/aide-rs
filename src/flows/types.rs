@@ -45,6 +45,13 @@ pub enum PromptPart {
         #[serde(default)]
         prefix: String,
     },
+    #[serde(rename = "file_list")]
+    FileList {
+        #[serde(default)]
+        scopes: Vec<String>,
+        #[serde(default)]
+        prefix: String,
+    },
     #[serde(rename = "prompt_file_field")]
     PromptFileField { field: String, prefix: String },
     #[serde(rename = "previous_output")]
