@@ -53,7 +53,13 @@ impl Orchestrator {
             role: crate::gemini_types::Role::User,
         }];
 
-        let response = self.gemini.generate_content(contents, None).await?;
+        let research_tool = crate::gemini_types::Tool {
+            google_search_retrieval: Some(crate::gemini_types::GoogleSearchRetrieval::default()),
+            ..Default::default()
+        };
+        let tools = Some(vec![research_tool]);
+
+        let response = self.gemini.generate_content(contents, tools).await?;
 
         let research_text = response
             .candidates
@@ -244,6 +250,7 @@ impl Orchestrator {
 
             let tools = Some(vec![crate::gemini_types::Tool {
                 function_declarations: self.tool_executor.schemas(),
+                ..Default::default()
             }]);
 
             let response = self.gemini.generate_content(contents, tools).await?;

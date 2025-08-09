@@ -45,11 +45,18 @@ impl ContentPart {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Tool {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub function_declarations: Vec<FunctionDeclaration>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub google_search_retrieval: Option<GoogleSearchRetrieval>,
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct GoogleSearchRetrieval {}
 
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
