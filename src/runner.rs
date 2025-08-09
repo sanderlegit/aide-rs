@@ -344,13 +344,16 @@ impl FlowRunner {
 
                 if !has_function_call {
                     // No tool call, this is the final response for this turn.
-                    block_output = candidate
-                        .content
-                        .parts
-                        .iter()
-                        .find_map(|p| p.text.as_ref())
-                        .map(|s| json!(s))
-                        .unwrap_or(json!(null));
+                    // Only set the output if it hasn't been set by a tool call already.
+                    if block_output == json!(null) {
+                        block_output = candidate
+                            .content
+                            .parts
+                            .iter()
+                            .find_map(|p| p.text.as_ref())
+                            .map(|s| json!(s))
+                            .unwrap_or(json!(null));
+                    }
                     break; // Exit conversation loop
                 }
 

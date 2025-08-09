@@ -83,6 +83,17 @@ async fn test_e2e_plan_flow() {
         .mount(&env.mock_server)
         .await;
 
+    // Mock the response after the tool call to finish the block
+    let finish_response = json!({ "candidates": [{"content": { "parts": [{"text": "OK" }], "role": "model" }}] });
+    Mock::given(method("POST"))
+        .and(path(
+            "/v1beta/models/gemini-2.5-pro:generateContent",
+        ))
+        .and(body_string_contains("functionResponse"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(finish_response))
+        .mount(&env.mock_server)
+        .await;
+
     // 5. Run the command
     let mut cmd = get_aide_cmd();
     env.apply_env(&mut cmd);
@@ -228,6 +239,18 @@ edition = "2021"
         .mount(&env.mock_server)
         .await;
 
+    // Mock 2.5: The response after sending the tool call result back to the model
+    let finish_response = json!({ "candidates": [{"content": { "parts": [{"text": "OK" }], "role": "model" }}] });
+    Mock::given(method("POST"))
+        .and(path(
+            "/v1beta/models/gemini-2.5-pro:generateContent",
+        ))
+        .and(body_string_contains("functionResponse"))
+        .and(body_string_contains("create_task_list"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(finish_response.clone()))
+        .mount(&env.mock_server)
+        .await;
+
     // Mock 3: The 'implement_tasks' block
     let impl_response = json!({
         "candidates": [{
@@ -257,6 +280,17 @@ edition = "2021"
             "Add hello_world function to src/lib.rs",
         ))
         .respond_with(ResponseTemplate::new(200).set_body_json(impl_response))
+        .mount(&env.mock_server)
+        .await;
+
+    // Mock 3.5: Finish the implementation turn
+    Mock::given(method("POST"))
+        .and(path(
+            "/v1beta/models/gemini-2.5-pro:generateContent",
+        ))
+        .and(body_string_contains("functionResponse"))
+        .and(body_string_contains("edit_file"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(finish_response))
         .mount(&env.mock_server)
         .await;
 
@@ -393,6 +427,18 @@ edition = "2021"
         .mount(&env.mock_server)
         .await;
 
+    // Mock 2.5: Finish the structured task generation turn
+    let finish_response = json!({ "candidates": [{"content": { "parts": [{"text": "OK" }], "role": "model" }}] });
+    Mock::given(method("POST"))
+        .and(path(
+            "/v1beta/models/gemini-2.5-pro:generateContent",
+        ))
+        .and(body_string_contains("functionResponse"))
+        .and(body_string_contains("create_task_list"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(finish_response.clone()))
+        .mount(&env.mock_server)
+        .await;
+
     // Mock 3: The 'implement_tasks' block, first it calls doc_retriever
     let doc_retriever_call_response = json!({
         "candidates": [{
@@ -444,6 +490,17 @@ edition = "2021"
         .and(body_string_contains("functionResponse")) // The history now contains the tool result
         .and(body_string_contains("Does important stuff.")) // The doc string from the tool result
         .respond_with(ResponseTemplate::new(200).set_body_json(edit_file_call_response))
+        .mount(&env.mock_server)
+        .await;
+
+    // Mock 5: Finish the implementation turn after edit_file
+    Mock::given(method("POST"))
+        .and(path(
+            "/v1beta/models/gemini-2.5-pro:generateContent",
+        ))
+        .and(body_string_contains("functionResponse"))
+        .and(body_string_contains("edit_file"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(finish_response))
         .mount(&env.mock_server)
         .await;
 
@@ -573,6 +630,18 @@ edition = "2021"
         .mount(&env.mock_server)
         .await;
 
+    // Mock 2.5: Finish the structured task generation turn
+    let finish_response = json!({ "candidates": [{"content": { "parts": [{"text": "OK" }], "role": "model" }}] });
+    Mock::given(method("POST"))
+        .and(path(
+            "/v1beta/models/gemini-2.5-pro:generateContent",
+        ))
+        .and(body_string_contains("functionResponse"))
+        .and(body_string_contains("create_task_list"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(finish_response.clone()))
+        .mount(&env.mock_server)
+        .await;
+
     // Mock 3: The 'implement_tasks' block - FIRST attempt (with syntax error)
     let impl_response_fail = json!({
         "candidates": [{
@@ -605,7 +674,19 @@ edition = "2021"
         .mount(&env.mock_server)
         .await;
 
-    // Mock 3: The 'implement_tasks' block - SECOND attempt (with fix)
+    // Mock 3.5: The model's response to the failed tool call. It should just be an empty ack.
+    // The verification logic will trigger the retry.
+    Mock::given(method("POST"))
+        .and(path(
+            "/v1beta/models/gemini-2.5-pro:generateContent",
+        ))
+        .and(body_string_contains("functionResponse"))
+        .and(body_string_contains("edit_file"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(finish_response.clone()))
+        .mount(&env.mock_server)
+        .await;
+
+    // Mock 4: The 'implement_tasks' block - SECOND attempt (with fix)
     let impl_response_success = json!({
         "candidates": [{
             "content": {
@@ -629,6 +710,17 @@ edition = "2021"
         .and(body_string_contains("The last attempt failed validation.")) // From on_failure_prompt
         .and(body_string_contains("expected `;`")) // From cargo check stderr
         .respond_with(ResponseTemplate::new(200).set_body_json(impl_response_success))
+        .mount(&env.mock_server)
+        .await;
+
+    // Mock 4.5: The model's response to the successful tool call.
+    Mock::given(method("POST"))
+        .and(path(
+            "/v1beta/models/gemini-2.5-pro:generateContent",
+        ))
+        .and(body_string_contains("functionResponse"))
+        .and(body_string_contains("edit_file"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(finish_response))
         .mount(&env.mock_server)
         .await;
 
@@ -732,6 +824,17 @@ edition = "2021"
         .mount(&env.mock_server)
         .await;
 
+    // Mock the response after the tool call to finish the block
+    let finish_response = json!({ "candidates": [{"content": { "parts": [{"text": "OK" }], "role": "model" }}] });
+    Mock::given(method("POST"))
+        .and(path(
+            "/v1beta/models/gemini-2.5-pro:generateContent",
+        ))
+        .and(body_string_contains("functionResponse"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(finish_response.clone()))
+        .mount(&env.mock_server)
+        .await;
+
     // 4. Run the 'plan' command
     let mut plan_cmd = get_aide_cmd();
     env.apply_env(&mut plan_cmd);
@@ -780,6 +883,16 @@ edition = "2021"
             "implement a single task from a pre-approved plan",
         )) // Unique to implement.yml
         .respond_with(ResponseTemplate::new(200).set_body_json(impl_response))
+        .mount(&env.mock_server)
+        .await;
+
+    // Mock the response after the tool call to finish the block
+    Mock::given(method("POST"))
+        .and(path(
+            "/v1beta/models/gemini-2.5-pro:generateContent",
+        ))
+        .and(body_string_contains("functionResponse"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(finish_response))
         .mount(&env.mock_server)
         .await;
 
