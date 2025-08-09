@@ -289,6 +289,177 @@ edition = "2021"
 }
 
 #[tokio::test]
+async fn test_e2e_code_flow_with_doc_retriever() {
+    let env = TestEnv::new().await;
+    env.init_git_repo();
+
+    // 1. Create flow and context files
+    fs::create_dir_all(env.full_path("flows")).unwrap();
+    let code_flow_content = fs::read_to_string("flows/code.yml").unwrap();
+    env.create_file("flows/code.yml", &code_flow_content);
+
+    fs::create_dir_all(env.full_path("ctx")).unwrap();
+    let base_scope_content = fs::read_to_string("ctx/base.yaml").unwrap();
+    env.create_file("ctx/base.yaml", &base_scope_content);
+    let ai_scope_content = fs::read_to_string("ctx/ai.yaml").unwrap();
+    env.create_file("ctx/ai.yaml", &ai_scope_content);
+    fs::create_dir_all(env.full_path("doc")).unwrap();
+    let arch_doc_content = fs::read_to_string("doc/refactor_architecture.md").unwrap();
+    env.create_file("doc/refactor_architecture.md", &arch_doc_content);
+
+    // 2. Create prompt and a dummy crate for the tool to inspect
+    env.create_file("Makefile", "test:\n\t@cargo check\n");
+    env.create_file(
+        "my_doc_prompt.yml",
+        r#"
+        objective: "In `src/lib.rs`, add a call to `test_crate::do_stuff()`"
+        file_scoping:
+          include:
+            - "src/lib.rs"
+            - "Cargo.toml"
+        "#,
+    );
+    env.create_file(
+        "Cargo.toml",
+        r#"[package]
+name = "my-project"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+test_crate = { path = "test_crate" }
+"#,
+    );
+    env.create_file("src/lib.rs", "// empty\n");
+
+    // Create the dependency crate that the agent will inspect
+    env.create_file(
+        "test_crate/Cargo.toml",
+        r#"[package]
+name = "test_crate"
+version = "0.1.0"
+edition = "2021"
+"#,
+    );
+    env.create_file(
+        "test_crate/src/lib.rs",
+        r#"
+        /// Does important stuff.
+        pub fn do_stuff() -> u32 { 42 }
+        "#,
+    );
+
+    // 3. Mock API calls
+    // Mock 1 & 2: Plan and structure tasks (skipping for brevity, straight to implement)
+    let markdown_plan_response = json!({
+        "candidates": [{
+            "content": { "parts": [{ "text": "Plan: Call the function." }], "role": "model" }
+        }]
+    });
+    Mock::given(method("POST"))
+        .and(body_string_contains("create a detailed, human-readable implementation plan"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(markdown_plan_response))
+        .mount(&env.mock_server)
+        .await;
+
+    let structured_task_response = json!({
+        "candidates": [{
+            "content": {
+                "parts": [{
+                    "functionCall": {
+                        "name": "create_task_list",
+                        "args": { "tasks": [ { "id": "call-it", "description": "Call test_crate::do_stuff" } ] }
+                    }
+                }],
+                "role": "model"
+            }
+        }]
+    });
+    Mock::given(method("POST"))
+        .and(body_string_contains("convert the provided markdown plan"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(structured_task_response))
+        .mount(&env.mock_server)
+        .await;
+
+    // Mock 3: The 'implement_tasks' block, first it calls doc_retriever
+    let doc_retriever_call_response = json!({
+        "candidates": [{
+            "content": {
+                "parts": [{
+                    "functionCall": {
+                        "name": "doc_retriever",
+                        "args": {
+                            "crate_name": "test_crate",
+                            "path": "test_crate::do_stuff"
+                        }
+                    }
+                }],
+                "role": "model"
+            }
+        }]
+    });
+    Mock::given(method("POST"))
+        .and(body_string_contains("Your goal is to implement the current task."))
+        .and(body_string_contains("Call test_crate::do_stuff"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(doc_retriever_call_response))
+        .mount(&env.mock_server)
+        .await;
+
+    // Mock 4: The 'implement_tasks' block gets the doc_retriever result and edits the file
+    let edit_file_call_response = json!({
+        "candidates": [{
+            "content": {
+                "parts": [{
+                    "functionCall": {
+                        "name": "edit_file",
+                        "args": {
+                            "path": "src/lib.rs",
+                            "content": "pub fn my_func() { test_crate::do_stuff(); }"
+                        }
+                    }
+                }],
+                "role": "model"
+            }
+        }]
+    });
+    Mock::given(method("POST"))
+        .and(body_string_contains("functionResponse")) // The history now contains the tool result
+        .and(body_string_contains("Does important stuff.")) // The doc string from the tool result
+        .respond_with(ResponseTemplate::new(200).set_body_json(edit_file_call_response))
+        .mount(&env.mock_server)
+        .await;
+
+    // 4. Run the command
+    let mut cmd = get_aide_cmd();
+    env.apply_env(&mut cmd);
+    cmd.current_dir(env.path());
+    cmd.arg("run")
+        .arg("code")
+        .arg("--prompt")
+        .arg("my_doc_prompt.yml");
+
+    // 5. Assert success and file modification
+    let output = cmd.output().unwrap();
+    assert!(
+        output.status.success(),
+        "Command failed. Stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("Flow 'code' finished."),
+        "Flow did not finish. Stderr:\n---\n{}\n---",
+        stderr
+    );
+    assert!(stderr.contains("TOOL CALL: doc_retriever"));
+    assert!(stderr.contains("TOOL CALL: edit_file"));
+
+    let final_content = fs::read_to_string(env.full_path("src/lib.rs")).unwrap();
+    assert!(final_content.contains("test_crate::do_stuff()"));
+}
+
+#[tokio::test]
 async fn test_e2e_code_flow_with_retry() {
     let env = TestEnv::new().await;
     env.init_git_repo();
