@@ -332,7 +332,7 @@ impl FlowRunner {
                     .generate_content(history_for_request, tools_config)
                     .await?;
 
-                let Some(candidate) = response.candidates.and_then(|mut c| c.pop()) else {
+                let Some(candidate) = response.candidates.clone().and_then(|mut c| c.pop()) else {
                     warn!(
                         "Gemini response contained no candidates. This may be due to safety filters. Full response: {:?}",
                         response
