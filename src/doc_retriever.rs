@@ -20,7 +20,7 @@ fn generate_docs(crate_name: &str, current_dir: Option<&Path>) -> Result<PathBuf
         .quiet(true);
 
     if let Some(dir) = &canonical_dir {
-        builder = builder.target_dir(dir.join("target"));
+        builder = builder.target_dir(dir.join("target")).current_dir(dir);
     }
 
     builder.build().map_err(|e| {
@@ -298,7 +298,6 @@ pub mod my_module {
     }
 
     #[test]
-    #[ignore] // Ignoring due to issues with temp dirs in test environment
     fn test_get_crate_docs() {
         let (_dir, crate_root) = setup_test_crate();
         let result = get_crate_docs("test_crate", Some(&crate_root)).unwrap();
@@ -311,7 +310,6 @@ pub mod my_module {
     }
 
     #[test]
-    #[ignore] // Ignoring due to issues with temp dirs in test environment
     fn test_get_item_docs() {
         let (_dir, crate_root) = setup_test_crate();
 
@@ -343,5 +341,6 @@ pub mod my_module {
         assert_eq!(methods.len(), 1);
         assert_eq!(methods[0]["name"], "new");
         assert_eq!(methods[0]["documentation"], "A method on MyStruct.");
+        assert_eq!(methods[0]["signature"], "pub fn new() -> Self");
     }
 }

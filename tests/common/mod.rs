@@ -55,6 +55,31 @@ impl TestEnv {
         fs::write(full_path, content).unwrap();
     }
 
+    pub fn create_test_crate(&self, name: &str, lib_content: &str) {
+        let crate_root = self.path().join(name);
+        fs::create_dir_all(crate_root.join("src")).unwrap();
+
+        let cargo_toml = format!(
+            r#"[package]
+name = "{}"
+version = "0.1.0"
+edition = "2021"
+"#,
+            name
+        );
+        fs::write(crate_root.join("Cargo.toml"), cargo_toml).unwrap();
+
+        let cargo_config_dir = crate_root.join(".cargo");
+        fs::create_dir(&cargo_config_dir).unwrap();
+        fs::write(
+            cargo_config_dir.join("config.toml"),
+            "[build]\ntarget-dir = \"target\"\n",
+        )
+        .unwrap();
+
+        fs::write(crate_root.join("src/lib.rs"), lib_content).unwrap();
+    }
+
     pub fn init_git_repo(&self) {
         let repo = Repository::init(self.path()).unwrap();
         let mut index = repo.index().unwrap();
