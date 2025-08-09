@@ -125,6 +125,7 @@ async fn test_e2e_code_flow_single_task() {
     env.create_file("doc/refactor_architecture.md", &arch_doc_content);
 
     // 2. Create prompt and initial project files
+    env.create_file("Makefile", "test:\n\t@cargo check\n");
     env.create_file(
         "my_code_prompt.yml",
         r#"
@@ -218,9 +219,9 @@ edition = "2021"
             "/v1beta/models/gemini-1.5-flash-latest:generateContent",
         ))
         .and(body_string_contains(
-            "implement the current task as part of a larger plan",
-        )) // Unique to code.yml
-        .and(body_string_contains("**Current Task to Implement:**"))
+            "Your goal is to implement the current task.",
+        )) // Unique to code.yml implement_tasks
+        .and(body_string_contains("**Current Task:**"))
         .and(body_string_contains(
             "Add hello_world function to src/lib.rs",
         ))
@@ -276,6 +277,7 @@ async fn test_e2e_code_flow_with_retry() {
     env.create_file("doc/refactor_architecture.md", &arch_doc_content);
 
     // 2. Create prompt and initial project files
+    env.create_file("Makefile", "test:\n\t@cargo check\n");
     env.create_file(
         "my_retry_prompt.yml",
         r#"
@@ -367,9 +369,9 @@ edition = "2021"
             "/v1beta/models/gemini-1.5-flash-latest:generateContent",
         ))
         .and(body_string_contains(
-            "implement the current task as part of a larger plan",
-        )) // Unique to code.yml
-        .and(body_string_contains("**Current Task to Implement:**"))
+            "Your goal is to implement the current task.",
+        )) // Unique to code.yml implement_tasks
+        .and(body_string_contains("**Current Task:**"))
         .and(body_string_contains(
             "Add a public function `go()` to lib.rs",
         ))
