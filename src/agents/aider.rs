@@ -91,7 +91,7 @@ impl AiderWrapper {
                 .stderr(Stdio::inherit())
                 .spawn()?;
 
-            let status = child.await?;
+            let status = child.wait().await?;
 
             if !status.success() {
                 return Err(Error::ToolFailed(format!(

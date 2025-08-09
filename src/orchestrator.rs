@@ -1,17 +1,18 @@
 use crate::agents::aider::AiderWrapper;
-use crate::agents::AiderRunResult;
 use crate::error::{Error, Result};
 use crate::gemini::GeminiClientWrapper;
 use crate::logging::RunLogger;
 use crate::session::Session;
+use crate::tools::ToolExecutor;
 use crate::vcs;
-use tracing::info;
+use tracing::{error, info};
 
 /// The main orchestrator for managing AI workflows.
 pub struct Orchestrator {
     logger: RunLogger,
     gemini: GeminiClientWrapper,
     aider: AiderWrapper,
+    tool_executor: ToolExecutor,
 }
 
 impl Orchestrator {
@@ -20,10 +21,13 @@ impl Orchestrator {
         // TODO: Make model configurable
         let gemini = GeminiClientWrapper::new("gemini-1.5-pro".to_string(), logger.clone())?;
         let aider = AiderWrapper;
+        // For now, enable all tools. Later this could be configured per-strategy.
+        let tool_executor = ToolExecutor::new(&["doc_retriever".to_string()]);
         Ok(Self {
             logger,
             gemini,
             aider,
+            tool_executor,
         })
     }
 
@@ -219,10 +223,59 @@ impl Orchestrator {
                 max_retries
             ));
 
-            // TODO: Implement Gemini-based debugging. For now, just feed back the error.
-            current_objective = format!(
-                "The last attempt failed. Here is the output from the validation command:\n\nSTDOUT:\n{}\n\nSTDERR:\n{}\n\nPlease try to fix it.",
+            // Implement Gemini-based debugging.
+            let debug_prompt = format!(
+                "The last attempt to fix the code failed. I need your help to figure out what to do next.
+                Based on the error output below, what documentation should I look up using the `doc_retriever` tool?
+                Please call the tool with the most relevant `crate_name` and `path` to get documentation that might help solve the error.
+
+                Validation command STDOUT:
+                {}
+
+                Validation command STDERR:
+                {}",
                 result.stdout, result.stderr
+            );
+
+            let contents = vec![crate::gemini_types::Content {
+                parts: vec![crate::gemini_types::ContentPart::new_text(debug_prompt)],
+                role: crate::gemini_types::Role::User,
+            }];
+
+            let tools = Some(vec![crate::gemini_types::Tool {
+                function_declarations: self.tool_executor.schemas(),
+            }]);
+
+            let response = self.gemini.generate_content(contents, tools).await?;
+
+            let mut retrieved_docs = "No documentation was retrieved.".to_string();
+
+            if let Some(function_call) = response
+                .candidates
+                .as_ref()
+                .and_then(|c| c.first())
+                .and_then(|c| c.content.parts.first())
+                .and_then(|p| p.function_call.as_ref())
+            {
+                info!(call = ?function_call, "Gemini requested a tool call for debugging");
+                match self.tool_executor.execute(function_call).await {
+                    Ok(docs) => {
+                        retrieved_docs = serde_json::to_string_pretty(&docs)
+                            .unwrap_or_else(|_| "Failed to format documentation.".to_string());
+                        info!(docs = %retrieved_docs, "Retrieved documentation");
+                    }
+                    Err(e) => {
+                        error!(error = %e, "Tool execution failed");
+                        retrieved_docs = format!("Failed to retrieve documentation: {}", e);
+                    }
+                }
+            } else {
+                info!("Gemini did not request a tool call for debugging.");
+            }
+
+            current_objective = format!(
+                "The last attempt failed. Here is the output from the validation command:\n\nSTDOUT:\n{}\n\nSTDERR:\n{}\n\nI tried to find relevant documentation and got this:\n\n{}\n\nPlease use this information to fix the code.",
+                result.stdout, result.stderr, retrieved_docs
             );
         }
 
