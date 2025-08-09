@@ -286,6 +286,12 @@ edition = "2021"
 
     let final_content = fs::read_to_string(env.full_path("src/lib.rs")).unwrap();
     assert!(final_content.contains("pub fn hello_world"));
+
+    let commit_msg = env.get_last_commit_message();
+    assert_eq!(
+        commit_msg,
+        "aide-rs: auto-commit after task 'add-hello' in flow 'code'"
+    );
 }
 
 #[tokio::test]
@@ -469,6 +475,12 @@ edition = "2021"
 
     let final_content = fs::read_to_string(env.full_path("src/lib.rs")).unwrap();
     assert!(final_content.contains("test_crate::do_stuff()"));
+
+    let commit_msg = env.get_last_commit_message();
+    assert_eq!(
+        commit_msg,
+        "aide-rs: auto-commit after task 'call-it' in flow 'code'"
+    );
 }
 
 #[tokio::test]
@@ -647,6 +659,12 @@ edition = "2021"
 
     let final_content = fs::read_to_string(env.full_path("src/lib.rs")).unwrap();
     assert!(final_content.contains("println!(\"go!\");"));
+
+    let commit_msg = env.get_last_commit_message();
+    assert_eq!(
+        commit_msg,
+        "aide-rs: auto-commit after task 'add-go-fn' in flow 'code'"
+    );
 }
 
 #[tokio::test]
@@ -796,4 +814,10 @@ edition = "2021"
 
     let final_content = fs::read_to_string(env.full_path("src/lib.rs")).unwrap();
     assert!(final_content.contains("pub fn hello_world"));
+
+    let commit_msg = env.get_last_commit_message();
+    assert_eq!(
+        commit_msg,
+        "aide-rs: auto-commit after task 'add-hello' in flow 'implement'"
+    );
 }

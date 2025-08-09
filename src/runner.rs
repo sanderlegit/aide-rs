@@ -107,6 +107,39 @@ impl FlowRunner {
                         .execute_block(block, flow, prompt_path, loop_item_override)
                         .await?;
                     iteration_outputs.push(iteration_output);
+
+                    if looping_strategy.commit_on_iteration_success {
+                        let changed_files = self.changed_files();
+                        let task_id =
+                            item.get("id").and_then(|v| v.as_str()).unwrap_or("unknown");
+                        if !changed_files.is_empty() {
+                            self.logger.log_summary(&format!(
+                                "Loop iteration for task '{}' succeeded, committing {} file(s)...",
+                                task_id,
+                                changed_files.len()
+                            ));
+                            let commit_message = format!(
+                                "aide-rs: auto-commit after task '{}' in flow '{}'",
+                                task_id, flow.id
+                            );
+                            vcs::add_and_commit(
+                                &std::env::current_dir()?,
+                                &changed_files,
+                                &commit_message,
+                            )?;
+                            self.logger.log_summary(&format!(
+                                "Committed {} file(s).",
+                                changed_files.len()
+                            ));
+                            // After committing, clear the list of changed files for the next iteration.
+                            self.changed_files.clear();
+                        } else {
+                            self.logger.log_summary(&format!(
+                                "Loop iteration for task '{}' in block '{}' succeeded, but no files were changed. Skipping commit.",
+                                task_id, block.id
+                            ));
+                        }
+                    }
                 }
 
                 // The output of the looping block is the list of outputs from each iteration.

@@ -217,4 +217,7 @@ pub struct LoopingStrategy {
     /// If true, clears the conversation history at the start of each iteration to keep context focused.
     #[serde(default)]
     pub clear_history_on_iteration: bool,
+    /// If true, creates a git commit after each successful iteration of the loop.
+    #[serde(default)]
+    pub commit_on_iteration_success: bool,
 }

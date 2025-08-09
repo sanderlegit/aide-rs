@@ -71,4 +71,11 @@ impl TestEnv {
         )
         .unwrap();
     }
+
+    pub fn get_last_commit_message(&self) -> String {
+        let repo = Repository::open(self.path()).unwrap();
+        let head = repo.head().unwrap();
+        let commit = head.peel_to_commit().unwrap();
+        commit.message().unwrap().to_string()
+    }
 }

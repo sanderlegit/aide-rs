@@ -133,6 +133,7 @@ For blocks that need to iterate over a list of items (e.g., implementing a list 
 -   `over` (string, required): The `id` of a previous block whose output is a list (e.g., a `TaskList`).
 -   `as` (string, required): The key to use when making the current item from the list available to the prompt composition system. For example, if `as: "current_task"`, you could use a `previous_output` part with `block_id: "current_task"`.
 -   `clear_history_on_iteration` (boolean, default: false): If `true`, the conversation history is cleared at the beginning of each loop iteration. This is useful for long-running tasks to prevent the context from growing too large and to keep the agent focused on the current item.
+-   `commit_on_iteration_success` (boolean, default: false): If `true`, after each item in the loop is processed successfully (including passing verification), the `FlowRunner` will create a git commit with all files modified during that iteration. The list of changed files is reset after each commit. This is distinct from the block-level `commit_on_success` annotation, which would only commit once after the entire loop is finished.
 
 ## 4. Core Component Refactoring
 

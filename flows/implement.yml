@@ -7,6 +7,7 @@ blocks:
     looping:
       over: "generate_tasks"
       as: "current_task"
+      commit_on_iteration_success: true
     prompt:
       composition:
         - type: static_text
