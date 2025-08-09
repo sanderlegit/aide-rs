@@ -9,7 +9,7 @@ use serde_json::json;
 use std::collections::HashMap;
 use std::path::Path;
 use std::time::Instant;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 struct VerificationResult {
     success: bool,
@@ -198,6 +198,8 @@ impl FlowRunner {
                     &verification_output,
                 )
                 .await?;
+
+            debug!(prompt = %built_prompt.full_prompt, "Full prompt for block '{}'", block.id);
 
             // 3. Execute the block's main logic (API call, tools)
             let tool_executor = ToolExecutor::new(&block.annotations.tools);

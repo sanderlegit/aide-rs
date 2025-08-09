@@ -1,9 +1,8 @@
-description: "Base scope for most operations. Includes source code, docs, and core config."
+description: "Base scope for most operations. Includes source code, and core config."
 include:
   - "src/**/*.rs"
   - "Cargo.toml"
   - "README.md"
-  - "docs/**/*.md"
   - "Makefile"
 exclude:
   - ".git"
