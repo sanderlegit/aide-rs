@@ -38,6 +38,7 @@ async fn run() -> Result<()> {
             prompt,
             input_file,
             input_id,
+            model,
         } => {
             let logger = RunLogger::new()?;
             info!(%flow_name, ?prompt, "Running flow");
@@ -50,7 +51,11 @@ async fn run() -> Result<()> {
                 )));
             }
             let flow_content = fs::read_to_string(&flow_path)?;
-            let flow: Flow = serde_yaml::from_str(&flow_content)?;
+            let mut flow: Flow = serde_yaml::from_str(&flow_content)?;
+
+            if let Some(model_override) = model {
+                flow.model = Some(model_override);
+            }
 
             let mut runner = FlowRunner::new(logger)?;
 

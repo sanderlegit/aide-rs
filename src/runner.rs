@@ -19,7 +19,6 @@ struct VerificationResult {
 pub struct FlowRunner {
     logger: RunLogger,
     prompt_builder: PromptBuilder,
-    gemini_client: GeminiClientWrapper,
     // We will store the output of each block here, keyed by block.id.
     block_outputs: HashMap<String, serde_json::Value>,
     // The full conversation history.
@@ -28,13 +27,11 @@ pub struct FlowRunner {
 
 impl FlowRunner {
     pub fn new(logger: RunLogger) -> Result<Self> {
-        // TODO: The model should probably be configurable per-flow or per-block
-        let gemini_client =
-            GeminiClientWrapper::new("gemini-1.5-flash-latest".to_string(), logger.clone())?;
+        // The Gemini client is now created on-demand in `execute_block`
+        // to support per-block/per-flow model configuration.
         Ok(Self {
             logger,
             prompt_builder: PromptBuilder::new(),
-            gemini_client,
             block_outputs: HashMap::new(),
             history: Vec::new(),
         })
@@ -100,7 +97,7 @@ impl FlowRunner {
 
                     let loop_item_override = Some((looping_strategy.as_key.as_str(), item));
                     let iteration_output = self
-                        .execute_block(block, prompt_path, loop_item_override)
+                        .execute_block(block, flow, prompt_path, loop_item_override)
                         .await?;
                     iteration_outputs.push(iteration_output);
                 }
@@ -109,7 +106,7 @@ impl FlowRunner {
                 serde_json::to_value(iteration_outputs)?
             } else {
                 // This is a standard, non-looping block.
-                self.execute_block(block, prompt_path, None).await?
+                self.execute_block(block, flow, prompt_path, None).await?
             };
 
             if let Some(save_path) = &block.annotations.save_output_to {
@@ -137,6 +134,7 @@ impl FlowRunner {
     async fn execute_block(
         &mut self,
         block: &crate::flows::types::Block,
+        flow: &Flow,
         prompt_path: &Path,
         loop_item_override: Option<(&str, &serde_json::Value)>,
     ) -> Result<serde_json::Value> {
@@ -150,6 +148,17 @@ impl FlowRunner {
         let mut verification_output: Option<serde_json::Value> = None;
 
         for attempt in 0..=max_retries {
+            // Determine which model to use for this block execution.
+            // Precedence: block-specific model > flow-level model > hardcoded default.
+            let model_name = block
+                .annotations
+                .model
+                .as_deref()
+                .or(flow.model.as_deref())
+                .unwrap_or("gemini-2.5-pro")
+                .to_string();
+            let gemini_client = GeminiClientWrapper::new(model_name, self.logger.clone())?;
+
             // 1. Determine which prompt to use
             let prompt_def = if attempt > 0 {
                 // This is a retry, use the on_failure_prompt
@@ -223,14 +232,13 @@ impl FlowRunner {
             };
 
             self.logger.log_prompt(PromptLog {
-                model_name: self.gemini_client.model_name().to_string(),
+                model_name: gemini_client.model_name().to_string(),
                 system_prompt: "".to_string(), // We are using a user-style prompt for now
                 user_prompt: prompt_string,
                 tools: json!(tools_config),
             });
 
-            let response = self
-                .gemini_client
+            let response = gemini_client
                 .generate_content(history_for_request, tools_config)
                 .await?;
 
@@ -305,7 +313,11 @@ impl FlowRunner {
             // 4. Run verification logic
             if let Some(verification) = &block.verification {
                 let result = self
-                    .run_verification(&verification.strategy, prompt_path)
+                    .run_verification(
+                        &verification.strategy,
+                        gemini_client.model_name(),
+                        prompt_path,
+                    )
                     .await?;
                 if result.success {
                     // Success, break the retry loop
@@ -340,6 +352,7 @@ impl FlowRunner {
     async fn run_verification(
         &mut self,
         strategy: &VerificationStrategy,
+        model_name: &str,
         prompt_path: &Path,
     ) -> Result<VerificationResult> {
         match strategy {
@@ -412,8 +425,9 @@ impl FlowRunner {
                     };
 
                     // Verification prompts are ephemeral and not part of the main history.
-                    let response = self
-                        .gemini_client
+                    let gemini_client =
+                        GeminiClientWrapper::new(model_name.to_string(), self.logger.clone())?;
+                    let response = gemini_client
                         .generate_content(vec![user_content], tools_config)
                         .await?;
 

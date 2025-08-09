@@ -8,6 +8,8 @@ use std::path::Path;
 pub struct Flow {
     pub id: String,
     pub description: String,
+    #[serde(default)]
+    pub model: Option<String>,
     pub blocks: Vec<Block>,
 }
 
@@ -61,6 +63,8 @@ pub enum PromptPart {
 /// Modifies the execution behavior of a block.
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Annotations {
+    #[serde(default)]
+    pub model: Option<String>,
     #[serde(default)]
     pub history: History,
     #[serde(default)]

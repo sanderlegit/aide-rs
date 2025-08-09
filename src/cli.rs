@@ -27,6 +27,10 @@ pub enum Commands {
         /// The block ID to associate with the input file's content.
         #[arg(long, value_name = "ID", requires = "input_file")]
         input_id: Option<String>,
+
+        /// Overrides the model specified in the flow file.
+        #[arg(long, value_name = "MODEL_NAME")]
+        model: Option<String>,
     },
     /// Lists all available flows.
     List,
