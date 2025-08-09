@@ -1,9 +1,14 @@
 mod common;
 
-use common::TestEnv;
 use assert_cmd::Command;
+use common::TestEnv;
+use serde_json::json;
 use std::fs;
 use std::process::Command as StdCommand;
+use wiremock::{
+    matchers::{method, path_regex},
+    Mock, ResponseTemplate,
+};
 
 #[tokio::test]
 async fn test_implement_auto_success_on_first_try() {
@@ -37,12 +42,12 @@ async fn test_implement_auto_success_on_first_try() {
         .arg("true");
 
     let output = cmd.assert().success();
-    let stdout = String::from_utf8(output.get_output().stdout.clone()).unwrap();
+    let stderr = String::from_utf8(output.get_output().stderr.clone()).unwrap();
 
-    assert!(stdout.contains("Starting implement strategy."));
-    assert!(stdout.contains("Running aider in auto mode."));
-    assert!(stdout.contains("Aider succeeded on attempt 1/5."));
-    assert!(stdout.contains("Committing changes with message: Implement: a test objective"));
+    assert!(stderr.contains("Starting implement strategy."));
+    assert!(stderr.contains("Running aider in auto mode."));
+    assert!(stderr.contains("Aider succeeded on attempt 1/5."));
+    assert!(stderr.contains("Committing changes with message: Implement: a test objective"));
 
     let last_commit = env.get_last_commit_message();
     assert_eq!(last_commit, "Implement: a test objective");
@@ -51,6 +56,28 @@ async fn test_implement_auto_success_on_first_try() {
 #[tokio::test]
 async fn test_implement_auto_failure_and_retry() {
     let env = TestEnv::new().await;
+
+    // Mock the Gemini API for the debug step.
+    // It should suggest using the doc_retriever tool.
+    let mock_response = json!({
+        "candidates": [{
+            "content": {
+                "parts": [{
+                    "functionCall": {
+                        "name": "doc_retriever",
+                        "args": { "crate_name": "some_crate", "path": "some_crate::some_module" }
+                    }
+                }]
+            },
+            "finishReason": "TOOL_USE"
+        }]
+    });
+    Mock::given(method("POST"))
+        .and(path_regex(r"/v1beta/models/gemini-1.5-pro:generateContent.*"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(mock_response))
+        .mount(&env.mock_server)
+        .await;
+
     env.init_git_repo();
     env.create_file("src/main.rs", "fn main() {}");
 
@@ -97,12 +124,12 @@ async fn test_implement_auto_failure_and_retry() {
         .arg("true"); // This doesn't matter since aider itself fails/succeeds
 
     let output = cmd.assert().success();
-    let stdout = String::from_utf8(output.get_output().stdout.clone()).unwrap();
+    let stderr = String::from_utf8(output.get_output().stderr.clone()).unwrap();
 
     // Check logs for both attempts
-    assert!(stdout.contains("Aider failed on attempt 1/5. Analyzing failure..."));
-    assert!(stdout.contains("Aider succeeded on attempt 2/5."));
-    assert!(stdout.contains("Committing changes with message: Implement: a retry objective"));
+    assert!(stderr.contains("Aider failed on attempt 1/5. Analyzing failure..."));
+    assert!(stderr.contains("Aider succeeded on attempt 2/5."));
+    assert!(stderr.contains("Committing changes with message: Implement: a retry objective"));
 
     let last_commit = env.get_last_commit_message();
     assert_eq!(last_commit, "Implement: a retry objective");
