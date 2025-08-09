@@ -15,6 +15,7 @@ fn generate_docs(crate_name: &str, current_dir: Option<&Path>) -> Result<PathBuf
         .unwrap_or_else(|| PathBuf::from("Cargo.toml"));
 
     let mut builder = Builder::default()
+        .toolchain("nightly")
         .package(crate_name)
         .manifest_path(&manifest_path)
         .quiet(true);
