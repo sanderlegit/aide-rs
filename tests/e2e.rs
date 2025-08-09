@@ -409,3 +409,148 @@ edition = "2021"
     let final_content = fs::read_to_string(env.full_path("src/lib.rs")).unwrap();
     assert!(final_content.contains("println!(\"go!\");"));
 }
+
+#[tokio::test]
+async fn test_e2e_plan_then_implement_flow() {
+    let env = TestEnv::new().await;
+    env.init_git_repo();
+
+    // 1. Create flow and context files
+    fs::create_dir_all(env.full_path("flows")).unwrap();
+    let plan_flow_content = fs::read_to_string("flows/plan.yml").unwrap();
+    env.create_file("flows/plan.yml", &plan_flow_content);
+    let implement_flow_content = fs::read_to_string("flows/implement.yml").unwrap();
+    env.create_file("flows/implement.yml", &implement_flow_content);
+
+    fs::create_dir_all(env.full_path("ctx")).unwrap();
+    let base_scope_content = fs::read_to_string("ctx/base.yaml").unwrap();
+    env.create_file("ctx/base.yaml", &base_scope_content);
+
+    // 2. Create prompt and initial project files
+    env.create_file(
+        "my_chained_prompt.yml",
+        r#"
+        objective: "Add a hello world function to lib.rs"
+        file_scoping:
+          include: ["src/lib.rs"]
+        "#,
+    );
+    env.create_file(
+        "Cargo.toml",
+        r#"[package]
+name = "test-project"
+version = "0.1.0"
+edition = "2021"
+"#,
+    );
+    env.create_file("src/lib.rs", "// Initial content\n");
+
+    // 3. Mock API call for 'plan' flow
+    let plan_response_body = json!({
+        "candidates": [{
+            "content": {
+                "parts": [{
+                    "functionCall": {
+                        "name": "create_task_list",
+                        "args": {
+                            "tasks": [
+                                { "id": "add-hello", "description": "Add hello_world function to src/lib.rs" }
+                            ]
+                        }
+                    }
+                }],
+                "role": "model"
+            }
+        }]
+    });
+
+    Mock::given(method("POST"))
+        .and(path_regex(
+            r"/v1beta/models/gemini-1.5-flash-latest:generateContent",
+        ))
+        .and(body_string_contains(
+            "break it down into a high-level list of task descriptions",
+        )) // Unique to plan.yml
+        .respond_with(ResponseTemplate::new(200).set_body_json(plan_response_body))
+        .mount(&env.mock_server)
+        .await;
+
+    // 4. Run the 'plan' command
+    let mut plan_cmd = get_aide_cmd();
+    env.apply_env(&mut plan_cmd);
+    plan_cmd.current_dir(env.path());
+    plan_cmd
+        .arg("run")
+        .arg("plan")
+        .arg("--prompt")
+        .arg("my_chained_prompt.yml");
+
+    let plan_output = plan_cmd.output().unwrap();
+    assert!(
+        plan_output.status.success(),
+        "Plan command failed. Stderr: {}",
+        String::from_utf8_lossy(&plan_output.stderr)
+    );
+
+    // Assert that the tasks file was created
+    let tasks_path = env.full_path(".ai/tasks.json");
+    assert!(tasks_path.exists());
+    let tasks_content = fs::read_to_string(&tasks_path).unwrap();
+    assert!(tasks_content.contains("add-hello"));
+
+    // 5. Mock API call for 'implement' flow
+    let impl_response = json!({
+        "candidates": [{
+            "content": {
+                "parts": [{
+                    "functionCall": {
+                        "name": "edit_file",
+                        "args": {
+                            "path": "src/lib.rs",
+                            "content": "pub fn hello_world() { println!(\"Hello, world!\"); }"
+                        }
+                    }
+                }],
+                "role": "model"
+            }
+        }]
+    });
+    Mock::given(method("POST"))
+        .and(path_regex(
+            r"/v1beta/models/gemini-1.5-flash-latest:generateContent",
+        ))
+        .and(body_string_contains(
+            "implement a single task from a pre-approved plan",
+        )) // Unique to implement.yml
+        .respond_with(ResponseTemplate::new(200).set_body_json(impl_response))
+        .mount(&env.mock_server)
+        .await;
+
+    // 6. Run the 'implement' command
+    let mut impl_cmd = get_aide_cmd();
+    env.apply_env(&mut impl_cmd);
+    impl_cmd.current_dir(env.path());
+    impl_cmd
+        .arg("run")
+        .arg("implement")
+        .arg("--prompt")
+        .arg("my_chained_prompt.yml")
+        .arg("--input-file")
+        .arg(".ai/tasks.json")
+        .arg("--input-id")
+        .arg("generate_tasks");
+
+    let impl_output = impl_cmd.output().unwrap();
+    assert!(
+        impl_output.status.success(),
+        "Implement command failed. Stderr: {}",
+        String::from_utf8_lossy(&impl_output.stderr)
+    );
+
+    // 7. Assert success and file modification
+    let stderr = String::from_utf8(impl_output.stderr).unwrap();
+    assert!(stderr.contains("Flow 'implement' finished."));
+
+    let final_content = fs::read_to_string(env.full_path("src/lib.rs")).unwrap();
+    assert!(final_content.contains("pub fn hello_world"));
+}

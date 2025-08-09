@@ -150,14 +150,16 @@ This new architecture requires significant changes to the codebase.
 
 ## 5. Migration Path: Replicating `plan` and `impl`
 
-The previous `plan` and `impl` functionality can be replicated as two separate flows.
+The previous `plan` and `impl` functionality is replicated as two separate flows, `plan` and `implement`, which can be chained together. A single, monolithic `code` flow is also provided as an example of a more complex, multi-stage workflow.
 
--   **`flows/plan.yml`**: A single-block flow that uses a prompt and the `task_creator` tool to generate a structured list of tasks, similar to the old `PlanAgent`.
--   **`flows/code.yml`**: A multi-stage flow that orchestrates the entire development process:
-    1.  **High-Level Plan Block**: Takes the user's objective and generates a detailed implementation plan in Markdown.
-    2.  **Structured Task Block**: Takes the Markdown plan and converts it into a structured list of task descriptions using a tool.
-    3.  **Implementation Loop Block**: This block is designed to be looped over by the `FlowRunner`. For each task description from the previous block (or a batch of them), it performs a two-step process:
-        -   **JIT Planning**: A prompt that takes the task description(s) and creates a detailed, structured `TaskPlan` (defining scopes, validation, etc.) for that specific work item.
-        -   **Implementation & Verification**: A prompt that takes the `TaskPlan` and implements the code, followed by a `verification` step (e.g., `command: "cargo check"`) to ensure correctness. The `FlowRunner` handles the retry loop on failure.
+-   **`flows/plan.yml`**: A single-block flow that uses a prompt and the `task_creator` tool to generate a structured list of tasks, similar to the old `PlanAgent`. The output of this flow is saved to a file (e.g., `.ai/tasks.json`).
 
-This demonstrates the power of the new system: core behaviors are no longer hardcoded but are flexible, composable workflows.
+-   **`flows/implement.yml`**: A flow designed to execute a list of tasks. It takes the output from the `plan` flow as an input.
+    -   It contains a single `implement_tasks` block with a `looping` strategy.
+    -   The `FlowRunner` iterates over the tasks provided in the input file.
+    -   For each task, it runs a prompt to implement the change using file system tools.
+    -   After each implementation attempt, it runs a `verification` step (e.g., `command: "cargo check"`) to ensure correctness and retries on failure.
+
+This separation demonstrates the power of the new system: core behaviors are no longer hardcoded but are flexible, composable workflows that can be chained together using the CLI. For example:
+1.  `aide-rs run plan --prompt <objective.yml>`
+2.  `aide-rs run implement --prompt <objective.yml> --input-file .ai/tasks.json --input-id generate_tasks`

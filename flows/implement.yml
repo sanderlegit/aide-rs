@@ -11,7 +11,7 @@ blocks:
       composition:
         - type: static_text
           content: |
-            You are an expert pair programmer. Your goal is to implement the current task.
+            You are an expert pair programmer. Your goal is to implement a single task from a pre-approved plan.
             Analyze the task description and the provided code. Use the available tools to modify files.
             If you are unsure about an API, use the `doc_retriever` tool to get documentation.
             Once you have made your changes, explain your solution.
