@@ -75,7 +75,13 @@ impl PromptBuilder {
                 } else {
                     block_outputs
                         .get(block_id)
-                        .and_then(|v| serde_json::to_string_pretty(v).ok())
+                        .map(|v| {
+                            if let Some(s) = v.as_str() {
+                                s.to_string()
+                            } else {
+                                serde_json::to_string_pretty(v).unwrap_or_default()
+                            }
+                        })
                         .unwrap_or_else(|| {
                             format!("Error: Output for block '{}' not found.", block_id)
                         })
