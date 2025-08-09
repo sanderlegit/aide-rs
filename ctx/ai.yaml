@@ -1,6 +1,0 @@
-description: "Adds context for working on the AI's own logic. Layer on top of 'base'."
-include:
-  - "ctx/**/*.yaml"
-  - "prompts/**/*.y*ml"
-  - "doc/refactor_architecture.md"
-exclude: []
