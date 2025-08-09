@@ -235,12 +235,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_fs_tool_write_and_read() {
-        let dir = tempdir().unwrap();
-        let original_dir = std::env::current_dir().unwrap();
-        std::env::set_current_dir(dir.path()).unwrap();
-
+        let dir = tempfile::Builder::new()
+            .prefix("test_fs_rw_")
+            .tempdir_in("target")
+            .unwrap();
         let tool = FileSystemTool;
-        let path = "test.txt";
+        let path = dir.path().join("test.txt");
         let content = "hello world";
 
         // Write
@@ -250,8 +250,11 @@ mod tests {
             "content": content
         });
         let result = tool.execute(write_args).await.unwrap();
-        assert_eq!(result, json!({"success": true, "path": path}));
-        assert_eq!(fs::read_to_string(path).unwrap(), content);
+        assert_eq!(
+            result,
+            json!({"success": true, "path": path.to_str().unwrap()})
+        );
+        assert_eq!(fs::read_to_string(&path).unwrap(), content);
 
         // Read
         let read_args = json!({
@@ -262,31 +265,32 @@ mod tests {
         assert_eq!(result, json!({"success": true, "content": content}));
 
         // Write to subdir
-        let path_subdir = "subdir/test.txt";
+        let path_subdir = dir.path().join("subdir/test.txt");
         let write_args_subdir = json!({
             "operation": "write",
             "path": path_subdir,
             "content": content
         });
         tool.execute(write_args_subdir).await.unwrap();
-        assert_eq!(fs::read_to_string(path_subdir).unwrap(), content);
-
-        std::env::set_current_dir(original_dir).unwrap();
+        assert_eq!(fs::read_to_string(&path_subdir).unwrap(), content);
     }
 
     #[tokio::test]
     async fn test_fs_tool_list() {
-        let dir = tempdir().unwrap();
-        let original_dir = std::env::current_dir().unwrap();
-        std::env::set_current_dir(dir.path()).unwrap();
-        fs::write("file1.txt", "a").unwrap();
-        fs::create_dir("subdir").unwrap();
-        fs::write("subdir/file2.txt", "b").unwrap();
+        let dir = tempfile::Builder::new()
+            .prefix("test_fs_list_")
+            .tempdir_in("target")
+            .unwrap();
+        let test_dir_path = dir.path();
+
+        fs::write(test_dir_path.join("file1.txt"), "a").unwrap();
+        fs::create_dir(test_dir_path.join("subdir")).unwrap();
+        fs::write(test_dir_path.join("subdir/file2.txt"), "b").unwrap();
 
         let tool = FileSystemTool;
         let list_args = json!({
             "operation": "list",
-            "path": "."
+            "path": test_dir_path.to_str().unwrap()
         });
         let result = tool.execute(list_args).await.unwrap();
         let mut files = result["files"]
@@ -296,19 +300,22 @@ mod tests {
             .map(|v| v.as_str().unwrap().to_string())
             .collect::<Vec<_>>();
         files.sort();
-        // Use Path::join to create platform-agnostic paths for comparison
-        let expected_file1 = std::path::Path::new(".").join("file1.txt");
-        let expected_subdir = std::path::Path::new(".").join("subdir");
+
         let mut expected = vec![
-            expected_file1.to_str().unwrap().to_string(),
-            expected_subdir.to_str().unwrap().to_string(),
+            test_dir_path
+                .join("file1.txt")
+                .to_str()
+                .unwrap()
+                .to_string(),
+            test_dir_path.join("subdir").to_str().unwrap().to_string(),
         ];
         expected.sort();
         assert_eq!(files, expected);
 
+        let subdir_path_str = test_dir_path.join("subdir").to_str().unwrap().to_string();
         let list_args_subdir = json!({
             "operation": "list",
-            "path": "subdir"
+            "path": subdir_path_str
         });
         let result_subdir = tool.execute(list_args_subdir).await.unwrap();
         let files_subdir = result_subdir["files"]
@@ -317,13 +324,11 @@ mod tests {
             .iter()
             .map(|v| v.as_str().unwrap().to_string())
             .collect::<Vec<_>>();
-        let expected_subdir_file = std::path::Path::new("subdir").join("file2.txt");
+        let expected_subdir_file = test_dir_path.join("subdir/file2.txt");
         assert_eq!(
             files_subdir,
             vec![expected_subdir_file.to_str().unwrap().to_string()]
         );
-
-        std::env::set_current_dir(original_dir).unwrap();
     }
 
     #[tokio::test]
