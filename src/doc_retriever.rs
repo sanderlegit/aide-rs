@@ -20,10 +20,23 @@ fn generate_docs(crate_name: &str, current_dir: Option<&Path>) -> Result<PathBuf
         .quiet(true);
 
     if let Some(dir) = &canonical_dir {
-        builder = builder.target_dir(dir.join("target")).current_dir(dir);
+        builder = builder.target_dir(dir.join("target"));
     }
 
-    builder.build().map_err(|e| {
+    // Temporarily change the current directory if a specific one is provided.
+    // This is necessary because `cargo rustdoc` can behave differently depending
+    // on the working directory, especially in workspace contexts.
+    let build_result = if let Some(dir) = &canonical_dir {
+        let original_dir = std::env::current_dir()?;
+        std::env::set_current_dir(dir)?;
+        let res = builder.build();
+        std::env::set_current_dir(original_dir)?;
+        res
+    } else {
+        builder.build()
+    };
+
+    build_result.map_err(|e| {
         Error::Config(format!(
             "Failed to build rustdoc for {}: {}",
             crate_name, e
