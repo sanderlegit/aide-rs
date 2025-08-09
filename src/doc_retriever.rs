@@ -315,7 +315,7 @@ pub mod my_module {
     fn test_get_module_docs() {
         let (_dir, crate_root) = setup_test_crate();
         let result =
-            get_module_docs("test_crate", "test_crate::my_module", Some(&crate_root)).unwrap();
+            get_item_docs("test_crate", "test_crate::my_module", Some(&crate_root)).unwrap();
 
         assert_eq!(result["type"], "module");
         assert_eq!(result["crate"], "test_crate");
@@ -331,7 +331,7 @@ pub mod my_module {
     fn test_get_type_docs_struct() {
         let (_dir, crate_root) = setup_test_crate();
         let result =
-            get_type_docs("test_crate", "test_crate::my_module::MyStruct", Some(&crate_root))
+            get_item_docs("test_crate", "test_crate::my_module::MyStruct", Some(&crate_root))
                 .unwrap();
 
         assert_eq!(result["type"], "struct");
