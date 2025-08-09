@@ -231,7 +231,7 @@ impl FlowRunner {
                 }])
             };
 
-            self.logger.log_prompt(PromptLog {
+            self.logger.log_prompt(&PromptLog {
                 model_name: gemini_client.model_name().to_string(),
                 system_prompt: "".to_string(), // We are using a user-style prompt for now
                 user_prompt: built_prompt.full_prompt,

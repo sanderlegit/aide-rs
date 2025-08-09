@@ -13,7 +13,7 @@ struct LogEntry<T> {
     payload: T,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct PromptLog {
     pub model_name: String,
@@ -133,9 +133,9 @@ impl RunLogger {
         }
     }
 
-    pub fn log_prompt(&self, mut log: PromptLog) {
-        let summary = if let Some(display) = log.display_prompt.take() {
-            display
+    pub fn log_prompt(&self, log: &PromptLog) {
+        let summary = if let Some(display) = &log.display_prompt {
+            display.clone()
         } else {
             // Fallback for prompts that don't use the new system, or for older logs.
             format!(
