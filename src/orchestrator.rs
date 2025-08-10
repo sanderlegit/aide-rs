@@ -152,7 +152,7 @@ impl Orchestrator {
 
         let response = self
             .gemini
-            .generate_content(contents, tools, model_override)
+            .generate_content(&contents, tools.as_ref(), model_override)
             .await?;
 
         let research_text = response
@@ -247,7 +247,7 @@ impl Orchestrator {
 
         let response = self
             .gemini
-            .generate_content(contents, None, model_override)
+            .generate_content(&contents, None, model_override)
             .await?;
 
         let plan_text = response
@@ -493,7 +493,7 @@ impl Orchestrator {
 
             let response = self
                 .gemini
-                .generate_content(contents, tools, model_override)
+                .generate_content(&contents, tools.as_ref(), model_override)
                 .await?;
 
             let mut retrieved_docs = "No documentation was retrieved.".to_string();
@@ -559,7 +559,7 @@ impl Orchestrator {
 
                         let retry_response = self
                             .gemini
-                            .generate_content(history, tools.clone(), model_override)
+                            .generate_content(&history, tools.as_ref(), model_override)
                             .await?;
 
                         let retry_function_call = retry_response

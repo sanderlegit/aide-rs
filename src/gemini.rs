@@ -41,14 +41,14 @@ impl GeminiClientWrapper {
 
     pub async fn generate_content(
         &self,
-        contents: Vec<Content>,
-        tools: Option<Vec<Tool>>,
+        contents: &[Content],
+        tools: Option<&Vec<Tool>>,
         model_override: Option<&str>,
     ) -> Result<GenerateContentResponse> {
         let start_time = Instant::now();
         let request_body = GenerateContentRequest {
-            contents,
-            tools,
+            contents: contents.to_vec(),
+            tools: tools.cloned(),
         };
 
         let model_to_use = model_override.unwrap_or(&self.model_name);

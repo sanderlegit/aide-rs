@@ -59,7 +59,7 @@ fn get_crate_docs_from_krate(krate: &Crate, crate_name: &str) -> Result<serde_js
     Ok(json!({
         "type": "crate",
         "name": crate_name,
-        "version": krate.crate_version.unwrap_or_default(),
+        "version": krate.crate_version.clone().unwrap_or_default(),
         "documentation": root_module.docs.clone().unwrap_or_default(),
         "modules": modules,
     }))
