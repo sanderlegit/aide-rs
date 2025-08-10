@@ -102,6 +102,8 @@ This loop will:
 
 The `run` command orchestrates a complete, non-interactive workflow from a single configuration file. This is ideal for CI/CD pipelines or complex, automated refactoring tasks.
 
+For a detailed breakdown of how a workflow file is executed, see the [annotated example workflow](doc/annotated_workflow.yml).
+
 First, create a YAML file (e.g., `feature.yml`) that defines a sequence of steps:
 ```yaml
 # feature.yml

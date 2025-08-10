@@ -81,7 +81,6 @@ impl Orchestrator {
         model_override: Option<&str>,
     ) -> Result<PathBuf> {
         let session = Session::new("research", &objective)?;
-        info!(objective, ?files, "Starting research strategy.");
 
         let research_prompt = format!(
             "Please research the following topic and provide a detailed summary in a markdown document.
@@ -148,7 +147,6 @@ impl Orchestrator {
                 .await?;
         }
 
-        self.logger.log_summary("Research strategy completed.");
         Ok(research_file_path)
     }
 
@@ -162,7 +160,6 @@ impl Orchestrator {
         model_override: Option<&str>,
     ) -> Result<PathBuf> {
         let session = Session::new("plan", &objective)?;
-        info!(objective, ?files, "Starting plan strategy.");
 
         let mut file_context = String::new();
         for file_path in &files {
@@ -233,7 +230,6 @@ impl Orchestrator {
                 .await?;
         }
 
-        self.logger.log_summary("Plan strategy completed.");
         Ok(plan_file_path)
     }
 
@@ -248,7 +244,6 @@ impl Orchestrator {
         model_override: Option<&str>,
     ) -> Result<()> {
         let session = Session::new("implement", &objective)?;
-        info!(objective, ?files, %validate_cmd, %auto, "Starting implement strategy.");
 
         let mut current_objective = format!(
             "Hello, can you help me with my implementation? I need to do the following:
@@ -388,6 +383,8 @@ impl Orchestrator {
         let mut plan_file_path: Option<PathBuf> = None;
         let mut research_file_path: Option<PathBuf> = None;
         let mut last_objective: Option<String> = None;
+        let total_steps = config.steps.len();
+        let mut step_number = 1;
 
         for step in config.steps {
             match step {
@@ -398,6 +395,10 @@ impl Orchestrator {
                     output,
                     files: extra_files,
                 } => {
+                    self.logger.log_summary(&format!(
+                        "\n--- Starting Step {}/{}: Research ---",
+                        step_number, total_steps
+                    ));
                     info!(objective = %objective, "Running research step.");
                     last_objective = Some(objective.clone());
                     let mut files =
@@ -412,12 +413,20 @@ impl Orchestrator {
                         .research(objective, files, false, output, model.as_deref())
                         .await?;
                     research_file_path = Some(path);
+                    self.logger.log_summary(&format!(
+                        "--- Completed Step {}/{}: Research ---\n",
+                        step_number, total_steps
+                    ));
                 }
                 StepConfig::Plan {
                     objective,
                     context,
                     model,
                 } => {
+                    self.logger.log_summary(&format!(
+                        "\n--- Starting Step {}/{}: Plan ---",
+                        step_number, total_steps
+                    ));
                     info!(objective = %objective, "Running plan step.");
                     last_objective = Some(objective.clone());
                     let files =
@@ -431,6 +440,10 @@ impl Orchestrator {
                         .plan(objective, files, false, research_content, model.as_deref())
                         .await?;
                     plan_file_path = Some(path);
+                    self.logger.log_summary(&format!(
+                        "--- Completed Step {}/{}: Plan ---\n",
+                        step_number, total_steps
+                    ));
                 }
                 StepConfig::Implement {
                     objective,
@@ -439,6 +452,10 @@ impl Orchestrator {
                     max_retries,
                     model,
                 } => {
+                    self.logger.log_summary(&format!(
+                        "\n--- Starting Step {}/{}: Implement ---",
+                        step_number, total_steps
+                    ));
                     info!(objective = %objective, "Running implement step.");
                     let mut files =
                         file_provider::get_files(&[".".to_string()], Some(&context), None)?;
@@ -467,8 +484,13 @@ impl Orchestrator {
                         model.as_deref(),
                     )
                     .await?;
+                    self.logger.log_summary(&format!(
+                        "--- Completed Step {}/{}: Implement ---\n",
+                        step_number, total_steps
+                    ));
                 }
             }
+            step_number += 1;
         }
 
         self.logger
