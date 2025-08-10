@@ -294,14 +294,30 @@ impl Orchestrator {
                 .await?;
 
             if result.success {
+                // Aider exits with 0 if validation passes. We need to check if it made
+                // any changes to determine if the task is complete.
+                if result.stdout.contains("No changes were applied.") {
+                    self.logger.log_summary(&format!(
+                        "Aider reported no changes on attempt {}/{}. Assuming completion.",
+                        i + 1,
+                        max_retries
+                    ));
+                    self.logger
+                        .log_summary("Implement strategy completed successfully.");
+                    return Ok(());
+                }
+
                 self.logger.log_summary(&format!(
-                    "Aider succeeded on attempt {}/{}.",
+                    "Aider succeeded on attempt {}/{}. Continuing with plan.",
                     i + 1,
                     max_retries
                 ));
                 self.logger
-                    .log_summary("Aider has committed the changes.");
-                return Ok(());
+                    .log_summary("Aider has committed the changes. Checking for next step.");
+                current_objective =
+                    "The previous changes were successful. Please continue implementing the plan."
+                        .to_string();
+                continue;
             }
 
             self.logger.log_summary(&format!(

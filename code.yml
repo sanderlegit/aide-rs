@@ -53,4 +53,3 @@ steps:
     validate_cmd: "make test"
     max_retries: 10
     allow_shell_commands: true
-    allow_shell_commands: true
