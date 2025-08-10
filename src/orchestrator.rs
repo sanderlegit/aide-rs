@@ -323,8 +323,6 @@ impl Orchestrator {
         allow_shell_commands: bool,
         continue_on_success: bool,
         pre_validate: bool,
-        continue_on_success: bool,
-        pre_validate: bool,
     ) -> Result<()> {
         self.logger.log_summary("Starting implement strategy.");
         let session = Session::new("implement", &objective)?;

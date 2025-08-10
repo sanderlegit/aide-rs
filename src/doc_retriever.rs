@@ -1,6 +1,6 @@
 use crate::error::{Error, Result};
 use rustdoc_json::Builder;
-use rustdoc_types::{Crate, Id, Item, ItemEnum, Module, Struct, Type};
+use rustdoc_types::{Crate, Id, Item, ItemEnum, Module, Type};
 use serde_json::json;
 use std::path::{Path, PathBuf};
 
