@@ -1,4 +1,4 @@
-use crate::error::{Error, Result};
+use crate::error::Result;
 use ignore::{overrides::OverrideBuilder, WalkBuilder};
 use std::fs;
 use std::path::Path;

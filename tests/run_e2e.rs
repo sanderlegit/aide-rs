@@ -13,6 +13,10 @@ use wiremock::{
 #[tokio::test]
 async fn test_run_command_e2e() {
     let env = TestEnv::new().await;
+    println!(
+        "Test temp dir for run_command_e2e: {}",
+        env.path().display()
+    );
     env.init_git_repo();
 
     // 1. Create config file for the `run` command
@@ -80,6 +84,10 @@ validate_cmd: "true"
 #[tokio::test]
 async fn test_plan_command_e2e() {
     let env = TestEnv::new().await;
+    println!(
+        "Test temp dir for plan_command_e2e: {}",
+        env.path().display()
+    );
     env.init_git_repo();
     env.create_file("src/main.rs", "fn main() {}");
 
@@ -154,7 +162,12 @@ async fn test_plan_command_e2e() {
 #[tokio::test]
 async fn test_research_command_e2e() {
     let env = TestEnv::new().await;
+    println!(
+        "Test temp dir for research_command_e2e: {}",
+        env.path().display()
+    );
     env.init_git_repo();
+    env.create_file("src/main.rs", "fn main() {}");
 
     // 1. Mock Gemini for the 'research' stage
     let research_response = json!({
@@ -225,6 +238,10 @@ async fn test_research_command_e2e() {
 #[tokio::test]
 async fn test_run_command_e2e_with_debug_loop() {
     let env = TestEnv::new().await;
+    println!(
+        "Test temp dir for run_command_e2e_with_debug_loop: {}",
+        env.path().display()
+    );
     env.init_git_repo();
 
     // 1. Create a test crate for doc_retriever to use

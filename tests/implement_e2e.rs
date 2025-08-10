@@ -13,6 +13,10 @@ use wiremock::{
 #[tokio::test]
 async fn test_implement_auto_success_on_first_try() {
     let env = TestEnv::new().await;
+    println!(
+        "Test temp dir for implement_auto_success_on_first_try: {}",
+        env.path().display()
+    );
     env.init_git_repo();
     env.create_file("src/main.rs", "fn main() {}");
 
@@ -56,6 +60,10 @@ async fn test_implement_auto_success_on_first_try() {
 #[tokio::test]
 async fn test_implement_auto_failure_and_retry() {
     let env = TestEnv::new().await;
+    println!(
+        "Test temp dir for implement_auto_failure_and_retry: {}",
+        env.path().display()
+    );
 
     // Mock the Gemini API for the debug step.
     // It should suggest using the doc_retriever tool.
@@ -139,6 +147,10 @@ async fn test_implement_auto_failure_and_retry() {
 #[tokio::test]
 async fn test_implement_auto_failure_and_debug_with_docs() {
     let env = TestEnv::new().await;
+    println!(
+        "Test temp dir for implement_auto_failure_and_debug_with_docs: {}",
+        env.path().display()
+    );
 
     // 1. Setup a test crate that will be used by doc_retriever
     let lib_content = r#"
