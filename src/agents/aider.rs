@@ -37,6 +37,12 @@ impl AiderWrapper {
         // The first part of the split is the command itself.
         let command_name = args.remove(0);
 
+        // In auto mode, prevent aider from checking for updates, which can cause it
+        // to crash in a non-interactive environment.
+        if auto && !args.iter().any(|arg| arg == "--no-check-update") {
+            args.push("--no-check-update".to_string());
+        }
+
         // Add session-specific arguments
         args.push("--chat-history-file".to_string());
         args.push(
