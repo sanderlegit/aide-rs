@@ -80,11 +80,10 @@ steps:
     assert!(stderr.contains("Plan saved to"));
     assert!(stderr.contains("Running implement step."));
     assert!(stderr.contains("Aider succeeded on attempt 1/5."));
-    assert!(stderr.contains("Committing changes"));
+    assert!(stderr.contains("Aider has committed the changes."));
 
-    let last_commit = env.get_last_commit_message();
-    assert!(last_commit.contains("Implement: Implement the tasks described in the plan file"));
-    assert!(last_commit.contains("The original objective was: Implement a new feature"));
+    // Since aider is mocked, we can't check the commit message directly.
+    // We just check that the flow completes.
 }
 
 #[tokio::test]
@@ -118,11 +117,15 @@ async fn test_plan_command_e2e() {
     let aider_prompt_file = env.full_path("aider_prompt.txt");
     let script_content = format!(
         r#"#!/bin/bash
-        # The prompt is passed via --message. The arguments are:
-        # $1: --chat-history-file, $2: <path>, $3: src/main.rs, $4: <plan.md>, $5: --message, $6: <prompt>
-        echo "$6" > {}
-        exit 0
-        "#,
+                for i in $(seq 1 $#); do
+                    if [ "${{!i}}" == "--message" ]; then
+                        j=$((i+1))
+                        echo "${{!j}}" > {}
+                        break
+                    fi
+                done
+                exit 0
+                "#,
         aider_prompt_file.to_str().unwrap()
     );
     fs::write(&mock_aider_path, script_content).unwrap();
@@ -196,11 +199,15 @@ async fn test_research_command_e2e() {
     let aider_prompt_file = env.full_path("aider_prompt.txt");
     let script_content = format!(
         r#"#!/bin/bash
-        # The prompt is passed via --message. The arguments are:
-        # $1: --chat-history-file, $2: <path>, $3: <research.md>, $4: --message, $5: <prompt>
-        echo "$5" > {}
-        exit 0
-        "#,
+                for i in $(seq 1 $#); do
+                    if [ "${{!i}}" == "--message" ]; then
+                        j=$((i+1))
+                        echo "${{!j}}" > {}
+                        break
+                    fi
+                done
+                exit 0
+                "#,
         aider_prompt_file.to_str().unwrap()
     );
     fs::write(&mock_aider_path, script_content).unwrap();
@@ -319,9 +326,15 @@ steps:
             echo "1" > {counter}
             exit 1
         else
-            # On second run, capture all arguments (which includes the prompt with docs) and succeed
+            # On second run, capture the prompt and succeed
             echo "second run, succeeding"
-            echo "$*" > {docs_prompt}
+            for i in $(seq 1 $#); do
+                if [ "${{!i}}" == "--message" ]; then
+                    j=$((i+1))
+                    echo "${{!j}}" > {docs_prompt}
+                    break
+                fi
+            done
             exit 0
         fi
         "#,
@@ -356,14 +369,10 @@ steps:
     assert!(stderr.contains("Gemini requested a tool call for debugging"));
     assert!(stderr.contains("Retrieved documentation"));
     assert!(stderr.contains("Aider succeeded on attempt 2/5."));
-    assert!(stderr.contains("Committing changes"));
+    assert!(stderr.contains("Aider has committed the changes."));
 
-    // Check that the final commit was made with the right message
-    let last_commit = env.get_last_commit_message();
-    assert!(last_commit.contains("Implement: Implement the tasks described in the plan file"));
-    assert!(last_commit.contains(
-        "The original objective was: Implement a feature that will initially fail"
-    ));
+    // Since aider is mocked, we can't check the commit message directly.
+    // We just check that the flow completes.
 
     // Check that the docs were passed to aider on the second run
     let final_prompt = fs::read_to_string(docs_prompt_file).unwrap();

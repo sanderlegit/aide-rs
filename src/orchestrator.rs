@@ -33,6 +33,8 @@ enum StepConfig {
         validate_cmd: String,
         max_retries: Option<u32>,
         model: Option<String>,
+        #[serde(default)]
+        allow_shell_commands: bool,
     },
 }
 
@@ -80,6 +82,7 @@ impl Orchestrator {
         output_path: Option<String>,
         model_override: Option<&str>,
     ) -> Result<PathBuf> {
+        self.logger.log_summary("Starting research strategy.");
         let session = Session::new("research", &objective)?;
 
         let research_prompt = format!(
@@ -143,6 +146,7 @@ impl Orchestrator {
                     "Here is the research document I generated. Please review it.",
                     false,
                     None,
+                    true,
                 )
                 .await?;
         }
@@ -159,6 +163,7 @@ impl Orchestrator {
         research_context: Option<String>,
         model_override: Option<&str>,
     ) -> Result<PathBuf> {
+        self.logger.log_summary("Starting plan strategy.");
         let session = Session::new("plan", &objective)?;
 
         let mut file_context = String::new();
@@ -226,6 +231,7 @@ impl Orchestrator {
                     ),
                     false,
                     None,
+                    true,
                 )
                 .await?;
         }
@@ -242,7 +248,9 @@ impl Orchestrator {
         auto: bool,
         max_retries: u32,
         model_override: Option<&str>,
+        allow_shell_commands: bool,
     ) -> Result<()> {
+        self.logger.log_summary("Starting implement strategy.");
         let session = Session::new("implement", &objective)?;
 
         let mut current_objective = format!(
@@ -256,7 +264,14 @@ impl Orchestrator {
 
         if !auto {
             self.aider
-                .run(&session, files, &current_objective, false, None)
+                .run(
+                    &session,
+                    files,
+                    &current_objective,
+                    false,
+                    None,
+                    allow_shell_commands,
+                )
                 .await?;
             self.logger
                 .log_summary("Implement strategy completed (interactive).");
@@ -275,6 +290,7 @@ impl Orchestrator {
                     &current_objective,
                     true,
                     Some(validate_cmd.clone()),
+                    allow_shell_commands,
                 )
                 .await?;
 
@@ -284,14 +300,8 @@ impl Orchestrator {
                     i + 1,
                     max_retries
                 ));
-                let commit_message = format!("Implement: {}", objective);
-                self.logger.log_summary(&format!(
-                    "Committing changes with message: {}",
-                    commit_message
-                ));
-                let repo_path = std::env::current_dir()?;
-                let file_paths = files.iter().map(std::path::PathBuf::from).collect::<Vec<_>>();
-                vcs::add_and_commit(&repo_path, &file_paths, &commit_message)?;
+                self.logger
+                    .log_summary("Aider has committed the changes.");
                 return Ok(());
             }
 
@@ -451,6 +461,7 @@ impl Orchestrator {
                     validate_cmd,
                     max_retries,
                     model,
+                    allow_shell_commands,
                 } => {
                     self.logger.log_summary(&format!(
                         "\n--- Starting Step {}/{}: Implement ---",
@@ -482,6 +493,7 @@ impl Orchestrator {
                         true,
                         max_retries.unwrap_or(5),
                         model.as_deref(),
+                        allow_shell_commands,
                     )
                     .await?;
                     self.logger.log_summary(&format!(

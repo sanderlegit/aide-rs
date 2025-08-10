@@ -25,6 +25,7 @@ impl AiderWrapper {
         message: &str,
         auto: bool,
         validate_cmd: Option<String>,
+        allow_shell_commands: bool,
     ) -> Result<AiderRunResult> {
         let base_command = env::var("AIDER_COMMAND")
             .map_err(|_| Error::Config("AIDER_COMMAND environment variable not set.".to_string()))?;
@@ -47,13 +48,18 @@ impl AiderWrapper {
             if !args.iter().any(|arg| arg == "--yes-always" || arg == "--yes") {
                 args.push("--yes-always".to_string());
             }
-            // We manage commits, so disable aider's auto-commits
-            if !args.iter().any(|arg| arg == "--no-auto-commits") {
-                args.push("--no-auto-commits".to_string());
-            }
             // Disable streaming for cleaner logs in auto mode
             if !args.iter().any(|arg| arg == "--no-stream") {
                 args.push("--no-stream".to_string());
+            }
+            // Do not allow using URLs
+            if !args.iter().any(|arg| arg == "--no-detect-urls") {
+                args.push("--no-detect-urls".to_string());
+            }
+            // Do not allow running commands unless explicitly allowed
+            if !allow_shell_commands && !args.iter().any(|arg| arg == "--no-suggest-shell-commands")
+            {
+                args.push("--no-suggest-shell-commands".to_string());
             }
         }
 

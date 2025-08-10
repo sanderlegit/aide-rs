@@ -51,10 +51,10 @@ async fn test_implement_auto_success_on_first_try() {
     assert!(stderr.contains("Starting implement strategy."));
     assert!(stderr.contains("Running aider in auto mode."));
     assert!(stderr.contains("Aider succeeded on attempt 1/5."));
-    assert!(stderr.contains("Committing changes with message: Implement: a test objective"));
+    assert!(stderr.contains("Aider has committed the changes."));
 
-    let last_commit = env.get_last_commit_message();
-    assert_eq!(last_commit, "Implement: a test objective");
+    // Since aider is mocked, we can't check the commit message directly.
+    // We just check that the flow completes.
 }
 
 #[tokio::test]
@@ -138,10 +138,10 @@ async fn test_implement_auto_failure_and_retry() {
     // Check logs for both attempts
     assert!(stderr.contains("Aider failed on attempt 1/5. Analyzing failure..."));
     assert!(stderr.contains("Aider succeeded on attempt 2/5."));
-    assert!(stderr.contains("Committing changes with message: Implement: a retry objective"));
+    assert!(stderr.contains("Aider has committed the changes."));
 
-    let last_commit = env.get_last_commit_message();
-    assert_eq!(last_commit, "Implement: a retry objective");
+    // Since aider is mocked, we can't check the commit message directly.
+    // We just check that the flow completes.
 }
 
 #[tokio::test]
@@ -202,9 +202,13 @@ async fn test_implement_auto_failure_and_debug_with_docs() {
         else
             # On second run, capture the prompt and succeed
             echo "second run, succeeding"
-            # The prompt is passed via --message. The arguments are:
-            # $1: --chat-history-file, $2: <path>, $3: src/main.rs, $4: --message, $5: <prompt>
-            echo "$5" > {docs_prompt}
+            for i in $(seq 1 $#); do
+                if [ "${{!i}}" == "--message" ]; then
+                    j=$((i+1))
+                    echo "${{!j}}" > {docs_prompt}
+                    break
+                fi
+            done
             exit 0
         fi
         "#,

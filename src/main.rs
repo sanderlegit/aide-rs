@@ -73,6 +73,7 @@ async fn run() -> Result<()> {
             auto,
             context,
             max_retries,
+            allow_shell_commands,
         } => {
             let files_to_provide = if let Some(context_name) = &context {
                 file_provider::get_files(&[".".to_string()], Some(context_name), None)?
@@ -91,6 +92,7 @@ async fn run() -> Result<()> {
                     auto,
                     max_retries,
                     None,
+                    allow_shell_commands,
                 )
                 .await?;
         }

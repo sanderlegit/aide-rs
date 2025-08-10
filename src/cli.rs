@@ -56,6 +56,9 @@ pub enum Commands {
         /// The maximum number of retries for the automated loop.
         #[arg(long, default_value = "5")]
         max_retries: u32,
+        /// Allow aider to suggest and run shell commands.
+        #[arg(long)]
+        allow_shell_commands: bool,
     },
     /// Execute a non-interactive, multi-stage workflow from a config file.
     Run {
