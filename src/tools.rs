@@ -2,7 +2,6 @@ use crate::error::{Error, Result};
 use crate::gemini_types::{FunctionCall, FunctionDeclaration};
 use async_trait::async_trait;
 use serde::Deserialize;
-use serde_json::json;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::debug;
