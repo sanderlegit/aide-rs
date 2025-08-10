@@ -21,6 +21,9 @@ pub enum Commands {
         /// The context name for file filtering (e.g., 'all', 'backend'). Overrides `files`.
         #[arg(long)]
         context: Option<String>,
+        /// Optional. The path to save the research output file.
+        #[arg(long)]
+        output: Option<String>,
     },
     /// Launch a planning session to break an objective into a task list.
     Plan {

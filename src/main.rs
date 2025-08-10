@@ -35,6 +35,7 @@ async fn run() -> Result<()> {
             objective,
             files,
             context,
+            output,
         } => {
             let files_to_provide = if let Some(context_name) = &context {
                 file_provider::get_files(&[".".to_string()], Some(context_name), None)?
@@ -43,7 +44,9 @@ async fn run() -> Result<()> {
             } else {
                 vec![]
             };
-            orchestrator.research(objective, files_to_provide, true).await?;
+            orchestrator
+                .research(objective, files_to_provide, true, output)
+                .await?;
         }
         Commands::Plan {
             objective,

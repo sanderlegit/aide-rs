@@ -70,6 +70,7 @@ impl Orchestrator {
         objective: String,
         files: Vec<String>,
         interactive: bool,
+        output_path: Option<String>,
     ) -> Result<PathBuf> {
         let session = Session::new("research", &objective)?;
         info!(objective, ?files, "Starting research strategy.");
@@ -106,7 +107,11 @@ impl Orchestrator {
             .and_then(|p| p.text)
             .unwrap_or_else(|| "No response text from Gemini.".to_string());
 
-        let research_file_path = session.dir.join("research.md");
+        let research_file_path = if let Some(path_str) = output_path {
+            PathBuf::from(path_str)
+        } else {
+            session.dir.join("research.md")
+        };
         std::fs::write(&research_file_path, &research_text)?;
 
         self.logger.log_summary(&format!(
@@ -363,7 +368,7 @@ impl Orchestrator {
                     last_objective = Some(objective.clone());
                     let files =
                         file_provider::get_files(&[".".to_string()], Some(&context), None)?;
-                    let path = self.research(objective, files, false).await?;
+                    let path = self.research(objective, files, false, None).await?;
                     research_file_path = Some(path);
                 }
                 StepConfig::Plan { objective, context } => {
