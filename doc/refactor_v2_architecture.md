@@ -73,11 +73,12 @@ These strategies define the high-level workflows the `Orchestrator` can execute.
 This is the core automated workflow, which orchestrates `aider`'s test-driven development capabilities.
 1.  **Initiate**: User runs `aide-rs implement "my task" --auto --validate-cmd "cargo check"`.
 2.  **Session Start**: A new session is created. The `Orchestrator` enters a retry loop.
-3.  **Delegate to Aider**: `Orchestrator` calls `AiderWrapper`, providing the task and passing the validation command to `aider`'s `--test-cmd` argument.
-4.  **Aider's Internal Loop**: `aider` applies the code changes suggested by its LLM, then immediately runs the validation command (`cargo check`).
-5.  **Check Result**: `aide-rs` checks the exit status of the `aider` process.
-    -   **On Success (Validation Passes)**: `aider` will have run the validation command successfully, committed the changes, and exited with a status code of 0. The `aide-rs` loop terminates, reporting success.
-    -   **On Failure (Validation Fails)**: `aider` exits with a non-zero status code. `aide-rs` captures the `stdout` and `stderr` from the failed validation.
+3.  **Delegate to Aider**: `Orchestrator` calls `AiderWrapper`, providing the task.
+4.  **Aider Commits**: `aider` applies code changes and commits them.
+5.  **Validate**: `aide-rs` runs the validation command itself.
+6.  **Check Result**:
+    -   **On Success**: The loop terminates.
+    -   **On Failure**: `aide-rs` reverts the commit. It then captures the `stdout` and `stderr` from the failed validation.
         a. The test failure output is captured.
         b. `Orchestrator` calls `GeminiWrapper` in "Debug Mode" with the error, asking it to identify relevant APIs or concepts to look up.
         c. The Gemini response is used to invoke our `doc_retriever` tool.

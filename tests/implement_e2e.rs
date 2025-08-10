@@ -50,11 +50,8 @@ async fn test_implement_auto_success_on_first_try() {
 
     assert!(stderr.contains("Starting implement strategy."));
     assert!(stderr.contains("Running aider in auto mode."));
-    assert!(stderr.contains("Aider succeeded on attempt 1/5."));
-    assert!(stderr.contains("Aider has committed the changes."));
-
-    // Since aider is mocked, we can't check the commit message directly.
-    // We just check that the flow completes.
+    assert!(stderr.contains("Running validation command."));
+    assert!(stderr.contains("Validation passed on attempt 1/5."));
 }
 
 #[tokio::test]
@@ -66,17 +63,11 @@ async fn test_implement_auto_failure_and_retry() {
     );
 
     // Mock the Gemini API for the debug step.
-    // It should suggest using the doc_retriever tool.
     let mock_response = json!({
         "candidates": [{
             "content": {
                 "role": "model",
-                "parts": [{
-                    "functionCall": {
-                        "name": "doc_retriever",
-                        "args": { "crate_name": "some_crate", "path": "some_crate::some_module" }
-                    }
-                }]
+                "parts": [{"functionCall": { "name": "doc_retriever", "args": { "crate_name": "some_crate", "path": "some_crate::some_module" } } }]
             },
             "finishReason": "TOOL_USE"
         }]
@@ -90,33 +81,38 @@ async fn test_implement_auto_failure_and_retry() {
     env.init_git_repo();
     env.create_file("src/main.rs", "fn main() {}");
 
-    // This mock script will fail on the first run and succeed on the second.
-    // We'll use a counter file to track runs.
-    let counter_file = env.full_path("run_count.txt");
-    fs::write(&counter_file, "0").unwrap();
-
+    // Mock `aider` to always succeed.
     let mock_aider_path = env.full_path("mock_aider.sh");
-    let script_content = format!(
-        r#"#!/bin/bash
-        RUN_COUNT=$(cat {counter})
-        if [ "$RUN_COUNT" -eq "0" ]; then
-            echo "first run, failing"
-            echo "0" > {main_rs} # make a change
-            echo "1" > {counter}
-            exit 1
-        else
-            echo "second run, succeeding"
-            echo "1" > {main_rs} # make another change
-            exit 0
-        fi
-        "#,
-        counter = counter_file.to_str().unwrap(),
-        main_rs = env.full_path("src/main.rs").to_str().unwrap()
-    );
+    let script_content = "#!/bin/bash\necho 'aider made a change'\nexit 0";
     fs::write(&mock_aider_path, script_content).unwrap();
     StdCommand::new("chmod")
         .arg("+x")
         .arg(&mock_aider_path)
+        .status()
+        .unwrap();
+
+    // Mock validation command to fail once, then succeed.
+    let counter_file = env.full_path("run_count.txt");
+    fs::write(&counter_file, "0").unwrap();
+    let mock_validate_path = env.full_path("mock_validate.sh");
+    let validate_script = format!(
+        r#"#!/bin/bash
+        RUN_COUNT=$(cat {counter})
+        if [ "$RUN_COUNT" -eq "0" ]; then
+            echo "validation failing"
+            echo "1" > {counter}
+            exit 1
+        else
+            echo "validation succeeding"
+            exit 0
+        fi
+        "#,
+        counter = counter_file.to_str().unwrap()
+    );
+    fs::write(&mock_validate_path, validate_script).unwrap();
+    StdCommand::new("chmod")
+        .arg("+x")
+        .arg(&mock_validate_path)
         .status()
         .unwrap();
 
@@ -130,18 +126,14 @@ async fn test_implement_auto_failure_and_retry() {
         .arg("src/main.rs")
         .arg("--auto")
         .arg("--validate-cmd")
-        .arg("true"); // This doesn't matter since aider itself fails/succeeds
+        .arg(mock_validate_path.to_str().unwrap());
 
     let output = cmd.assert().success();
     let stderr = String::from_utf8(output.get_output().stderr.clone()).unwrap();
 
     // Check logs for both attempts
-    assert!(stderr.contains("Aider failed on attempt 1/5. Analyzing failure..."));
-    assert!(stderr.contains("Aider succeeded on attempt 2/5."));
-    assert!(stderr.contains("Aider has committed the changes."));
-
-    // Since aider is mocked, we can't check the commit message directly.
-    // We just check that the flow completes.
+    assert!(stderr.contains("Validation failed on attempt 1/5. Analyzing failure..."));
+    assert!(stderr.contains("Validation passed on attempt 2/5."));
 }
 
 #[tokio::test]
@@ -165,12 +157,7 @@ async fn test_implement_auto_failure_and_debug_with_docs() {
         "candidates": [{
             "content": {
                 "role": "model",
-                "parts": [{
-                    "functionCall": {
-                        "name": "doc_retriever",
-                        "args": { "crate_name": "test_crate", "path": "test_crate::old_function" }
-                    }
-                }]
+                "parts": [{"functionCall": { "name": "doc_retriever", "args": { "crate_name": "test_crate", "path": "test_crate::old_function" } } }]
             },
             "finishReason": "TOOL_USE"
         }]
@@ -182,11 +169,9 @@ async fn test_implement_auto_failure_and_debug_with_docs() {
         .await;
 
     env.init_git_repo();
-    // The file to be "edited" by aider.
     env.create_file("src/main.rs", "fn main() {}");
 
-    // 3. Mock aider to fail the first time, and succeed the second time.
-    // The second run's prompt will be checked to see if it contains the docs.
+    // 3. Mock aider to always succeed, but capture the prompt on the second run.
     let counter_file = env.full_path("run_count.txt");
     fs::write(&counter_file, "0").unwrap();
     let docs_prompt_file = env.full_path("docs_prompt.txt");
@@ -196,12 +181,12 @@ async fn test_implement_auto_failure_and_debug_with_docs() {
         r#"#!/bin/bash
         RUN_COUNT=$(cat {counter})
         if [ "$RUN_COUNT" -eq "0" ]; then
-            echo "first run, failing"
+            echo "first aider run"
             echo "1" > {counter}
-            exit 1
+            exit 0
         else
             # On second run, capture the prompt and succeed
-            echo "second run, succeeding"
+            echo "second aider run"
             for i in $(seq 1 $#); do
                 if [ "${{!i}}" == "--message" ]; then
                     j=$((i+1))
@@ -222,6 +207,31 @@ async fn test_implement_auto_failure_and_debug_with_docs() {
         .status()
         .unwrap();
 
+    // 4. Mock validation command to fail once, then succeed.
+    let validate_counter_file = env.full_path("validate_run_count.txt");
+    fs::write(&validate_counter_file, "0").unwrap();
+    let mock_validate_path = env.full_path("mock_validate.sh");
+    let validate_script = format!(
+        r#"#!/bin/bash
+        RUN_COUNT=$(cat {counter})
+        if [ "$RUN_COUNT" -eq "0" ]; then
+            echo "validation failing"
+            echo "1" > {counter}
+            exit 1
+        else
+            echo "validation succeeding"
+            exit 0
+        fi
+        "#,
+        counter = validate_counter_file.to_str().unwrap()
+    );
+    fs::write(&mock_validate_path, validate_script).unwrap();
+    StdCommand::new("chmod")
+        .arg("+x")
+        .arg(&mock_validate_path)
+        .status()
+        .unwrap();
+
     let mut cmd = Command::cargo_bin("aide-rs").unwrap();
     cmd.current_dir(env.path());
     env.apply_env(&mut cmd);
@@ -232,16 +242,16 @@ async fn test_implement_auto_failure_and_debug_with_docs() {
         .arg("src/main.rs")
         .arg("--auto")
         .arg("--validate-cmd")
-        .arg("true");
+        .arg(mock_validate_path.to_str().unwrap());
 
     let output = cmd.assert().success();
     let stderr = String::from_utf8(output.get_output().stderr.clone()).unwrap();
 
-    // 4. Assertions
-    assert!(stderr.contains("Aider failed on attempt 1/5. Analyzing failure..."));
+    // 5. Assertions
+    assert!(stderr.contains("Validation failed on attempt 1/5. Analyzing failure..."));
     assert!(stderr.contains("Gemini requested a tool call for debugging"));
     assert!(stderr.contains("Retrieved documentation"));
-    assert!(stderr.contains("Aider succeeded on attempt 2/5."));
+    assert!(stderr.contains("Validation passed on attempt 2/5."));
 
     let final_prompt = fs::read_to_string(docs_prompt_file).unwrap();
     assert!(final_prompt.contains("pub fn old_function()"));

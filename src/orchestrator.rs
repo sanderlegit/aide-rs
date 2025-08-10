@@ -8,7 +8,47 @@ use crate::tools::ToolExecutor;
 use serde::Deserialize;
 use std::path::PathBuf;
 use std::time::Instant;
+use tokio::process::Command;
 use tracing::{error, info};
+
+struct CommandResult {
+    success: bool,
+    exit_code: i32,
+    stdout: String,
+    stderr: String,
+}
+
+async fn run_shell_command(command_str: &str) -> CommandResult {
+    let mut parts = command_str.split_whitespace();
+    let command = parts.next().unwrap_or("");
+    let args: Vec<&str> = parts.collect();
+
+    if command.is_empty() {
+        return CommandResult {
+            success: false,
+            exit_code: -1,
+            stdout: String::new(),
+            stderr: "No command provided.".to_string(),
+        };
+    }
+
+    let output = Command::new(command).args(&args).output().await;
+
+    match output {
+        Ok(out) => CommandResult {
+            success: out.status.success(),
+            exit_code: out.status.code().unwrap_or(-1),
+            stdout: String::from_utf8_lossy(&out.stdout).to_string(),
+            stderr: String::from_utf8_lossy(&out.stderr).to_string(),
+        },
+        Err(e) => CommandResult {
+            success: false,
+            exit_code: -1,
+            stdout: String::new(),
+            stderr: e.to_string(),
+        },
+    }
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", tag = "type")]
@@ -244,18 +284,16 @@ impl Orchestrator {
     /// In automated mode (`auto = true`), this function orchestrates `aider` in a
     /// validation-driven loop. The process is as follows:
     ///
-    /// 1.  `aide-rs` invokes `aider` with the provided objective and passes the
-    ///     `validate_cmd` to `aider`'s `--test-cmd` argument.
-    /// 2.  `aider` attempts to modify the code based on the objective. After
-    ///     applying changes, it automatically runs the `validate_cmd`.
-    /// 3.  **If `validate_cmd` succeeds**: `aider` commits the changes and exits with
-    ///     a success code. `aide-rs` detects this and, depending on the
-    ///     `continue_on_success` flag, will either terminate the loop or continue
-    ///     with a new prompt to implement the next part of a plan.
-    /// 4.  **If `validate_cmd` fails**: `aider` exits with a failure code. `aide-rs`
-    ///     captures the output, uses the Gemini model to analyze the error, and
-    ///     fetches relevant documentation via the `doc_retriever` tool.
-    /// 5.  The loop repeats with a new, context-enriched prompt for `aider`,
+    /// 1.  `aide-rs` invokes `aider` with the provided objective.
+    /// 2.  `aider` attempts to modify the code and commits its changes.
+    /// 3.  After `aider` finishes, `aide-rs` runs the `validate_cmd`.
+    /// 4.  **If `validate_cmd` succeeds**: `aide-rs` considers the step successful.
+    ///     Depending on the `continue_on_success` flag, it will either terminate
+    ///     the loop or continue with a new prompt to implement the next part of a plan.
+    /// 5.  **If `validate_cmd` fails**: `aide-rs` reverts `aider`'s commit,
+    ///     captures the error output, uses the Gemini model to analyze the error,
+    ///     and fetches relevant documentation via the `doc_retriever` tool.
+    /// 6.  The loop repeats with a new, context-enriched prompt for `aider`,
     //      containing the error and the retrieved documentation, until the
     //      `max_retries` limit is reached.
     #[tracing::instrument(skip(self))]
@@ -277,7 +315,7 @@ impl Orchestrator {
             "Hello, can you help me with my implementation? I need to do the following:
             '{}'
 
-            Please use the above information to get started. I will run `{}` after each of your attempts.
+            Please use the above information to get started. After you commit your changes, I will run `{}` to validate them.
             ",
             objective, validate_cmd
         );
@@ -302,79 +340,92 @@ impl Orchestrator {
         for i in 0..max_retries {
             info!(attempt = i + 1, max_attempts = max_retries, "Running aider in auto mode.");
 
-            let start_time = Instant::now();
-            let result = self
+            // 1. Run aider to make changes
+            let aider_start_time = Instant::now();
+            let aider_result = self
                 .aider
                 .run(
                     &session,
                     files.clone(),
                     &current_objective,
                     true,
-                    Some(validate_cmd.clone()),
+                    None, // We run validation ourselves
                     allow_shell_commands,
                 )
                 .await?;
-            let time_taken = start_time.elapsed();
+            let aider_time_taken = aider_start_time.elapsed();
 
             self.logger.log_aider_run(crate::logging::AiderLog {
-                success: result.success,
-                stdout: result.stdout.clone(),
-                stderr: result.stderr.clone(),
-                time_taken_ms: time_taken.as_millis(),
+                success: aider_result.success,
+                stdout: aider_result.stdout.clone(),
+                stderr: aider_result.stderr.clone(),
+                time_taken_ms: aider_time_taken.as_millis(),
             });
 
-            // Aider's exit code is not always reliable. Check output for test failures.
-            let validation_failed = !result.success
-                || result.stdout.contains("Test command failed.")
-                || result.stderr.contains("Test command failed.")
-                || result.stdout.contains("Tests failed.")
-                || result.stderr.contains("Tests failed.");
+            if !aider_result.success {
+                return Err(Error::ToolFailed(format!(
+                    "Aider itself failed to run. Stderr: {}",
+                    aider_result.stderr
+                )));
+            }
 
-            if !validation_failed {
-                if !continue_on_success {
-                    self.logger.log_summary(&format!(
-                        "Aider succeeded on attempt {}/{}.",
-                        i + 1,
-                        max_retries
-                    ));
-                    self.logger
-                        .log_summary("Aider has committed the changes.");
-                    return Ok(());
-                }
-
-                // Aider exits with 0 if validation passes. We need to check if it made
-                // any changes to determine if the task is complete.
-                if result.stdout.contains("No changes were applied.") {
-                    self.logger.log_summary(&format!(
-                        "Aider reported no changes on attempt {}/{}. Assuming completion.",
-                        i + 1,
-                        max_retries
-                    ));
-                    self.logger
-                        .log_summary("Implement strategy completed successfully.");
-                    return Ok(());
-                }
-
+            if aider_result.stdout.contains("No changes were applied.") {
                 self.logger.log_summary(&format!(
-                    "Aider succeeded on attempt {}/{}. Continuing with plan.",
+                    "Aider reported no changes on attempt {}/{}. Assuming completion.",
                     i + 1,
                     max_retries
                 ));
                 self.logger
-                    .log_summary("Aider has committed the changes. Checking for next step.");
+                    .log_summary("Implement strategy completed successfully.");
+                return Ok(());
+            }
+
+            // 2. Run validation command
+            info!(command = %validate_cmd, "Running validation command.");
+            let validation_start_time = Instant::now();
+            let validation_result = run_shell_command(&validate_cmd).await;
+            let validation_time_taken = validation_start_time.elapsed();
+
+            self.logger.log_validation(crate::logging::ValidationLog {
+                command: validate_cmd.clone(),
+                exit_code: validation_result.exit_code,
+                stdout: validation_result.stdout.clone(),
+                stderr: validation_result.stderr.clone(),
+                success: validation_result.success,
+                time_taken_ms: validation_time_taken.as_millis(),
+            });
+
+            if validation_result.success {
+                if !continue_on_success {
+                    self.logger.log_summary(&format!(
+                        "Validation passed on attempt {}/{}.",
+                        i + 1,
+                        max_retries
+                    ));
+                    return Ok(());
+                }
+
+                self.logger.log_summary(&format!(
+                    "Validation passed on attempt {}/{}. Continuing with plan.",
+                    i + 1,
+                    max_retries
+                ));
                 current_objective =
                     "The previous changes were successful. Please continue implementing the plan."
                         .to_string();
                 continue;
             }
 
+            // 3. Validation failed, enter debug loop
             self.logger.log_summary(&format!(
-                "Aider failed on attempt {}/{}. Analyzing failure...",
+                "Validation failed on attempt {}/{}. Analyzing failure...",
                 i + 1,
                 max_retries
             ));
 
-            // Implement Gemini-based debugging.
+            info!("Reverting the last commit from aider.");
+            crate::vcs::revert_last_commit(&PathBuf::from("."))?;
+
             let debug_prompt = format!(
                 "The last attempt to fix the code failed. I need your help to figure out what to do next.
                 Based on the error output below, what documentation should I look up using the `doc_retriever` tool?
@@ -385,7 +436,7 @@ impl Orchestrator {
 
                 Validation command STDERR:
                 {}",
-                result.stdout, result.stderr
+                validation_result.stdout, validation_result.stderr
             );
 
             let contents = vec![crate::gemini_types::Content {
@@ -435,7 +486,7 @@ impl Orchestrator {
 
             current_objective = format!(
                 "The last attempt failed. Here is the output from the validation command:\n\nSTDOUT:\n{}\n\nSTDERR:\n{}\n\nI tried to find relevant documentation and got this:\n\n{}\n\nPlease use this information to fix the code.",
-                result.stdout, result.stderr, retrieved_docs
+                validation_result.stdout, validation_result.stderr, retrieved_docs
             );
         }
 

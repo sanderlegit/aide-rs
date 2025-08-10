@@ -105,10 +105,10 @@ steps:
 
     validateCmd: "make test"
     # `validateCmd`: The validation command to run after each implementation
-    # attempt. `aide-rs` passes this command directly to `aider`'s `--test-cmd`
-    # flag. `aider` then runs this command after applying code changes. If the
-    # command succeeds, `aider` commits the changes and exits successfully. If it
-    # fails, `aide-rs` initiates its debugging loop.
+    # attempt. After `aider` applies and commits its changes, `aide-rs` will
+    # execute this command. If the command succeeds, the step is considered
+    # complete. If it fails, `aide-rs` reverts the commit and initiates its
+    # debugging loop.
 
     maxRetries: 10
     # `maxRetries`: The number of times the agent will try to fix the code if
