@@ -11,12 +11,28 @@ use std::path::PathBuf;
 use tracing::{error, info};
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", tag = "type")]
+enum StepConfig {
+    Research {
+        objective: String,
+        context: String,
+    },
+    Plan {
+        objective: String,
+        context: String,
+    },
+    Implement {
+        objective: String,
+        context: String,
+        #[serde(default = "default_validate_cmd")]
+        validate_cmd: String,
+    },
+}
+
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct RunConfig {
-    objective: String,
-    context: String,
-    #[serde(default = "default_validate_cmd")]
-    validate_cmd: String,
+    steps: Vec<StepConfig>,
 }
 
 fn default_validate_cmd() -> String {
@@ -323,31 +339,51 @@ impl Orchestrator {
         let file_content = std::fs::read_to_string(&prompt_file)?;
         let config: RunConfig = serde_yaml::from_str(&file_content)?;
 
-        let filtered_files =
-            file_provider::get_files(&[".".to_string()], Some(&config.context), None)?;
+        let mut plan_file_path: Option<PathBuf> = None;
+        let mut last_objective: Option<String> = None;
 
-        info!(objective = %config.objective, "Running plan strategy.");
-        let plan_file_path = self
-            .plan(config.objective.clone(), filtered_files.clone(), false)
-            .await?;
+        for step in config.steps {
+            match step {
+                StepConfig::Research { objective, context } => {
+                    info!(objective = %objective, "Running research step.");
+                    last_objective = Some(objective.clone());
+                    let files =
+                        file_provider::get_files(&[".".to_string()], Some(&context), None)?;
+                    self.research(objective, files).await?;
+                }
+                StepConfig::Plan { objective, context } => {
+                    info!(objective = %objective, "Running plan step.");
+                    last_objective = Some(objective.clone());
+                    let files =
+                        file_provider::get_files(&[".".to_string()], Some(&context), None)?;
+                    let path = self.plan(objective, files, false).await?;
+                    plan_file_path = Some(path);
+                }
+                StepConfig::Implement {
+                    objective,
+                    context,
+                    validate_cmd,
+                } => {
+                    info!(objective = %objective, "Running implement step.");
+                    let mut files =
+                        file_provider::get_files(&[".".to_string()], Some(&context), None)?;
+                    let mut implement_objective = objective.clone();
 
-        let implement_objective = format!(
-            "Implement the tasks described in the plan file `{}`. The original objective was: {}",
-            plan_file_path.display(),
-            config.objective
-        );
+                    if let Some(plan_path) = &plan_file_path {
+                        let original_objective = last_objective.as_deref().unwrap_or(&objective);
+                        implement_objective = format!(
+                            "Implement the tasks described in the plan file `{}`. The original objective was: {}",
+                            plan_path.display(),
+                            original_objective
+                        );
+                        files.push(plan_path.to_str().unwrap().to_string());
+                    }
 
-        let mut implement_files = filtered_files;
-        implement_files.push(plan_file_path.to_str().unwrap().to_string());
-
-        info!("Running implement strategy.");
-        self.implement(
-            implement_objective,
-            implement_files,
-            config.validate_cmd,
-            true, // always auto for `run` command
-        )
-        .await?;
+                    self.implement(implement_objective, files, validate_cmd, true)
+                        .await?;
+                }
+            }
+        }
 
         self.logger
             .log_summary(&format!("Run from {} completed.", prompt_file));

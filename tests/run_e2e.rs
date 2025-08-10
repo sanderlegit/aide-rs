@@ -21,13 +21,18 @@ async fn test_run_command_e2e() {
 
     // 1. Create config file for the `run` command
     let config_content = r#"
-objective: "Implement a new feature"
-files:
-  - "src/main.rs"
-validate_cmd: "true"
+steps:
+  - type: plan
+    objective: "Implement a new feature"
+    context: "all"
+  - type: implement
+    objective: "Implement the plan"
+    context: "all"
+    validate_cmd: "true"
 "#;
     env.create_file("run.yml", config_content);
     env.create_file("src/main.rs", "fn main() {}");
+    env.create_file(".ai/filter=all", "#include\n*.rs");
 
     // 2. Mock Gemini for the 'plan' stage
     let plan_response = json!({
@@ -71,14 +76,15 @@ validate_cmd: "true"
     let stderr = String::from_utf8(output.get_output().stderr.clone()).unwrap();
 
     assert!(stderr.contains("Starting run from config file."));
-    assert!(stderr.contains("Starting plan strategy."));
+    assert!(stderr.contains("Running plan step."));
     assert!(stderr.contains("Plan saved to"));
-    assert!(stderr.contains("Starting implement strategy."));
+    assert!(stderr.contains("Running implement step."));
     assert!(stderr.contains("Aider succeeded on attempt 1/5."));
     assert!(stderr.contains("Committing changes"));
 
     let last_commit = env.get_last_commit_message();
     assert!(last_commit.contains("Implement: Implement the tasks described in the plan file"));
+    assert!(last_commit.contains("The original objective was: Implement a new feature"));
 }
 
 #[tokio::test]
@@ -254,13 +260,18 @@ async fn test_run_command_e2e_with_debug_loop() {
 
     // 2. Create config file for the `run` command
     let config_content = r#"
-objective: "Implement a feature that will initially fail"
-files:
-  - "src/main.rs"
-validate_cmd: "true" # The mock aider script controls success/failure
+steps:
+  - type: plan
+    objective: "Implement a feature that will initially fail"
+    context: "all"
+  - type: implement
+    objective: "Implement the plan"
+    context: "all"
+    validate_cmd: "true" # The mock aider script controls success/failure
 "#;
     env.create_file("run.yml", config_content);
     env.create_file("src/main.rs", "fn main() {}");
+    env.create_file(".ai/filter=all", "#include\n*.rs\n*.toml");
 
     // 3. Mock Gemini for the 'plan' stage
     let plan_response = json!({
@@ -338,9 +349,9 @@ validate_cmd: "true" # The mock aider script controls success/failure
 
     // Check that the full flow happened
     assert!(stderr.contains("Starting run from config file."));
-    assert!(stderr.contains("Starting plan strategy."));
+    assert!(stderr.contains("Running plan step."));
     assert!(stderr.contains("Plan saved to"));
-    assert!(stderr.contains("Starting implement strategy."));
+    assert!(stderr.contains("Running implement step."));
     assert!(stderr.contains("Aider failed on attempt 1/5. Analyzing failure..."));
     assert!(stderr.contains("Gemini requested a tool call for debugging"));
     assert!(stderr.contains("Retrieved documentation"));

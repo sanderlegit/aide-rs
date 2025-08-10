@@ -100,12 +100,17 @@ This loop will:
 
 The `run` command orchestrates a complete, non-interactive workflow from a single configuration file. This is ideal for CI/CD pipelines or complex, automated refactoring tasks.
 
-First, create a YAML file (e.g., `feature.yml`):
+First, create a YAML file (e.g., `feature.yml`) that defines a sequence of steps:
 ```yaml
 # feature.yml
-objective: "Add a new 'list' subcommand to the audio tool to display all entries from the database."
-context: "all"
-validate_cmd: "cargo check"
+steps:
+  - type: plan
+    objective: "Add a new 'list' subcommand to the audio tool to display all entries from the database."
+    context: "all"
+  - type: implement
+    objective: "Implement the plan."
+    context: "all"
+    validate_cmd: "cargo check"
 ```
 
 Then, execute it:
@@ -113,11 +118,11 @@ Then, execute it:
 aide-rs run feature.yml
 ```
 
-This single command will:
+This single command will execute the steps in order:
 1.  Start a new session.
-2.  Run the **plan** strategy to generate a task list (`plan.md`).
-3.  Run the **implement** strategy in fully automated mode, using the generated plan as the objective.
-4.  Use the automated debugging loop (`--auto`) to fix issues until `validate_cmd` succeeds.
+2.  Run the **plan** step to generate a task list (`plan.md`).
+3.  Run the **implement** step in fully automated mode. It will automatically use the `plan.md` from the previous step as its primary objective.
+4.  Use the automated debugging loop to fix issues until `validate_cmd` succeeds.
 5.  Commit the final changes.
 
 ## Tools
