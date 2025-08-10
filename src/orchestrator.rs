@@ -323,9 +323,12 @@ impl Orchestrator {
         allow_shell_commands: bool,
         continue_on_success: bool,
         pre_validate: bool,
+        continue_on_success: bool,
+        pre_validate: bool,
     ) -> Result<()> {
         self.logger.log_summary("Starting implement strategy.");
         let session = Session::new("implement", &objective)?;
+        let mut retrieved_doc_paths: Vec<String> = Vec::new();
 
         let mut current_objective = format!(
             "Hello, can you help me with my implementation? I need to do the following:
@@ -466,10 +469,19 @@ impl Orchestrator {
             // The failed state will be part of the git history, and subsequent
             // attempts will build on it.
 
+            let history_info = if retrieved_doc_paths.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    "\n\nIn previous attempts, I have already retrieved documentation for the following, but it was not enough to solve the issue: {}. Please suggest a different, more relevant `path` or `crate_name` to look up. Do not suggest the same paths again.",
+                    retrieved_doc_paths.join(", ")
+                )
+            };
+
             let debug_prompt = format!(
                 "The last attempt to fix the code failed. I need your help to figure out what to do next.
                 Based on the error output below, what documentation should I look up using the `doc_retriever` tool?
-                Please call the tool with the most relevant `crate_name` and `path` to get documentation that might help solve the error.
+                Please call the tool with the most relevant `crate_name` and `path` to get documentation that might help solve the error.{}
 
                 If the tool fails to find the exact path, it will return documentation for the parent module or the whole crate, which should still be helpful. If you are unsure of the exact path, providing a guess is better than not calling the tool at all.
 
@@ -478,7 +490,7 @@ impl Orchestrator {
 
                 Validation command STDERR:
                 {}",
-                validation_result.stdout, validation_result.stderr
+                history_info, validation_result.stdout, validation_result.stderr
             );
 
             let contents = vec![crate::gemini_types::Content {
@@ -511,6 +523,14 @@ impl Orchestrator {
 
             if let Some(call) = function_call {
                 info!(call = ?call, "Gemini requested a tool call for debugging");
+
+                if let Ok(args) =
+                    serde_json::from_value::<crate::tools::DocRetrieverArgs>(call.arguments.clone())
+                {
+                    let path_str = args.path.unwrap_or_else(|| "(crate-level)".to_string());
+                    retrieved_doc_paths.push(format!("`{}:{}`", args.crate_name, path_str));
+                }
+
                 let tool_execution_result = self.tool_executor.execute(call).await;
 
                 match tool_execution_result {
@@ -575,6 +595,18 @@ impl Orchestrator {
 
                         if let Some(retry_call) = retry_function_call {
                             info!(call = ?retry_call, "Gemini requested a tool call for retry");
+
+                            if let Ok(args) = serde_json::from_value::<
+                                crate::tools::DocRetrieverArgs,
+                            >(
+                                retry_call.arguments.clone()
+                            ) {
+                                let path_str =
+                                    args.path.unwrap_or_else(|| "(crate-level)".to_string());
+                                retrieved_doc_paths
+                                    .push(format!("`{}:{}`", args.crate_name, path_str));
+                            }
+
                             match self.tool_executor.execute(retry_call).await {
                                 Ok(docs) => {
                                     retrieved_docs = serde_json::to_string_pretty(&docs)

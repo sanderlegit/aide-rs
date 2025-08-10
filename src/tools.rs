@@ -67,7 +67,7 @@ impl ToolExecutor {
 // --- Doc Retriever Tool ---
 
 #[derive(Deserialize)]
-struct DocRetrieverArgs {
+pub(crate) struct DocRetrieverArgs {
     crate_name: String,
     path: Option<String>,
 }

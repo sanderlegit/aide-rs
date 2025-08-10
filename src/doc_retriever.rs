@@ -118,10 +118,9 @@ pub fn get_item_docs(
         Ok(item) => match &item.inner {
             ItemEnum::Module(_) => get_module_docs_json(&krate, item, crate_name, path),
             ItemEnum::Struct(s) => {
-                let (type_name, methods, impls) =
-                    ("struct", get_methods(&krate, s), get_impls(&krate, &item.id));
+                let (methods, impls) = get_methods_and_trait_impls(&krate, &s.impls);
                 Ok(json!({
-                    "type": type_name,
+                    "type": "struct",
                     "crate": crate_name,
                     "path": path,
                     "documentation": item.docs.clone().unwrap_or_default(),
@@ -130,10 +129,9 @@ pub fn get_item_docs(
                 }))
             }
             ItemEnum::Enum(e) => {
-                let (type_name, methods, impls) =
-                    ("enum", get_methods(&krate, e), get_impls(&krate, &item.id));
+                let (methods, impls) = get_methods_and_trait_impls(&krate, &e.impls);
                 Ok(json!({
-                    "type": type_name,
+                    "type": "enum",
                     "crate": crate_name,
                     "path": path,
                     "documentation": item.docs.clone().unwrap_or_default(),
@@ -210,61 +208,44 @@ fn get_module_item_names(krate: &Crate, module: &Module) -> (Vec<String>, Vec<St
     (structs, enums, functions)
 }
 
-trait HasItems {
-    fn get_items(&self) -> &Vec<Id>;
-}
-impl HasItems for Struct {
-    fn get_items(&self) -> &Vec<Id> {
-        &self.impls
-    }
-}
-impl HasItems for rustdoc_types::Enum {
-    fn get_items(&self) -> &Vec<Id> {
-        &self.impls
-    }
-}
+fn get_methods_and_trait_impls(
+    krate: &Crate,
+    impl_ids: &[Id],
+) -> (Vec<serde_json::Value>, Vec<serde_json::Value>) {
+    let mut inherent_methods = Vec::new();
+    let mut trait_impls = Vec::new();
 
-fn get_methods<T: HasItems>(krate: &Crate, item_with_impls: &T) -> Vec<serde_json::Value> {
-    let mut methods = Vec::new();
-    for impl_id in item_with_impls.get_items() {
+    for impl_id in impl_ids {
         if let Some(impl_item) = krate.index.get(impl_id) {
             if let ItemEnum::Impl(imp) = &impl_item.inner {
-                // We only care about inherent methods for this tool's purpose.
-                if imp.trait_.is_none() {
-                    for item_id in &imp.items {
-                        if let Some(method_item) = krate.index.get(item_id) {
-                            if let ItemEnum::Function(func) = &method_item.inner {
-                                methods.push(json!({
-                                    "name": method_item.name.clone().unwrap_or_default(),
-                                    "signature": clean_fn_signature(&func.sig.output, &func.sig.inputs, method_item.name.as_deref().unwrap_or("")),
-                                    "documentation": method_item.docs.clone().unwrap_or_default(),
-                                }));
-                            }
+                let mut methods_in_impl = Vec::new();
+                for item_id in &imp.items {
+                    if let Some(method_item) = krate.index.get(item_id) {
+                        if let ItemEnum::Function(func) = &method_item.inner {
+                            methods_in_impl.push(json!({
+                                "name": method_item.name.clone().unwrap_or_default(),
+                                "signature": clean_fn_signature(&func.sig.output, &func.sig.inputs, method_item.name.as_deref().unwrap_or("")),
+                                "documentation": method_item.docs.clone().unwrap_or_default(),
+                            }));
                         }
                     }
+                }
+
+                if let Some(trait_path) = &imp.trait_ {
+                    // Only add trait impl if it has methods.
+                    if !methods_in_impl.is_empty() {
+                        trait_impls.push(json!({
+                            "trait": trait_path.path.clone(),
+                            "methods": methods_in_impl,
+                        }));
+                    }
+                } else {
+                    inherent_methods.append(&mut methods_in_impl);
                 }
             }
         }
     }
-    methods
-}
-
-fn get_impls(krate: &Crate, item_id: &Id) -> Vec<String> {
-    krate
-        .index
-        .values()
-        .filter_map(|item| match &item.inner {
-            ItemEnum::Impl(imp) => {
-                if let Type::ResolvedPath(path) = &imp.for_ {
-                    if &path.id == item_id {
-                        return imp.trait_.as_ref().map(|t| t.path.clone());
-                    }
-                }
-                None
-            }
-            _ => None,
-        })
-        .collect()
+    (inherent_methods, trait_impls)
 }
 
 fn clean_fn_signature(
