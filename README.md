@@ -17,7 +17,8 @@ Instead of a simple prompt-and-response loop, `aide-rs` manages complex, multi-s
 
 ## Prerequisites
 
--   [Rust](https://www.rust-lang.org/tools/install) (latest stable version)
+-   [Rust](https://www.rust-lang.org/tools/install) (latest stable version).
+-   [Aider](https://github.com/paul-gauthier/aider), installed and available in your `PATH`.
 -   A Google Gemini API Key. See [Google AI for Developers](https://ai.google.dev/) to get one.
 
 ## Installation
@@ -29,12 +30,16 @@ Instead of a simple prompt-and-response loop, `aide-rs` manages complex, multi-s
     ```
     *(Note: Replace `your-username/aide-rs.git` with the actual repository URL)*
 
-2.  **Set up your API Key:**
-    Create a `.env` file in the root of the project and add your Gemini API key:
+2.  **Configure your environment:**
+    Create a `.env` file in the root of the project to store your API key and configure the `aider` command.
     ```
+    AIDER_COMMAND="aider --yes --dark-mode --model vertex_ai/gemini-1.5-pro"
     GEMINI_API_KEY=your_api_key_here
     ```
-    The application will load this variable automatically.
+    -   `AIDER_COMMAND`: The exact `aider` command to run. You can customize this with your preferred `aider` settings. `aide-rs` will append its own arguments to this command.
+    -   `GEMINI_API_KEY`: Your key for the Google Gemini API.
+
+    The application will load these variables automatically.
 
 3.  **Build and install the project:**
     ```bash
@@ -91,31 +96,7 @@ This loop will:
 3.  If it fails, `aide-rs` uses an LLM to analyze the error, looks up relevant documentation with its `doc_retriever` tool, and feeds the context back to `aider` for the next attempt.
 4.  If it succeeds, the loop finishes and the changes are committed.
 
-### Configuration
-
-#### File Filtering
-
-`aide-rs` automatically filters the files included in the context using rules defined in `.ai/filter=all`. This file uses glob patterns to include or exclude files and directories. You can customize it to suit your project's needs.
-
-The filter file is composed of sections, starting with `#include` or `#exclude`.
-
-**Example `.ai/filter=all`:**
-```
-#exclude
-.git
-.ai
-target/
-*.lock
-
-#include
-*.rs
-*.toml
-*.md
-Makefile
-```
-When you provide file paths to commands like `plan` or `implement` (e.g., `aide-rs plan "..." .`), `aide-rs` will walk the directories and apply these filters to determine the final list of files used.
-
-### Fully Automated Workflow: The `run` Command
+#### Fully Automated Workflow: The `run` Command
 
 The `run` command orchestrates a complete, non-interactive workflow from a single configuration file. This is ideal for CI/CD pipelines or complex, automated refactoring tasks.
 
@@ -140,6 +121,63 @@ This single command will:
 3.  Run the **implement** strategy in fully automated mode, using the generated plan as the objective.
 4.  Use the automated debugging loop (`--auto`) to fix issues until `validate_cmd` succeeds.
 5.  Commit the final changes.
+
+## Tools
+
+`aide-rs` includes helper tools that can also be used standalone.
+
+### `doc-retriever`
+
+The `doc-retriever` tool allows you to fetch Rust documentation for crates and specific items (structs, enums, functions, etc.) and view it as structured JSON. This is the same tool `aide-rs` uses internally to provide documentation context to the LLM during the automated debugging loop.
+
+It must be run from within a Rust project's directory.
+
+**Usage:**
+
+-   **Get crate-level documentation:**
+    ```bash
+    doc-retriever crate --name your_crate
+    ```
+    This will output JSON containing the crate's root documentation, version, and list of top-level modules.
+
+-   **Get item-specific documentation:**
+    ```bash
+    doc-retriever item --crate your_crate --path "your_crate::module::MyStruct"
+    ```
+    This will output JSON with detailed documentation for `MyStruct`, including its methods and trait implementations.
+
+## Configuration
+
+### File Filtering
+
+`aide-rs` automatically filters the files included in the context using rules defined in `.ai/filter=all`. This file uses glob patterns to include or exclude files and directories. You can customize it to suit your project's needs.
+
+The filter file is composed of sections, starting with `#include` or `#exclude`.
+
+**Example `.ai/filter=all`:**
+```
+#exclude
+.git
+.ai
+target/
+*.lock
+
+#include
+*.rs
+*.toml
+*.md
+Makefile
+```
+When you provide file paths to commands like `plan` or `implement` (e.g., `aide-rs plan "..." .`), `aide-rs` will walk the directories and apply these filters to determine the final list of files used.
+
+## Future Work
+
+With the core architecture in place, future work will focus on enhancing the agent's capabilities and improving user experience. Key areas for development include:
+
+-   **Model Configuration**: Allow users to specify the LLM model (e.g., `gemini-1.5-pro` vs. `gemini-1.5-flash`) via a command-line argument or configuration file.
+-   **Expanded Toolset**: Implement additional tools beyond `doc_retriever`, such as a `file_system` tool for creating, reading, and listing files, which would enhance the agent's ability to interact with the project structure.
+-   **Improved Interactive Experience**: Enhance the interactive modes (`plan`, `research`, `implement`) with better user feedback and more control over the agent's actions.
+-   **Configuration Flexibility**: Allow more granular configuration of strategies within the `run.yml` file, such as specifying which tools are enabled for a given run.
 
 ## Development
 
