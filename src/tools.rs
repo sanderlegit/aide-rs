@@ -4,7 +4,6 @@ use async_trait::async_trait;
 use serde::Deserialize;
 use serde_json::json;
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::debug;
 
@@ -42,7 +41,6 @@ impl ToolExecutor {
     fn get_tools_by_name(name: &str) -> Vec<Arc<dyn Tool>> {
         match name {
             "doc_retriever" => vec![Arc::new(DocRetrieverTool)],
-            "file_system" => vec![Arc::new(FileSystemTool)],
             _ => vec![],
         }
     }
@@ -117,103 +115,18 @@ impl Tool for DocRetrieverTool {
     }
 }
 
-// --- File System Tool ---
-
-#[derive(Deserialize)]
-struct FileSystemArgs {
-    operation: String,
-    path: PathBuf,
-    content: Option<String>,
-}
-
-pub struct FileSystemTool;
-#[async_trait]
-impl Tool for FileSystemTool {
-    fn name(&self) -> String {
-        "file_system".to_string()
-    }
-    fn schema(&self) -> FunctionDeclaration {
-        FunctionDeclaration {
-            name: self.name(),
-            description: "Performs file system operations: read, write, or list files in a directory.".to_string(),
-            parameters: serde_json::from_str(r#"{
-                "type": "object",
-                "properties": {
-                    "operation": {
-                        "type": "string",
-                        "description": "The operation to perform.",
-                        "enum": ["read", "write", "list"]
-                    },
-                    "path": { "type": "string", "description": "The path to the file or directory." },
-                    "content": { "type": "string", "description": "The content to write to the file (only for 'write' operation)." }
-                },
-                "required": ["operation", "path"]
-            }"#).unwrap(),
-        }
-    }
-    async fn execute(&self, args: serde_json::Value) -> Result<serde_json::Value> {
-        let fs_args: FileSystemArgs = serde_json::from_value(args)?;
-
-        // Basic security check: prevent path traversal.
-        if fs_args.path.is_absolute()
-            || fs_args
-                .path
-                .components()
-                .any(|c| c == std::path::Component::ParentDir)
-        {
-            return Err(Error::Config(
-                "Path must be relative and within the project directory.".to_string(),
-            ));
-        }
-
-        match fs_args.operation.as_str() {
-            "read" => {
-                let content = tokio::fs::read_to_string(&fs_args.path).await?;
-                Ok(json!({ "success": true, "content": content }))
-            }
-            "write" => {
-                let content = fs_args.content.ok_or_else(|| {
-                    Error::Config("Content is required for write operation".to_string())
-                })?;
-                if let Some(parent) = fs_args.path.parent() {
-                    if !parent.as_os_str().is_empty() {
-                        tokio::fs::create_dir_all(parent).await?;
-                    }
-                }
-                tokio::fs::write(&fs_args.path, content).await?;
-                Ok(json!({ "success": true, "path": fs_args.path.to_str() }))
-            }
-            "list" => {
-                let mut files = vec![];
-                let mut read_dir = tokio::fs::read_dir(&fs_args.path).await?;
-                while let Some(entry) = read_dir.next_entry().await? {
-                    files.push(entry.path().to_string_lossy().to_string());
-                }
-                Ok(json!({ "success": true, "files": files }))
-            }
-            _ => Err(Error::Config(format!(
-                "Unknown file system operation: {}",
-                fs_args.operation
-            ))),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::error::Error;
     use serde_json::json;
-    use std::fs;
-    use tempfile::tempdir;
 
     #[tokio::test]
     async fn test_tool_executor_new_and_schemas() {
-        let executor = ToolExecutor::new(&["doc_retriever".to_string(), "file_system".to_string()]);
+        let executor = ToolExecutor::new(&["doc_retriever".to_string()]);
         let schemas = executor.schemas();
-        assert_eq!(schemas.len(), 2);
+        assert_eq!(schemas.len(), 1);
         assert!(schemas.iter().any(|s| s.name == "doc_retriever"));
-        assert!(schemas.iter().any(|s| s.name == "file_system"));
     }
 
     #[tokio::test]
@@ -230,129 +143,6 @@ mod tests {
             assert!(msg.contains("Tool 'non_existent_tool' not found"));
         } else {
             panic!("Expected Config error");
-        }
-    }
-
-    #[tokio::test]
-    async fn test_fs_tool_write_and_read() {
-        let dir = tempfile::Builder::new()
-            .prefix("test_fs_rw_")
-            .tempdir_in("target")
-            .unwrap();
-        let tool = FileSystemTool;
-        let path = dir.path().join("test.txt");
-        let content = "hello world";
-
-        // Write
-        let write_args = json!({
-            "operation": "write",
-            "path": path,
-            "content": content
-        });
-        let result = tool.execute(write_args).await.unwrap();
-        assert_eq!(
-            result,
-            json!({"success": true, "path": path.to_str().unwrap()})
-        );
-        assert_eq!(fs::read_to_string(&path).unwrap(), content);
-
-        // Read
-        let read_args = json!({
-            "operation": "read",
-            "path": path
-        });
-        let result = tool.execute(read_args).await.unwrap();
-        assert_eq!(result, json!({"success": true, "content": content}));
-
-        // Write to subdir
-        let path_subdir = dir.path().join("subdir/test.txt");
-        let write_args_subdir = json!({
-            "operation": "write",
-            "path": path_subdir,
-            "content": content
-        });
-        tool.execute(write_args_subdir).await.unwrap();
-        assert_eq!(fs::read_to_string(&path_subdir).unwrap(), content);
-    }
-
-    #[tokio::test]
-    async fn test_fs_tool_list() {
-        let dir = tempfile::Builder::new()
-            .prefix("test_fs_list_")
-            .tempdir_in("target")
-            .unwrap();
-        let test_dir_path = dir.path();
-
-        fs::write(test_dir_path.join("file1.txt"), "a").unwrap();
-        fs::create_dir(test_dir_path.join("subdir")).unwrap();
-        fs::write(test_dir_path.join("subdir/file2.txt"), "b").unwrap();
-
-        let tool = FileSystemTool;
-        let list_args = json!({
-            "operation": "list",
-            "path": test_dir_path.to_str().unwrap()
-        });
-        let result = tool.execute(list_args).await.unwrap();
-        let mut files = result["files"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|v| v.as_str().unwrap().to_string())
-            .collect::<Vec<_>>();
-        files.sort();
-
-        let mut expected = vec![
-            test_dir_path
-                .join("file1.txt")
-                .to_str()
-                .unwrap()
-                .to_string(),
-            test_dir_path.join("subdir").to_str().unwrap().to_string(),
-        ];
-        expected.sort();
-        assert_eq!(files, expected);
-
-        let subdir_path_str = test_dir_path.join("subdir").to_str().unwrap().to_string();
-        let list_args_subdir = json!({
-            "operation": "list",
-            "path": subdir_path_str
-        });
-        let result_subdir = tool.execute(list_args_subdir).await.unwrap();
-        let files_subdir = result_subdir["files"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|v| v.as_str().unwrap().to_string())
-            .collect::<Vec<_>>();
-        let expected_subdir_file = test_dir_path.join("subdir/file2.txt");
-        assert_eq!(
-            files_subdir,
-            vec![expected_subdir_file.to_str().unwrap().to_string()]
-        );
-    }
-
-    #[tokio::test]
-    async fn test_fs_tool_security() {
-        let tool = FileSystemTool;
-
-        // Absolute path
-        let args = json!({"operation": "read", "path": "/etc/passwd"});
-        let result = tool.execute(args).await;
-        assert!(result.is_err());
-        if let Err(Error::Config(msg)) = result {
-            assert!(msg.contains("Path must be relative"));
-        } else {
-            panic!("Expected Config error for absolute path");
-        }
-
-        // Path traversal
-        let args = json!({"operation": "read", "path": "../some_file"});
-        let result = tool.execute(args).await;
-        assert!(result.is_err());
-        if let Err(Error::Config(msg)) = result {
-            assert!(msg.contains("Path must be relative"));
-        } else {
-            panic!("Expected Config error for path traversal");
         }
     }
 }
