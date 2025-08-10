@@ -14,7 +14,7 @@ use tracing::{error, info};
 #[serde(rename_all = "camelCase")]
 struct RunConfig {
     objective: String,
-    files: Vec<String>,
+    context: String,
     #[serde(default = "default_validate_cmd")]
     validate_cmd: String,
 }
@@ -323,7 +323,8 @@ impl Orchestrator {
         let file_content = std::fs::read_to_string(&prompt_file)?;
         let config: RunConfig = serde_yaml::from_str(&file_content)?;
 
-        let filtered_files = file_provider::get_files(&config.files, None)?;
+        let filtered_files =
+            file_provider::get_files(&[".".to_string()], Some(&config.context), None)?;
 
         info!(objective = %config.objective, "Running plan strategy.");
         let plan_file_path = self

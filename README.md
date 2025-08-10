@@ -67,19 +67,19 @@ For complex tasks, you can use the commands sequentially. This gives you full co
 
 1.  **Research (Optional)**: If you're unsure about the best libraries or patterns to use, start with a research step. `aide-rs` will use a search-enabled LLM to gather information.
     ```bash
-    aide-rs research "best rust crates for audio processing" src/main.rs
+    aide-rs research --context all "best rust crates for audio processing"
     ```
     This produces a `research.md` file and launches `aider` for you to review and refine it.
 
 2.  **Plan**: Once you have a clear goal, use the `plan` command. This uses an LLM to break down your objective into a markdown task list.
     ```bash
-    aide-rs plan "Create a command-line tool to manage audio files using lancedb" src/main.rs Cargo.toml
+    aide-rs plan --context all "Create a command-line tool to manage audio files using lancedb"
     ```
     This creates a `plan.md` and launches `aider` for refinement.
 
 3.  **Implement**: After planning, use the `implement` command to start coding. This command launches `aider` with your objective and files, ready for you to start pair-programming with the AI.
     ```bash
-    aide-rs implement "Implement the 'add' subcommand for the audio tool" src/main.rs src/db.rs
+    aide-rs implement --context all "Implement the 'add' subcommand for the audio tool"
     ```
 
 #### Automated Implementation: `implement --auto`
@@ -87,7 +87,7 @@ For complex tasks, you can use the commands sequentially. This gives you full co
 For smaller, well-defined tasks like fixing a bug, you can use the automated implementation loop.
 
 ```bash
-aide-rs implement "Fix the compilation errors" src/main.rs src/db.rs --auto --validate-cmd "cargo check"
+aide-rs implement --context all "Fix the compilation errors" --auto --validate-cmd "cargo check"
 ```
 
 This loop will:
@@ -104,9 +104,7 @@ First, create a YAML file (e.g., `feature.yml`):
 ```yaml
 # feature.yml
 objective: "Add a new 'list' subcommand to the audio tool to display all entries from the database."
-files:
-  - src/main.rs
-  - src/db.rs
+context: "all"
 validate_cmd: "cargo check"
 ```
 
@@ -168,7 +166,7 @@ target/
 *.md
 Makefile
 ```
-When you provide file paths to commands like `plan` or `implement` (e.g., `aide-rs plan "..." .`), `aide-rs` will walk the directories and apply these filters to determine the final list of files used.
+When you provide file paths to commands like `plan` or `implement`, or use the `--context` flag, `aide-rs` will walk the directories and apply these filters to determine the final list of files used.
 
 ## Future Work
 

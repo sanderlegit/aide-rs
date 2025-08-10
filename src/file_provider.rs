@@ -6,22 +6,28 @@ use std::path::Path;
 /// Expands a list of input paths into a list of files, applying filtering rules.
 ///
 /// It walks directories and applies include/exclude rules from a filter file.
-/// The default filter file is `.ai/filter=all`.
 ///
 /// # Arguments
 ///
-/// * `paths`: A slice of strings representing file or directory paths.
+/// * `paths`: A slice of strings representing file or directory paths to start the walk from.
+/// * `context`: An optional context name (e.g., "backend") to load a specific filter file like `.ai/filter=backend`. Defaults to "all".
 /// * `project_root_override`: An optional path to use as the project root, for testing.
-pub fn get_files(paths: &[String], project_root_override: Option<&Path>) -> Result<Vec<String>> {
+pub fn get_files(
+    paths: &[String],
+    context: Option<&str>,
+    project_root_override: Option<&Path>,
+) -> Result<Vec<String>> {
     let project_root = match project_root_override {
         Some(path) => path.to_path_buf(),
         None => std::env::current_dir()?,
     };
     let mut override_builder = OverrideBuilder::new(&project_root);
 
-    let filter_file_path = project_root.join(".ai/filter=all");
+    let context_name = context.unwrap_or("all");
+    let filter_file_path = project_root.join(format!(".ai/filter={}", context_name));
+
     if filter_file_path.exists() {
-        let content = fs::read_to_string(filter_file_path)?;
+        let content = fs::read_to_string(&filter_file_path)?;
         let mut is_exclude = false;
         let mut section_found = false;
 
@@ -53,8 +59,15 @@ pub fn get_files(paths: &[String], project_root_override: Option<&Path>) -> Resu
                 override_builder.add(&pattern)?;
             }
         }
+    } else if context.is_some() {
+        // A context was specified, but the file doesn't exist. This is an error.
+        return Err(crate::error::Error::Config(format!(
+            "Context filter file not found at {}",
+            filter_file_path.display()
+        )));
     } else {
-        // Default behavior if no filter file is found: include everything, respect .gitignore
+        // Default behavior if no filter file is found and no context was specified:
+        // include everything, respect .gitignore
         override_builder.add("!/.git")?;
         override_builder.add("!/.ai")?;
     }
@@ -108,7 +121,7 @@ mod tests {
         fs::write(filter_dir.join("filter=all"), filter_content)?;
 
         let paths = vec![root.to_str().unwrap().to_string()];
-        let files = get_files(&paths, Some(root))?;
+        let files = get_files(&paths, Some("all"), Some(root))?;
 
         let mut expected = vec![
             root.join("README.md").to_string_lossy().into_owned(),
@@ -135,7 +148,7 @@ mod tests {
         fs::write(root.join(".git/config"), "config")?;
 
         let paths = vec![root.to_str().unwrap().to_string()];
-        let files = get_files(&paths, Some(root))?;
+        let files = get_files(&paths, None, Some(root))?;
 
         let mut expected = vec![root.join("src/main.rs").to_string_lossy().into_owned()];
         expected.sort();

@@ -31,23 +31,58 @@ async fn run() -> Result<()> {
     info!(command = ?cli.command, "Executing command");
 
     match cli.command {
-        Commands::Research { objective, files } => {
-            let filtered_files = file_provider::get_files(&files, None)?;
-            orchestrator.research(objective, filtered_files).await?;
+        Commands::Research {
+            objective,
+            files,
+            context,
+        } => {
+            let files_to_provide = if let Some(context_name) = &context {
+                file_provider::get_files(&[".".to_string()], Some(context_name), None)?
+            } else if !files.is_empty() {
+                file_provider::get_files(&files, None, None)?
+            } else {
+                return Err(aide_rs::error::Error::Config(
+                    "You must provide either a list of files or a --context flag.".to_string(),
+                ));
+            };
+            orchestrator.research(objective, files_to_provide).await?;
         }
-        Commands::Plan { objective, files } => {
-            let filtered_files = file_provider::get_files(&files, None)?;
-            let _ = orchestrator.plan(objective, filtered_files, true).await?;
+        Commands::Plan {
+            objective,
+            files,
+            context,
+        } => {
+            let files_to_provide = if let Some(context_name) = &context {
+                file_provider::get_files(&[".".to_string()], Some(context_name), None)?
+            } else if !files.is_empty() {
+                file_provider::get_files(&files, None, None)?
+            } else {
+                return Err(aide_rs::error::Error::Config(
+                    "You must provide either a list of files or a --context flag.".to_string(),
+                ));
+            };
+            let _ = orchestrator
+                .plan(objective, files_to_provide, true)
+                .await?;
         }
         Commands::Implement {
             objective,
             files,
             validate_cmd,
             auto,
+            context,
         } => {
-            let filtered_files = file_provider::get_files(&files, None)?;
+            let files_to_provide = if let Some(context_name) = &context {
+                file_provider::get_files(&[".".to_string()], Some(context_name), None)?
+            } else if !files.is_empty() {
+                file_provider::get_files(&files, None, None)?
+            } else {
+                return Err(aide_rs::error::Error::Config(
+                    "You must provide either a list of files or a --context flag.".to_string(),
+                ));
+            };
             orchestrator
-                .implement(objective, filtered_files, validate_cmd, auto)
+                .implement(objective, files_to_provide, validate_cmd, auto)
                 .await?;
         }
         Commands::Run { prompt_file } => {

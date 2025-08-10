@@ -16,22 +16,31 @@ pub enum Commands {
     Research {
         /// The research topic (e.g., "best rust crates for audio processing").
         objective: String,
-        /// Files to include in the context.
+        /// Files to include in the context. Can be used if --context is not provided.
         files: Vec<String>,
+        /// The context name for file filtering (e.g., 'all', 'backend'). Overrides `files`.
+        #[arg(long)]
+        context: Option<String>,
     },
     /// Launch a planning session to break an objective into a task list.
     Plan {
         /// The high-level goal to be planned.
         objective: String,
-        /// Files to include in the context.
+        /// Files to include in the context. Can be used if --context is not provided.
         files: Vec<String>,
+        /// The context name for file filtering (e.g., 'all', 'backend'). Overrides `files`.
+        #[arg(long)]
+        context: Option<String>,
     },
     /// Launch an implementation session to work on code.
     Implement {
         /// The task to implement.
         objective: String,
-        /// Files to include in the context.
+        /// Files to include in the context. Can be used if --context is not provided.
         files: Vec<String>,
+        /// The context name for file filtering (e.g., 'all', 'backend'). Overrides `files`.
+        #[arg(long)]
+        context: Option<String>,
         /// The command to run to validate changes.
         #[arg(long, default_value = "make test")]
         validate_cmd: String,
