@@ -408,17 +408,6 @@ impl Orchestrator {
                 )));
             }
 
-            if aider_result.stdout.contains("No changes were applied.") {
-                self.logger.log_summary(&format!(
-                    "Aider reported no changes on attempt {}/{}. Assuming completion.",
-                    i + 1,
-                    max_retries
-                ));
-                self.logger
-                    .log_summary("Implement strategy completed successfully.");
-                return Ok(());
-            }
-
             // 2. Run validation command
             info!(command = %validate_cmd, "Running validation command.");
             let validation_start_time = Instant::now();
@@ -435,6 +424,17 @@ impl Orchestrator {
             });
 
             if validation_result.success {
+                if aider_result.stdout.contains("No changes were applied.") {
+                    self.logger.log_summary(&format!(
+                        "Validation passed and Aider reported no changes on attempt {}/{}. Assuming completion.",
+                        i + 1,
+                        max_retries
+                    ));
+                    self.logger
+                        .log_summary("Implement strategy completed successfully.");
+                    return Ok(());
+                }
+
                 if !continue_on_success {
                     self.logger.log_summary(&format!(
                         "Validation passed on attempt {}/{}.",

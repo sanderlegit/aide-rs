@@ -97,7 +97,7 @@ steps:
     assert!(stderr.contains("Running implement step."));
     assert!(stderr.contains("Validation passed on attempt 1/5. Continuing with plan."));
     assert!(stderr.contains(
-        "Aider reported no changes on attempt 2/5. Assuming completion."
+        "Validation passed and Aider reported no changes on attempt 2/5. Assuming completion."
     ));
     assert!(stderr.contains("Implement strategy completed successfully."));
 }
@@ -433,7 +433,7 @@ steps:
     assert!(stderr.contains("Retrieved documentation"));
     assert!(stderr.contains("Validation passed on attempt 2/5. Continuing with plan."));
     assert!(stderr.contains(
-        "Aider reported no changes on attempt 3/5. Assuming completion."
+        "Validation passed and Aider reported no changes on attempt 3/5. Assuming completion."
     ));
     assert!(stderr.contains("Implement strategy completed successfully."));
 
