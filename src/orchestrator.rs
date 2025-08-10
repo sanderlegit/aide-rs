@@ -511,15 +511,91 @@ impl Orchestrator {
 
             if let Some(call) = function_call {
                 info!(call = ?call, "Gemini requested a tool call for debugging");
-                match self.tool_executor.execute(call).await {
+                let tool_execution_result = self.tool_executor.execute(call).await;
+
+                match tool_execution_result {
                     Ok(docs) => {
                         retrieved_docs = serde_json::to_string_pretty(&docs)
                             .unwrap_or_else(|_| "Failed to format documentation.".to_string());
                         info!(docs = %retrieved_docs, "Retrieved documentation");
                     }
                     Err(e) => {
-                        error!(error = %e, "Tool execution failed");
-                        retrieved_docs = format!("Failed to retrieve documentation: {}", e);
+                        error!(error = %e, "Tool execution failed on first attempt. Retrying.");
+
+                        // Build a history for the retry prompt
+                        let mut history = contents; // This is the `Vec<Content>` from the first call
+                                                    // Add model's response (the tool call)
+                        history.push(crate::gemini_types::Content {
+                            parts: vec![crate::gemini_types::ContentPart {
+                                function_call: Some(call.clone()),
+                                ..Default::default()
+                            }],
+                            role: crate::gemini_types::Role::Model,
+                        });
+
+                        // Add tool's error response
+                        let error_response = serde_json::json!({
+                            "error": e.to_string(),
+                            "message": "Tool execution failed."
+                        });
+                        history.push(crate::gemini_types::Content {
+                            parts: vec![crate::gemini_types::ContentPart {
+                                function_response: Some(crate::gemini_types::FunctionResponse {
+                                    name: call.name.clone(),
+                                    response: error_response,
+                                }),
+                                ..Default::default()
+                            }],
+                            role: crate::gemini_types::Role::Tool,
+                        });
+
+                        // Add new user prompt for retry
+                        history.push(crate::gemini_types::Content {
+                            parts: vec![crate::gemini_types::ContentPart::new_text(
+                                "The tool call failed. Please analyze the error and try again. You may need to correct the `path` or `crate_name`.".to_string()
+                            )],
+                            role: crate::gemini_types::Role::User,
+                        });
+
+                        let retry_response = self
+                            .gemini
+                            .generate_content(history, tools.clone(), model_override)
+                            .await?;
+
+                        let retry_function_call = retry_response
+                            .candidates
+                            .as_ref()
+                            .and_then(|c| c.first())
+                            .and_then(|c| {
+                                c.content
+                                    .parts
+                                    .iter()
+                                    .find_map(|p| p.function_call.as_ref())
+                            });
+
+                        if let Some(retry_call) = retry_function_call {
+                            info!(call = ?retry_call, "Gemini requested a tool call for retry");
+                            match self.tool_executor.execute(retry_call).await {
+                                Ok(docs) => {
+                                    retrieved_docs = serde_json::to_string_pretty(&docs)
+                                        .unwrap_or_else(|_| {
+                                            "Failed to format documentation.".to_string()
+                                        });
+                                    info!(docs = %retrieved_docs, "Retrieved documentation on retry");
+                                }
+                                Err(e2) => {
+                                    error!(error = %e2, "Tool execution failed on retry.");
+                                    retrieved_docs = format!(
+                                        "Failed to retrieve documentation on retry: {}",
+                                        e2
+                                    );
+                                }
+                            }
+                        } else {
+                            info!("Gemini did not request a tool call on retry.");
+                            retrieved_docs =
+                                "Gemini did not provide a new tool call on retry.".to_string();
+                        }
                     }
                 }
             } else {
