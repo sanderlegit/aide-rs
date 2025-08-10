@@ -50,11 +50,27 @@ steps:
         .mount(&env.mock_server)
         .await;
 
-    // 3. Mock `aider` to succeed on the first try for the 'implement' stage
+    // 3. Mock `aider` to succeed, then report no changes to complete the loop.
     let mock_aider_path = env.full_path("mock_aider.sh");
+    let counter_file = env.full_path("run_count.txt");
+    fs::write(&counter_file, "0").unwrap();
+
     let script_content = format!(
-        "#!/bin/bash\necho 'modified' > {}\nexit 0",
-        env.full_path("src/main.rs").to_str().unwrap()
+        r#"#!/bin/bash
+        RUN_COUNT=$(cat {counter})
+        if [ "$RUN_COUNT" -eq "0" ]; then
+            echo "first run, making changes"
+            echo "modified" > {main_rs}
+            echo "1" > {counter}
+            exit 0
+        else
+            echo "second run, no changes needed"
+            echo "No changes were applied."
+            exit 0
+        fi
+        "#,
+        counter = counter_file.to_str().unwrap(),
+        main_rs = env.full_path("src/main.rs").to_str().unwrap()
     );
     fs::write(&mock_aider_path, script_content).unwrap();
     StdCommand::new("chmod")
@@ -79,11 +95,11 @@ steps:
     assert!(stderr.contains("Running plan step."));
     assert!(stderr.contains("Plan saved to"));
     assert!(stderr.contains("Running implement step."));
-    assert!(stderr.contains("Aider succeeded on attempt 1/5."));
-    assert!(stderr.contains("Aider has committed the changes."));
-
-    // Since aider is mocked, we can't check the commit message directly.
-    // We just check that the flow completes.
+    assert!(stderr.contains("Aider succeeded on attempt 1/5. Continuing with plan."));
+    assert!(stderr.contains(
+        "Aider reported no changes on attempt 2/5. Assuming completion."
+    ));
+    assert!(stderr.contains("Implement strategy completed successfully."));
 }
 
 #[tokio::test]
@@ -325,7 +341,7 @@ steps:
             echo "first run, failing"
             echo "1" > {counter}
             exit 1
-        else
+        elif [ "$RUN_COUNT" -eq "1" ]; then
             # On second run, capture the prompt and succeed
             echo "second run, succeeding"
             for i in $(seq 1 $#); do
@@ -335,6 +351,12 @@ steps:
                     break
                 fi
             done
+            echo "2" > {counter}
+            exit 0
+        else
+            # On third run, report no changes
+            echo "third run, no changes"
+            echo "No changes were applied."
             exit 0
         fi
         "#,
@@ -368,11 +390,11 @@ steps:
     assert!(stderr.contains("Aider failed on attempt 1/5. Analyzing failure..."));
     assert!(stderr.contains("Gemini requested a tool call for debugging"));
     assert!(stderr.contains("Retrieved documentation"));
-    assert!(stderr.contains("Aider succeeded on attempt 2/5."));
-    assert!(stderr.contains("Aider has committed the changes."));
-
-    // Since aider is mocked, we can't check the commit message directly.
-    // We just check that the flow completes.
+    assert!(stderr.contains("Aider succeeded on attempt 2/5. Continuing with plan."));
+    assert!(stderr.contains(
+        "Aider reported no changes on attempt 3/5. Assuming completion."
+    ));
+    assert!(stderr.contains("Implement strategy completed successfully."));
 
     // Check that the docs were passed to aider on the second run
     let final_prompt = fs::read_to_string(docs_prompt_file).unwrap();
