@@ -23,10 +23,7 @@ steps:
       - `tokio`: For the async runtime.
       - `tracing`: For logging.
     context: "all"
-    model: "gemini-1.5-flash"
     output: "research/crates.md"
-    files:
-      - "README.md"
 
   - type: plan
     objective: |
