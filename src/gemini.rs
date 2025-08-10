@@ -62,14 +62,14 @@ impl GeminiClientWrapper {
             "Sending request to Gemini model '{}' at '{}'.",
             model_to_use, self.base_url
         );
-        debug!(request = %serde_json::to_string_pretty(&request_body).unwrap_or_else(|_| "Failed to format request body".to_string()), "Gemini request body");
+        trace!(request = %serde_json::to_string_pretty(&request_body).unwrap_or_else(|_| "Failed to format request body".to_string()), "Gemini request body");
 
         let url = format!(
             "{}/v1beta/models/{}:generateContent?key={}",
             self.base_url, model_to_use, self.api_key
         );
 
-        debug!(url = %url, "Requesting URL");
+        trace!(url = %url, "Requesting URL");
         let response = self.client.post(&url).json(&request_body).send().await?;
 
         if !response.status().is_success() {
@@ -80,7 +80,7 @@ impl GeminiClientWrapper {
         }
 
         let response_text = response.text().await?;
-        debug!(response_text = %response_text, "Raw Gemini response body");
+        trace!(response_text = %response_text, "Raw Gemini response body");
 
         let response: GenerateContentResponse = match serde_json::from_str(&response_text) {
             Ok(resp) => resp,
@@ -93,7 +93,7 @@ impl GeminiClientWrapper {
                 return Err(e.into());
             }
         };
-        debug!(response = %serde_json::to_string_pretty(&response).unwrap_or_else(|_| "Failed to format response body".to_string()), "Gemini response received");
+        trace!(response = %serde_json::to_string_pretty(&response).unwrap_or_else(|_| "Failed to format response body".to_string()), "Gemini response received");
 
         let time_taken = start_time.elapsed();
         self.logger.log_response(ResponseLog {

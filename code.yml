@@ -50,6 +50,6 @@ steps:
   - type: implement
     objective: "Implement the plan to create the audio_db tool."
     context: "all"
-    validate_cmd: "make test"
-    max_retries: 10
-    allow_shell_commands: true
+    validateCmd: "make test"
+    maxRetries: 10
+    allowShellCommands: true
