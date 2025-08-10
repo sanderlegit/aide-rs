@@ -17,6 +17,9 @@ enum StepConfig {
         objective: String,
         context: String,
         model: Option<String>,
+        output: Option<String>,
+        #[serde(default)]
+        files: Option<Vec<String>>,
     },
     Plan {
         objective: String,
@@ -120,6 +123,10 @@ impl Orchestrator {
         } else {
             session.dir.join("research.md")
         };
+
+        if let Some(parent) = research_file_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
         std::fs::write(&research_file_path, &research_text)?;
 
         self.logger.log_summary(&format!(
@@ -383,13 +390,21 @@ impl Orchestrator {
                     objective,
                     context,
                     model,
+                    output,
+                    files: extra_files,
                 } => {
                     info!(objective = %objective, "Running research step.");
                     last_objective = Some(objective.clone());
-                    let files =
+                    let mut files =
                         file_provider::get_files(&[".".to_string()], Some(&context), None)?;
+                    if let Some(mut new_files) = extra_files {
+                        files.append(&mut new_files);
+                    }
+                    files.sort();
+                    files.dedup();
+
                     let path = self
-                        .research(objective, files, false, None, model.as_deref())
+                        .research(objective, files, false, output, model.as_deref())
                         .await?;
                     research_file_path = Some(path);
                 }
