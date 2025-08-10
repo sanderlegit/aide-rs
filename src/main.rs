@@ -74,6 +74,7 @@ async fn run() -> Result<()> {
             context,
             max_retries,
             allow_shell_commands,
+            pre_validate,
         } => {
             let files_to_provide = if let Some(context_name) = &context {
                 file_provider::get_files(&[".".to_string()], Some(context_name), None)?
@@ -94,6 +95,7 @@ async fn run() -> Result<()> {
                     None,
                     allow_shell_commands,
                     false, // Do not continue on success for standalone `implement`
+                    pre_validate,
                 )
                 .await?;
         }

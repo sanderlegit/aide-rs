@@ -320,6 +320,7 @@ impl Orchestrator {
         model_override: Option<&str>,
         allow_shell_commands: bool,
         continue_on_success: bool,
+        pre_validate: bool,
     ) -> Result<()> {
         self.logger.log_summary("Starting implement strategy.");
         let session = Session::new("implement", &objective)?;
@@ -347,6 +348,29 @@ impl Orchestrator {
             self.logger
                 .log_summary("Implement strategy completed (interactive).");
             return Ok(());
+        }
+
+        if pre_validate {
+            info!(command = %validate_cmd, "Running pre-validation command.");
+            let validation_start_time = Instant::now();
+            let validation_result = run_shell_command(&validate_cmd).await;
+            let validation_time_taken = validation_start_time.elapsed();
+
+            self.logger.log_validation(crate::logging::ValidationLog {
+                command: validate_cmd.clone(),
+                exit_code: validation_result.exit_code,
+                stdout: validation_result.stdout.clone(),
+                stderr: validation_result.stderr.clone(),
+                success: validation_result.success,
+                time_taken_ms: validation_time_taken.as_millis(),
+            });
+
+            if !validation_result.success {
+                return Err(Error::VerificationFailed(
+                    "Pre-validation command failed. Please fix your tests before running with --pre-validate.".to_string(),
+                ));
+            }
+            self.logger.log_summary("Pre-validation passed.");
         }
 
         // Automated loop

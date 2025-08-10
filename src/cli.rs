@@ -59,6 +59,9 @@ pub enum Commands {
         /// Allow aider to suggest and run shell commands.
         #[arg(long)]
         allow_shell_commands: bool,
+        /// Run validation command before starting the implementation loop to ensure tests are passing.
+        #[arg(long)]
+        pre_validate: bool,
     },
     /// Execute a non-interactive, multi-stage workflow from a config file.
     Run {

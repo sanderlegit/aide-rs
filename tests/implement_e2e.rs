@@ -257,3 +257,45 @@ async fn test_implement_auto_failure_and_debug_with_docs() {
     assert!(final_prompt.contains("pub fn old_function()"));
     assert!(final_prompt.contains("Please use this information to fix the code."));
 }
+
+#[tokio::test]
+async fn test_implement_auto_pre_validate_failure() {
+    let env = TestEnv::new().await;
+    println!(
+        "Test temp dir for implement_auto_pre_validate_failure: {}",
+        env.path().display()
+    );
+    env.init_git_repo();
+    env.create_file("src/main.rs", "fn main() {}");
+
+    // Mock `aider` to fail if it's ever called.
+    let mock_aider_path = env.full_path("mock_aider.sh");
+    let script_content = "#!/bin/bash\necho 'Aider should not have been called!'\nexit 1";
+    fs::write(&mock_aider_path, script_content).unwrap();
+    StdCommand::new("chmod")
+        .arg("+x")
+        .arg(&mock_aider_path)
+        .status()
+        .unwrap();
+
+    let mut cmd = Command::cargo_bin("aide-rs").unwrap();
+    cmd.current_dir(env.path());
+    env.apply_env(&mut cmd);
+    cmd.env("AIDER_COMMAND", mock_aider_path.to_str().unwrap());
+
+    cmd.arg("implement")
+        .arg("a test objective")
+        .arg("src/main.rs")
+        .arg("--auto")
+        .arg("--pre-validate")
+        .arg("--validate-cmd")
+        .arg("false"); // This validation command will fail
+
+    let output = cmd.assert().failure();
+    let stderr = String::from_utf8(output.get_output().stderr.clone()).unwrap();
+
+    assert!(stderr.contains("Running pre-validation command."));
+    // The error message from main.rs will be printed to stderr.
+    assert!(stderr.contains("Block verification failed: Pre-validation command failed."));
+    assert!(!stderr.contains("Running aider in auto mode.")); // Aider should not be run
+}
