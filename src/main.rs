@@ -1,6 +1,7 @@
 use aide_rs::{
     cli::{Cli, Commands},
     error::Result,
+    file_provider,
     orchestrator::Orchestrator,
 };
 use clap::Parser;
@@ -31,10 +32,12 @@ async fn run() -> Result<()> {
 
     match cli.command {
         Commands::Research { objective, files } => {
-            orchestrator.research(objective, files).await?;
+            let filtered_files = file_provider::get_files(&files, None)?;
+            orchestrator.research(objective, filtered_files).await?;
         }
         Commands::Plan { objective, files } => {
-            let _ = orchestrator.plan(objective, files, true).await?;
+            let filtered_files = file_provider::get_files(&files, None)?;
+            let _ = orchestrator.plan(objective, filtered_files, true).await?;
         }
         Commands::Implement {
             objective,
@@ -42,8 +45,9 @@ async fn run() -> Result<()> {
             validate_cmd,
             auto,
         } => {
+            let filtered_files = file_provider::get_files(&files, None)?;
             orchestrator
-                .implement(objective, files, validate_cmd, auto)
+                .implement(objective, filtered_files, validate_cmd, auto)
                 .await?;
         }
         Commands::Run { prompt_file } => {

@@ -1,5 +1,6 @@
 use crate::agents::aider::AiderWrapper;
 use crate::error::{Error, Result};
+use crate::file_provider;
 use crate::gemini::GeminiClientWrapper;
 use crate::logging::RunLogger;
 use crate::session::Session;
@@ -322,9 +323,11 @@ impl Orchestrator {
         let file_content = std::fs::read_to_string(&prompt_file)?;
         let config: RunConfig = serde_yaml::from_str(&file_content)?;
 
+        let filtered_files = file_provider::get_files(&config.files, None)?;
+
         info!(objective = %config.objective, "Running plan strategy.");
         let plan_file_path = self
-            .plan(config.objective.clone(), config.files.clone(), false)
+            .plan(config.objective.clone(), filtered_files.clone(), false)
             .await?;
 
         let implement_objective = format!(
@@ -333,7 +336,7 @@ impl Orchestrator {
             config.objective
         );
 
-        let mut implement_files = config.files;
+        let mut implement_files = filtered_files;
         implement_files.push(plan_file_path.to_str().unwrap().to_string());
 
         info!("Running implement strategy.");

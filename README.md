@@ -91,7 +91,31 @@ This loop will:
 3.  If it fails, `aide-rs` uses an LLM to analyze the error, looks up relevant documentation with its `doc_retriever` tool, and feeds the context back to `aider` for the next attempt.
 4.  If it succeeds, the loop finishes and the changes are committed.
 
-#### Fully Automated Workflow: The `run` Command
+### Configuration
+
+#### File Filtering
+
+`aide-rs` automatically filters the files included in the context using rules defined in `.ai/filter=all`. This file uses glob patterns to include or exclude files and directories. You can customize it to suit your project's needs.
+
+The filter file is composed of sections, starting with `#include` or `#exclude`.
+
+**Example `.ai/filter=all`:**
+```
+#exclude
+.git
+.ai
+target/
+*.lock
+
+#include
+*.rs
+*.toml
+*.md
+Makefile
+```
+When you provide file paths to commands like `plan` or `implement` (e.g., `aide-rs plan "..." .`), `aide-rs` will walk the directories and apply these filters to determine the final list of files used.
+
+### Fully Automated Workflow: The `run` Command
 
 The `run` command orchestrates a complete, non-interactive workflow from a single configuration file. This is ideal for CI/CD pipelines or complex, automated refactoring tasks.
 
