@@ -46,6 +46,7 @@ steps:
       - For the `play` command, read the audio data from the file path stored in LanceDB and use `rodio` to play it back.
       - The code should be well-structured. Consider creating separate modules for CLI, database logic, and audio handling if the complexity grows.
     context: "all"
+
   - type: implement
     objective: "Implement the plan to create the audio_db tool."
     context: "all"
