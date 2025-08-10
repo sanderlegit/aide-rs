@@ -97,7 +97,7 @@ This loop works by orchestrating `aider` with a validation command. Here's the p
 2.  `aider` attempts to fix the code and commits its changes.
 3.  After `aider` finishes, `aide-rs` runs the validation command (e.g., `cargo check`).
 4.  **If the validation command succeeds**, `aide-rs` considers the step successful and the loop finishes.
-5.  **If the validation command fails**, `aide-rs` reverts `aider`'s last commit, uses an LLM to analyze the error output, looks up relevant documentation with its `doc_retriever` tool, and then re-runs `aider` with the new context to try again.
+5.  **If the validation command fails**, `aide-rs` uses an LLM to analyze the error output, looks up relevant documentation with its `doc_retriever` tool, and then re-runs `aider` with the new context to try again. The original failing commit is not reverted, and `aider` will create a new commit with the fix.
 
 The `--allow-shell-commands` flag is recommended for automated runs to let the agent execute commands if needed, but can be omitted for safety.
 

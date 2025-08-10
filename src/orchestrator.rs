@@ -160,20 +160,25 @@ impl Orchestrator {
             .and_then(|p| p.text)
             .unwrap_or_else(|| "No response text from Gemini.".to_string());
 
-        let research_file_path = if let Some(path_str) = output_path {
+        // Always save to session cache for posterity
+        let session_cache_path = session.dir.join("research.md");
+        std::fs::write(&session_cache_path, &research_text)?;
+
+        // Determine the user-visible path. Default to `research/research.md` if not specified.
+        let user_visible_path = if let Some(path_str) = output_path {
             PathBuf::from(path_str)
         } else {
-            session.dir.join("research.md")
+            PathBuf::from("research/research.md")
         };
 
-        if let Some(parent) = research_file_path.parent() {
+        if let Some(parent) = user_visible_path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        std::fs::write(&research_file_path, &research_text)?;
+        std::fs::write(&user_visible_path, &research_text)?;
 
         self.logger.log_summary(&format!(
             "Research summary saved to {}",
-            research_file_path.display()
+            user_visible_path.display()
         ));
 
         if interactive {
@@ -182,7 +187,7 @@ impl Orchestrator {
             self.aider
                 .run(
                     &session,
-                    vec![research_file_path.to_str().unwrap().to_string()],
+                    vec![user_visible_path.to_str().unwrap().to_string()],
                     "Here is the research document I generated. Please review it.",
                     false,
                     None,
@@ -191,7 +196,7 @@ impl Orchestrator {
                 .await?;
         }
 
-        Ok(research_file_path)
+        Ok(user_visible_path)
     }
 
     #[tracing::instrument(skip(self))]
@@ -250,15 +255,23 @@ impl Orchestrator {
             .and_then(|p| p.text)
             .unwrap_or_else(|| "No response text from Gemini.".to_string());
 
-        let plan_file_path = session.dir.join("plan.md");
-        std::fs::write(&plan_file_path, &plan_text)?;
+        // Always save to session cache for posterity
+        let session_cache_path = session.dir.join("plan.md");
+        std::fs::write(&session_cache_path, &plan_text)?;
+
+        // Save to a user-visible path so aider can find it in its context.
+        let user_visible_path = PathBuf::from("plans/plan.md");
+        if let Some(parent) = user_visible_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::write(&user_visible_path, &plan_text)?;
 
         self.logger
-            .log_summary(&format!("Plan saved to {}", plan_file_path.display()));
+            .log_summary(&format!("Plan saved to {}", user_visible_path.display()));
 
         if interactive {
             let mut files_for_aider = files;
-            files_for_aider.push(plan_file_path.to_str().unwrap().to_string());
+            files_for_aider.push(user_visible_path.to_str().unwrap().to_string());
 
             info!("Launching aider to review and refine the plan.");
             self.aider
@@ -267,7 +280,7 @@ impl Orchestrator {
                     files_for_aider,
                     &format!(
                         "Here is the plan I generated, stored in `{}`. Please review it and help me refine it.",
-                        plan_file_path.display()
+                        user_visible_path.display()
                     ),
                     false,
                     None,
@@ -276,7 +289,7 @@ impl Orchestrator {
                 .await?;
         }
 
-        Ok(plan_file_path)
+        Ok(user_visible_path)
     }
 
     /// Executes the implementation strategy.
@@ -423,8 +436,9 @@ impl Orchestrator {
                 max_retries
             ));
 
-            info!("Reverting the last commit from aider.");
-            crate::vcs::revert_last_commit(&PathBuf::from("."))?;
+            // The user has opted to not revert failed commits automatically.
+            // The failed state will be part of the git history, and subsequent
+            // attempts will build on it.
 
             let debug_prompt = format!(
                 "The last attempt to fix the code failed. I need your help to figure out what to do next.
@@ -506,7 +520,6 @@ impl Orchestrator {
 
         let mut plan_file_path: Option<PathBuf> = None;
         let mut research_file_path: Option<PathBuf> = None;
-        let mut last_objective: Option<String> = None;
         let total_steps = config.steps.len();
         let mut step_number = 1;
 
@@ -524,7 +537,6 @@ impl Orchestrator {
                         step_number, total_steps
                     ));
                     info!(objective = %objective, "Running research step.");
-                    last_objective = Some(objective.clone());
                     let mut files =
                         file_provider::get_files(&[".".to_string()], Some(&context), None)?;
                     if let Some(mut new_files) = extra_files {
@@ -552,7 +564,6 @@ impl Orchestrator {
                         step_number, total_steps
                     ));
                     info!(objective = %objective, "Running plan step.");
-                    last_objective = Some(objective.clone());
                     let files =
                         file_provider::get_files(&[".".to_string()], Some(&context), None)?;
                     let research_content = if let Some(path) = &research_file_path {
@@ -582,23 +593,13 @@ impl Orchestrator {
                         step_number, total_steps
                     ));
                     info!(objective = %objective, "Running implement step.");
-                    let mut files =
+                    let files =
                         file_provider::get_files(&[".".to_string()], Some(&context), None)?;
-                    let mut implement_objective = objective.clone();
+                    let implement_objective = objective.clone();
 
-                    if let Some(plan_path) = &plan_file_path {
-                        let original_objective = last_objective.as_deref().unwrap_or(&objective);
-                        implement_objective = format!(
-                            "Implement the tasks described in the plan file `{}`. The original objective was: {}",
-                            plan_path.display(),
-                            original_objective
-                        );
-                        files.push(plan_path.to_str().unwrap().to_string());
-                    }
-
-                    if let Some(research_path) = &research_file_path {
-                        files.push(research_path.to_str().unwrap().to_string());
-                    }
+                    // The plan and research files are now in the workspace, so we don't need
+                    // to inject them into the prompt or file list. Aider will see them
+                    // as part of its context.
 
                     self.implement(
                         implement_objective,

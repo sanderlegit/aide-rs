@@ -294,7 +294,10 @@ steps:
 "#;
     env.create_file("run.yml", config_content);
     env.create_file("src/main.rs", "fn main() {}");
-    env.create_file(".ai/filter=all", "#include\n*.rs\n*.toml");
+    env.create_file(
+        ".ai/filter=all",
+        "#include\n*.rs\n*.toml\nplans/*.md\nresearch/*.md",
+    );
 
     // 3. Mock Gemini for the 'plan' stage
     let plan_response = json!({

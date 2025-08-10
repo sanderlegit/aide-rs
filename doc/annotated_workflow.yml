@@ -107,8 +107,8 @@ steps:
     # `validateCmd`: The validation command to run after each implementation
     # attempt. After `aider` applies and commits its changes, `aide-rs` will
     # execute this command. If the command succeeds, the step is considered
-    # complete. If it fails, `aide-rs` reverts the commit and initiates its
-    # debugging loop.
+    # complete. If it fails, `aide-rs` initiates its debugging loop. The original
+    # failing commit is not reverted.
 
     maxRetries: 10
     # `maxRetries`: The number of times the agent will try to fix the code if

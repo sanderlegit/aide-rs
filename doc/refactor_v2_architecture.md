@@ -78,7 +78,7 @@ This is the core automated workflow, which orchestrates `aider`'s test-driven de
 5.  **Validate**: `aide-rs` runs the validation command itself.
 6.  **Check Result**:
     -   **On Success**: The loop terminates.
-    -   **On Failure**: `aide-rs` reverts the commit. It then captures the `stdout` and `stderr` from the failed validation.
+    -   **On Failure**: `aide-rs` captures the `stdout` and `stderr` from the failed validation. The original commit is not reverted.
         a. The test failure output is captured.
         b. `Orchestrator` calls `GeminiWrapper` in "Debug Mode" with the error, asking it to identify relevant APIs or concepts to look up.
         c. The Gemini response is used to invoke our `doc_retriever` tool.

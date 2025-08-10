@@ -2,20 +2,6 @@ use crate::error::Result;
 use git2::{Oid, Repository, Signature};
 use std::path::{Path, PathBuf};
 
-pub fn revert_last_commit(repo_path: &Path) -> Result<()> {
-    let repo = Repository::open(repo_path)?;
-    let head_commit = repo.head()?.peel_to_commit()?;
-    // Ensure there is a parent to revert to.
-    if head_commit.parent_count() > 0 {
-        let parent_commit = head_commit.parent(0)?;
-        repo.reset(parent_commit.as_object(), git2::ResetType::Hard, None)?;
-    } else {
-        // This is the initial commit, can't revert.
-        tracing::warn!("Attempted to revert initial commit. No action taken.");
-    }
-    Ok(())
-}
-
 pub fn add_and_commit(repo_path: &Path, paths: &[PathBuf], message: &str) -> Result<Oid> {
     let repo = Repository::open(repo_path)?;
 
