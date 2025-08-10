@@ -5,7 +5,7 @@ use dotenvy::dotenv;
 use reqwest::Client;
 use std::env;
 use std::time::Instant;
-use tracing::{debug, error, info};
+use tracing::{error, info, trace};
 
 pub struct GeminiClientWrapper {
     client: Client,
