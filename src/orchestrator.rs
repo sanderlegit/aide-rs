@@ -70,7 +70,7 @@ enum StepConfig {
         objective: String,
         context: String,
         #[serde(default = "default_validate_cmd")]
-        validate_cmd: String,
+        validateCmd: String,
         max_retries: Option<u32>,
         model: Option<String>,
         #[serde(default)]
@@ -581,7 +581,7 @@ impl Orchestrator {
                 StepConfig::Implement {
                     objective,
                     context,
-                    validate_cmd,
+                    validateCmd,
                     max_retries,
                     model,
                     allow_shell_commands,
@@ -602,7 +602,7 @@ impl Orchestrator {
                     self.implement(
                         implement_objective,
                         files,
-                        validate_cmd,
+                        validateCmd,
                         true,
                         max_retries.unwrap_or(5),
                         model.as_deref(),

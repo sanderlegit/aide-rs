@@ -118,7 +118,7 @@ steps:
   - type: implement
     objective: "Implement the plan."
     context: "all"
-    validate_cmd: "cargo check"
+    validateCmd: "cargo check"
 ```
 
 Then, execute it:
