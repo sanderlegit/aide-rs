@@ -82,7 +82,7 @@ async fn test_implement_auto_failure_and_retry() {
         }]
     });
     Mock::given(method("POST"))
-        .and(path_regex(r"/v1beta/models/gemini-1.5-pro:generateContent.*"))
+        .and(path_regex(r"/v1beta/models/gemini-2.5-pro:generateContent.*"))
         .respond_with(ResponseTemplate::new(200).set_body_json(mock_response))
         .mount(&env.mock_server)
         .await;
@@ -176,7 +176,7 @@ async fn test_implement_auto_failure_and_debug_with_docs() {
         }]
     });
     Mock::given(method("POST"))
-        .and(path_regex(r"/v1beta/models/gemini-1.5-pro:generateContent.*"))
+        .and(path_regex(r"/v1beta/models/gemini-2.5-pro:generateContent.*"))
         .respond_with(ResponseTemplate::new(200).set_body_json(mock_response))
         .mount(&env.mock_server)
         .await;

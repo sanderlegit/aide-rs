@@ -57,7 +57,7 @@ pub struct Orchestrator {
 impl Orchestrator {
     pub fn new(model_override: Option<String>) -> Result<Self> {
         let logger = RunLogger::new()?;
-        let default_model = "gemini-1.5-pro".to_string();
+        let default_model = "gemini-2.5-pro".to_string();
         let model_name = model_override.unwrap_or(default_model);
         let gemini = GeminiClientWrapper::new(model_name, logger.clone())?;
         let aider = AiderWrapper;

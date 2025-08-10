@@ -45,7 +45,7 @@ steps:
         }]
     });
     Mock::given(method("POST"))
-        .and(path_regex(r"/v1beta/models/gemini-1.5-pro:generateContent.*"))
+        .and(path_regex(r"/v1beta/models/gemini-2.5-pro:generateContent.*"))
         .respond_with(ResponseTemplate::new(200).set_body_json(plan_response))
         .mount(&env.mock_server)
         .await;
@@ -108,7 +108,7 @@ async fn test_plan_command_e2e() {
         }]
     });
     Mock::given(method("POST"))
-        .and(path_regex(r"/v1beta/models/gemini-1.5-pro:generateContent.*"))
+        .and(path_regex(r"/v1beta/models/gemini-2.5-pro:generateContent.*"))
         .respond_with(ResponseTemplate::new(200).set_body_json(plan_response))
         .mount(&env.mock_server)
         .await;
@@ -186,7 +186,7 @@ async fn test_research_command_e2e() {
         }]
     });
     Mock::given(method("POST"))
-        .and(path_regex(r"/v1beta/models/gemini-1.5-pro:generateContent.*"))
+        .and(path_regex(r"/v1beta/models/gemini-2.5-pro:generateContent.*"))
         .respond_with(ResponseTemplate::new(200).set_body_json(research_response))
         .mount(&env.mock_server)
         .await;
@@ -293,13 +293,13 @@ steps:
 
     // The first POST is for the plan, the second is for the debug step.
     Mock::given(method("POST"))
-        .and(path_regex(r"/v1beta/models/gemini-1.5-pro:generateContent.*"))
+        .and(path_regex(r"/v1beta/models/gemini-2.5-pro:generateContent.*"))
         .respond_with(ResponseTemplate::new(200).set_body_json(plan_response))
         .up_to_n_times(1)
         .mount(&env.mock_server)
         .await;
     Mock::given(method("POST"))
-        .and(path_regex(r"/v1beta/models/gemini-1.5-pro:generateContent.*"))
+        .and(path_regex(r"/v1beta/models/gemini-2.5-pro:generateContent.*"))
         .respond_with(ResponseTemplate::new(200).set_body_json(implement_debug_response))
         .up_to_n_times(1)
         .mount(&env.mock_server)

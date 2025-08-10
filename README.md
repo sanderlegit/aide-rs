@@ -33,7 +33,7 @@ Instead of a simple prompt-and-response loop, `aide-rs` manages complex, multi-s
 2.  **Configure your environment:**
     Create a `.env` file in the root of the project to store your API key and configure the `aider` command.
     ```
-    AIDER_COMMAND="aider --yes --dark-mode --model vertex_ai/gemini-1.5-pro"
+    AIDER_COMMAND="aider --yes --dark-mode --model vertex_ai/gemini-2.5-pro"
     GEMINI_API_KEY=your_api_key_here
     ```
     -   `AIDER_COMMAND`: The exact `aider` command to run. You can customize this with your preferred `aider` settings. `aide-rs` will append its own arguments to this command.

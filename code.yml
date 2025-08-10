@@ -1,15 +1,5 @@
 # This workflow file directs the agent to create a new Rust command-line tool.
 # It is designed to be run from an empty directory.
-#
-# These are the recommended package versions for Cargo.toml:
-# lancedb = "0.21.2"
-# clap = { version = "4.5.43", features = ["derive"] }
-# hound = "3.5.1"
-# rodio = "0.21.1"
-# thiserror = "2.0.12"
-# tokio = { version = "1.47.1", features = ["full"] }
-# tracing = "0.1.41"
-# tracing-subscriber = "0.3.18"
 
 steps:
   - type: research
