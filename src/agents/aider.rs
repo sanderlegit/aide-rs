@@ -37,10 +37,24 @@ impl AiderWrapper {
         // The first part of the split is the command itself.
         let command_name = args.remove(0);
 
-        // In auto mode, prevent aider from checking for updates, which can cause it
-        // to crash in a non-interactive environment.
-        if auto && !args.iter().any(|arg| arg == "--no-check-update") {
-            args.push("--no-check-update".to_string());
+        // In auto mode, add flags to ensure it runs non-interactively and predictably.
+        if auto {
+            // Prevent aider from checking for updates, which can crash in non-interactive CI
+            if !args.iter().any(|arg| arg == "--no-check-update") {
+                args.push("--no-check-update".to_string());
+            }
+            // Always say yes to prompts in auto mode
+            if !args.iter().any(|arg| arg == "--yes-always" || arg == "--yes") {
+                args.push("--yes-always".to_string());
+            }
+            // We manage commits, so disable aider's auto-commits
+            if !args.iter().any(|arg| arg == "--no-auto-commits") {
+                args.push("--no-auto-commits".to_string());
+            }
+            // Disable streaming for cleaner logs in auto mode
+            if !args.iter().any(|arg| arg == "--no-stream") {
+                args.push("--no-stream".to_string());
+            }
         }
 
         // Add session-specific arguments
