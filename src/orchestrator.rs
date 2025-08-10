@@ -75,6 +75,8 @@ enum StepConfig {
         model: Option<String>,
         #[serde(default)]
         allow_shell_commands: bool,
+        #[serde(default)]
+        pre_validate: bool,
     },
 }
 
@@ -609,6 +611,7 @@ impl Orchestrator {
                     max_retries,
                     model,
                     allow_shell_commands,
+                    pre_validate,
                 } => {
                     self.logger.log_summary(&format!(
                         "\n--- Starting Step {}/{}: Implement ---",
@@ -632,6 +635,7 @@ impl Orchestrator {
                         model.as_deref(),
                         allow_shell_commands,
                         true, // Continue on success when called from `run`
+                        pre_validate,
                     )
                     .await?;
                     self.logger.log_summary(&format!(
