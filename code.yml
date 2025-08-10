@@ -53,3 +53,4 @@ steps:
     validateCmd: "make test"
     maxRetries: 10
     allowShellCommands: true
+    preValidate: true

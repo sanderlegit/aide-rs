@@ -89,7 +89,7 @@ For complex tasks, you can use the commands sequentially. This gives you full co
 For smaller, well-defined tasks like fixing a bug, you can use the automated implementation loop.
 
 ```bash
-aide-rs implement --context all "Fix the compilation errors" --auto --validate-cmd "cargo check" --allow-shell-commands
+aide-rs implement --context all "Fix the compilation errors" --auto --validate-cmd "cargo check" --allow-shell-commands --pre-validate
 ```
 
 This loop works by orchestrating `aider` with a validation command. Here's the process:
@@ -99,7 +99,7 @@ This loop works by orchestrating `aider` with a validation command. Here's the p
 4.  **If the validation command succeeds**, `aide-rs` considers the step successful and the loop finishes.
 5.  **If the validation command fails**, `aide-rs` uses an LLM to analyze the error output, looks up relevant documentation with its `doc_retriever` tool, and then re-runs `aider` with the new context to try again. The original failing commit is not reverted, and `aider` will create a new commit with the fix.
 
-The `--allow-shell-commands` flag is recommended for automated runs to let the agent execute commands if needed, but can be omitted for safety.
+The `--allow-shell-commands` flag is recommended for automated runs to let the agent execute commands if needed, but can be omitted for safety. The `--pre-validate` flag ensures your validation command is passing before the agent starts making changes.
 
 #### Fully Automated Workflow: The `run` Command
 
@@ -119,6 +119,9 @@ steps:
     objective: "Implement the plan."
     context: "all"
     validateCmd: "cargo check"
+    maxRetries: 10
+    allowShellCommands: true
+    preValidate: true
 ```
 
 Then, execute it:

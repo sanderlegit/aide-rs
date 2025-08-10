@@ -117,3 +117,8 @@ steps:
     allowShellCommands: true
     # `allowShellCommands`: (Optional, defaults to false) Can be set to `true`
     # to allow `aider` to execute shell commands during the implementation.
+
+    preValidate: true
+    # `preValidate`: (Optional, defaults to false) If true, `aide-rs` will run
+    # the `validateCmd` once before starting the implementation loop. If it fails,
+    # the run will abort. This ensures you start with a passing test suite.
