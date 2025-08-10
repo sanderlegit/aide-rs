@@ -104,9 +104,11 @@ steps:
     # `context: "all"`: All project files are added to the `aider` chat.
 
     validateCmd: "make test"
-    # `validateCmd`: The command to run after `aider` makes changes. `aide-rs`
-    # uses the exit code of this command to determine if the implementation was
-    # successful. `aider` will commit the changes upon success.
+    # `validateCmd`: The validation command to run after each implementation
+    # attempt. `aide-rs` passes this command directly to `aider`'s `--test-cmd`
+    # flag. `aider` then runs this command after applying code changes. If the
+    # command succeeds, `aider` commits the changes and exits successfully. If it
+    # fails, `aide-rs` initiates its debugging loop.
 
     maxRetries: 10
     # `maxRetries`: The number of times the agent will try to fix the code if

@@ -70,13 +70,14 @@ These strategies define the high-level workflows the `Orchestrator` can execute.
 5.  **Delegate to Aider**: The response (a markdown task list) is passed as the initial message to a new `aider` session. The user can then interactively refine the plan with `aider`. The final plan is saved to `<session_dir>/plan.md`.
 
 ### Implement Strategy (Automated Loop)
-This is the core automated workflow.
+This is the core automated workflow, which orchestrates `aider`'s test-driven development capabilities.
 1.  **Initiate**: User runs `aide-rs implement "my task" --auto --validate-cmd "cargo check"`.
 2.  **Session Start**: A new session is created. The `Orchestrator` enters a retry loop.
-3.  **Run Aider**: `Orchestrator` calls `AiderWrapper`, providing the task and the validation command. `aider` is configured to run the test automatically after making changes.
-4.  **Check Result**:
-    -   **On Success (Validation Passes)**: The loop terminates. `aider` commits the changes, and `aide-rs` reports success.
-    -   **On Failure (Validation Fails)**:
+3.  **Delegate to Aider**: `Orchestrator` calls `AiderWrapper`, providing the task and passing the validation command to `aider`'s `--test-cmd` argument.
+4.  **Aider's Internal Loop**: `aider` applies the code changes suggested by its LLM, then immediately runs the validation command (`cargo check`).
+5.  **Check Result**: `aide-rs` checks the exit status of the `aider` process.
+    -   **On Success (Validation Passes)**: `aider` will have run the validation command successfully, committed the changes, and exited with a status code of 0. The `aide-rs` loop terminates, reporting success.
+    -   **On Failure (Validation Fails)**: `aider` exits with a non-zero status code. `aide-rs` captures the `stdout` and `stderr` from the failed validation.
         a. The test failure output is captured.
         b. `Orchestrator` calls `GeminiWrapper` in "Debug Mode" with the error, asking it to identify relevant APIs or concepts to look up.
         c. The Gemini response is used to invoke our `doc_retriever` tool.

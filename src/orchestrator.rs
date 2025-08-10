@@ -238,6 +238,25 @@ impl Orchestrator {
         Ok(plan_file_path)
     }
 
+    /// Executes the implementation strategy.
+    ///
+    /// In automated mode (`auto = true`), this function orchestrates `aider` in a
+    /// validation-driven loop. The process is as follows:
+    ///
+    /// 1.  `aide-rs` invokes `aider` with the provided objective and passes the
+    ///     `validate_cmd` to `aider`'s `--test-cmd` argument.
+    /// 2.  `aider` attempts to modify the code based on the objective. After
+    ///     applying changes, it automatically runs the `validate_cmd`.
+    /// 3.  **If `validate_cmd` succeeds**: `aider` commits the changes and exits with
+    ///     a success code. `aide-rs` detects this and, depending on the
+    ///     `continue_on_success` flag, will either terminate the loop or continue
+    ///     with a new prompt to implement the next part of a plan.
+    /// 4.  **If `validate_cmd` fails**: `aider` exits with a failure code. `aide-rs`
+    ///     captures the output, uses the Gemini model to analyze the error, and
+    ///     fetches relevant documentation via the `doc_retriever` tool.
+    /// 5.  The loop repeats with a new, context-enriched prompt for `aider`,
+    //      containing the error and the retrieved documentation, until the
+    //      `max_retries` limit is reached.
     #[tracing::instrument(skip(self))]
     pub async fn implement(
         &self,

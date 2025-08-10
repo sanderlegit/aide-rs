@@ -92,11 +92,11 @@ For smaller, well-defined tasks like fixing a bug, you can use the automated imp
 aide-rs implement --context all "Fix the compilation errors" --auto --validate-cmd "cargo check" --allow-shell-commands
 ```
 
-This loop will:
-1.  Run `aider` to attempt a fix.
-2.  Run `cargo check`.
-3.  If it fails, `aide-rs` uses an LLM to analyze the error, looks up relevant documentation with its `doc_retriever` tool, and feeds the context back to `aider` for the next attempt.
-4.  If it succeeds, `aider` commits the changes, and the loop finishes.
+This loop works by orchestrating `aider` with a validation command. Here's the process:
+1.  `aide-rs` invokes `aider`, passing the objective and the validation command (e.g., `cargo check`) to `aider`'s `--test-cmd` argument.
+2.  `aider` attempts to fix the code. After applying changes, it automatically runs the provided validation command.
+3.  **If the validation command succeeds**, `aider` commits the changes and exits successfully. `aide-rs` sees the success and the implementation loop finishes.
+4.  **If the validation command fails**, `aider` exits with an error. `aide-rs` catches this failure, uses an LLM to analyze the error output, looks up relevant documentation with its `doc_retriever` tool, and then re-runs `aider` with the new context to try again.
 
 The `--allow-shell-commands` flag is recommended for automated runs to let the agent execute commands if needed, but can be omitted for safety.
 
