@@ -89,14 +89,16 @@ For complex tasks, you can use the commands sequentially. This gives you full co
 For smaller, well-defined tasks like fixing a bug, you can use the automated implementation loop.
 
 ```bash
-aide-rs implement --context all "Fix the compilation errors" --auto --validate-cmd "cargo check"
+aide-rs implement --context all "Fix the compilation errors" --auto --validate-cmd "cargo check" --allow-shell-commands
 ```
 
 This loop will:
 1.  Run `aider` to attempt a fix.
 2.  Run `cargo check`.
 3.  If it fails, `aide-rs` uses an LLM to analyze the error, looks up relevant documentation with its `doc_retriever` tool, and feeds the context back to `aider` for the next attempt.
-4.  If it succeeds, the loop finishes and the changes are committed.
+4.  If it succeeds, `aider` commits the changes, and the loop finishes.
+
+The `--allow-shell-commands` flag is recommended for automated runs to let the agent execute commands if needed, but can be omitted for safety.
 
 #### Fully Automated Workflow: The `run` Command
 
