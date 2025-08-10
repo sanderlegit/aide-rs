@@ -64,7 +64,7 @@ path = "src/bin/doc_retriever.rs"
 
 [dev-dependencies]
 # HTTP mocking for testing API interactions deterministically.
-wiremock = "0.6.0"
+wiremock = { version = "0.6.0", features = ["sequences"] }
 wiremock_logical_matchers = "0.6.0"
 
 # Assertion library for command-line application testing.
