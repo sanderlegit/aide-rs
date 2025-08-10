@@ -6,8 +6,8 @@ use serde_json::json;
 use std::fs;
 use std::process::Command as StdCommand;
 use wiremock::{
-    matchers::{method, path_regex},
-    Mock, ResponseTemplate, Sequence,
+    matchers::{body_string_contains, method, path_regex},
+    Mock, ResponseTemplate,
 };
 
 #[tokio::test]
@@ -317,20 +317,23 @@ steps:
         }]
     });
 
-    let mut seq = Sequence::new();
-    // The first POST is for the plan, the second is for the debug step.
+    // Mock for the plan step, identified by its objective in the body
     Mock::given(method("POST"))
         .and(path_regex(r"/v1beta/models/gemini-2.5-pro:generateContent.*"))
-        .in_sequence(&mut seq)
+        .and(body_string_contains(
+            "Implement a feature that will initially fail",
+        ))
         .respond_with(ResponseTemplate::new(200).set_body_json(plan_response))
-        .up_to_n_times(1)
         .mount(&env.mock_server)
         .await;
+
+    // Mock for the debug step, identified by its unique prompt text
     Mock::given(method("POST"))
         .and(path_regex(r"/v1beta/models/gemini-2.5-pro:generateContent.*"))
-        .in_sequence(&mut seq)
+        .and(body_string_contains(
+            "The last attempt to fix the code failed",
+        ))
         .respond_with(ResponseTemplate::new(200).set_body_json(implement_debug_response))
-        .up_to_n_times(1)
         .mount(&env.mock_server)
         .await;
 
