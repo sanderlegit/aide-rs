@@ -7,7 +7,7 @@ use std::fs;
 use std::process::Command as StdCommand;
 use wiremock::{
     matchers::{method, path_regex},
-    Mock, ResponseTemplate,
+    Mock, ResponseTemplate, Sequence,
 };
 
 #[tokio::test]
@@ -32,7 +32,7 @@ steps:
 "#;
     env.create_file("run.yml", config_content);
     env.create_file("src/main.rs", "fn main() {}");
-    env.create_file(".ai/filter=all", "#include\n*.rs");
+    env.create_file(".ai/filter=all", "#include\n*.rs\nplans/*.md");
 
     // 2. Mock Gemini for the 'plan' stage
     let plan_response = json!({
@@ -317,15 +317,18 @@ steps:
         }]
     });
 
+    let mut seq = Sequence::new();
     // The first POST is for the plan, the second is for the debug step.
     Mock::given(method("POST"))
         .and(path_regex(r"/v1beta/models/gemini-2.5-pro:generateContent.*"))
+        .in_sequence(&mut seq)
         .respond_with(ResponseTemplate::new(200).set_body_json(plan_response))
         .up_to_n_times(1)
         .mount(&env.mock_server)
         .await;
     Mock::given(method("POST"))
         .and(path_regex(r"/v1beta/models/gemini-2.5-pro:generateContent.*"))
+        .in_sequence(&mut seq)
         .respond_with(ResponseTemplate::new(200).set_body_json(implement_debug_response))
         .up_to_n_times(1)
         .mount(&env.mock_server)
@@ -401,7 +404,7 @@ steps:
     let config_content = fs::read_to_string(env.full_path("run.yml")).unwrap();
     let new_config_content = config_content.replace(
         "VALIDATE_CMD_PLACEHOLDER",
-        &format!("\"{}\"", mock_validate_path.to_str().unwrap()),
+        mock_validate_path.to_str().unwrap(),
     );
     env.create_file("run.yml", &new_config_content);
 
