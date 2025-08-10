@@ -85,7 +85,15 @@ impl AiderWrapper {
             args.push(cmd);
         }
 
-        info!(command = %command_name, args = ?args, "Executing aider");
+        // Redact the message for cleaner logs
+        let mut log_args = args.clone();
+        if let Some(i) = log_args.iter().position(|arg| arg == "--message") {
+            if i + 1 < log_args.len() {
+                log_args[i + 1] = "<message content redacted>".to_string();
+            }
+        }
+
+        info!(command = %command_name, args = ?log_args, "Executing aider");
 
         let mut command = Command::new(&command_name);
         command.args(&args);

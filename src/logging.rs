@@ -39,6 +39,15 @@ pub struct ResponseLog {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
+pub struct AiderLog {
+    pub success: bool,
+    pub stdout: String,
+    pub stderr: String,
+    pub time_taken_ms: u128,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct ToolCallLog {
     pub tool_name: String,
     pub tool_args: serde_json::Value,
@@ -283,6 +292,22 @@ impl RunLogger {
             log.result.success,
             serde_json::to_string_pretty(&log.result.output_json).unwrap_or_default(),
             log.result.stderr
+        );
+        self.log_summary(&summary_message);
+        if let Ok(mut file) = self.requests_file.lock() {
+            let _ = writeln!(file, "{}", summary_message);
+        }
+        self.log_complete(log);
+    }
+
+    pub fn log_aider_run(&self, log: AiderLog) {
+        let summary_message = format!(
+            "[{}] AIDER RUN ({}ms)\n--- RESULT ---\nSuccess: {}\nStdout:\n{}\nStderr:\n{}\n---\n",
+            Utc::now().to_rfc3339(),
+            log.time_taken_ms,
+            log.success,
+            log.stdout,
+            log.stderr
         );
         self.log_summary(&summary_message);
         if let Ok(mut file) = self.requests_file.lock() {

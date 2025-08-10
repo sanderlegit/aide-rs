@@ -7,6 +7,7 @@ use crate::session::Session;
 use crate::tools::ToolExecutor;
 use serde::Deserialize;
 use std::path::PathBuf;
+use std::time::Instant;
 use tracing::{error, info};
 
 #[derive(Debug, Deserialize)]
@@ -301,6 +302,7 @@ impl Orchestrator {
         for i in 0..max_retries {
             info!(attempt = i + 1, max_attempts = max_retries, "Running aider in auto mode.");
 
+            let start_time = Instant::now();
             let result = self
                 .aider
                 .run(
@@ -312,8 +314,23 @@ impl Orchestrator {
                     allow_shell_commands,
                 )
                 .await?;
+            let time_taken = start_time.elapsed();
 
-            if result.success {
+            self.logger.log_aider_run(crate::logging::AiderLog {
+                success: result.success,
+                stdout: result.stdout.clone(),
+                stderr: result.stderr.clone(),
+                time_taken_ms: time_taken.as_millis(),
+            });
+
+            // Aider's exit code is not always reliable. Check output for test failures.
+            let validation_failed = !result.success
+                || result.stdout.contains("Test command failed.")
+                || result.stderr.contains("Test command failed.")
+                || result.stdout.contains("Tests failed.")
+                || result.stderr.contains("Tests failed.");
+
+            if !validation_failed {
                 if !continue_on_success {
                     self.logger.log_summary(&format!(
                         "Aider succeeded on attempt {}/{}.",
