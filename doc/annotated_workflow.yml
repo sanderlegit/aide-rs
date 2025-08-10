@@ -106,8 +106,12 @@ steps:
     validate_cmd: "make test"
     # `validate_cmd`: The command to run after `aider` makes changes. `aide-rs`
     # uses the exit code of this command to determine if the implementation was
-    # successful.
+    # successful. `aider` will commit the changes upon success.
 
     max_retries: 10
     # `max_retries`: The number of times the agent will try to fix the code if
     # the `validate_cmd` fails.
+
+    allow_shell_commands: true
+    # `allow_shell_commands`: (Optional, defaults to false) Can be set to `true`
+    # to allow `aider` to execute shell commands during the implementation.

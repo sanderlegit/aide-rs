@@ -75,7 +75,7 @@ This is the core automated workflow.
 2.  **Session Start**: A new session is created. The `Orchestrator` enters a retry loop.
 3.  **Run Aider**: `Orchestrator` calls `AiderWrapper`, providing the task and the validation command. `aider` is configured to run the test automatically after making changes.
 4.  **Check Result**:
-    -   **On Success (Validation Passes)**: The loop terminates. `aide-rs` commits the changes and reports success.
+    -   **On Success (Validation Passes)**: The loop terminates. `aider` commits the changes, and `aide-rs` reports success.
     -   **On Failure (Validation Fails)**:
         a. The test failure output is captured.
         b. `Orchestrator` calls `GeminiWrapper` in "Debug Mode" with the error, asking it to identify relevant APIs or concepts to look up.

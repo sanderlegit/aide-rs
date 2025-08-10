@@ -5,7 +5,6 @@ use crate::gemini::GeminiClientWrapper;
 use crate::logging::RunLogger;
 use crate::session::Session;
 use crate::tools::ToolExecutor;
-use crate::vcs;
 use serde::Deserialize;
 use std::path::PathBuf;
 use tracing::{error, info};
