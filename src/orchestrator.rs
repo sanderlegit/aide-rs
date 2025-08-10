@@ -248,6 +248,7 @@ impl Orchestrator {
         max_retries: u32,
         model_override: Option<&str>,
         allow_shell_commands: bool,
+        continue_on_success: bool,
     ) -> Result<()> {
         self.logger.log_summary("Starting implement strategy.");
         let session = Session::new("implement", &objective)?;
@@ -294,6 +295,17 @@ impl Orchestrator {
                 .await?;
 
             if result.success {
+                if !continue_on_success {
+                    self.logger.log_summary(&format!(
+                        "Aider succeeded on attempt {}/{}.",
+                        i + 1,
+                        max_retries
+                    ));
+                    self.logger
+                        .log_summary("Aider has committed the changes.");
+                    return Ok(());
+                }
+
                 // Aider exits with 0 if validation passes. We need to check if it made
                 // any changes to determine if the task is complete.
                 if result.stdout.contains("No changes were applied.") {
@@ -509,6 +521,7 @@ impl Orchestrator {
                         max_retries.unwrap_or(5),
                         model.as_deref(),
                         allow_shell_commands,
+                        true, // Continue on success when called from `run`
                     )
                     .await?;
                     self.logger.log_summary(&format!(

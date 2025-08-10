@@ -93,6 +93,7 @@ async fn run() -> Result<()> {
                     max_retries,
                     None,
                     allow_shell_commands,
+                    false, // Do not continue on success for standalone `implement`
                 )
                 .await?;
         }
