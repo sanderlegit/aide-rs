@@ -153,7 +153,9 @@ It must be run from within a Rust project's directory.
 
 ### File Filtering
 
-`aide-rs` automatically filters the files included in the context using rules defined in `.ai/filter=all`. This file uses glob patterns to include or exclude files and directories. You can customize it to suit your project's needs.
+`aide-rs` filters the files provided to the context based on rules in a filter file. By default, it looks for `.ai/filter=all`, but you can specify a different context (e.g., `backend`) with the `--context` flag, which will cause it to look for `.ai/filter=backend`.
+
+This file uses glob patterns to include or exclude files and directories. You can customize it to suit your project's needs.
 
 The filter file is composed of sections, starting with `#include` or `#exclude`.
 
@@ -187,6 +189,9 @@ With the core architecture in place, future work will focus on enhancing the age
 To run the test suite, which includes unit, integration, and end-to-end tests:
 
 ```bash
-cargo test
+make test
 ```
-Note: Tests run sequentially (`--test-threads=1`) to avoid race conditions with environment variables.
+Alternatively, you can run the tests directly with Cargo. It is recommended to run them sequentially to avoid race conditions in tests that rely on shared resources like environment variables or mock servers.
+```bash
+cargo test -- --test-threads=1
+```
