@@ -471,6 +471,8 @@ impl Orchestrator {
                 Based on the error output below, what documentation should I look up using the `doc_retriever` tool?
                 Please call the tool with the most relevant `crate_name` and `path` to get documentation that might help solve the error.
 
+                If the tool fails to find the exact path, it will return documentation for the parent module or the whole crate, which should still be helpful. If you are unsure of the exact path, providing a guess is better than not calling the tool at all.
+
                 Validation command STDOUT:
                 {}
 
