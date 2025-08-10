@@ -45,7 +45,7 @@ async fn run() -> Result<()> {
                     "You must provide either a list of files or a --context flag.".to_string(),
                 ));
             };
-            orchestrator.research(objective, files_to_provide).await?;
+            orchestrator.research(objective, files_to_provide, true).await?;
         }
         Commands::Plan {
             objective,
@@ -62,7 +62,7 @@ async fn run() -> Result<()> {
                 ));
             };
             let _ = orchestrator
-                .plan(objective, files_to_provide, true)
+                .plan(objective, files_to_provide, true, None)
                 .await?;
         }
         Commands::Implement {
@@ -71,6 +71,7 @@ async fn run() -> Result<()> {
             validate_cmd,
             auto,
             context,
+            max_retries,
         } => {
             let files_to_provide = if let Some(context_name) = &context {
                 file_provider::get_files(&[".".to_string()], Some(context_name), None)?
@@ -82,7 +83,13 @@ async fn run() -> Result<()> {
                 ));
             };
             orchestrator
-                .implement(objective, files_to_provide, validate_cmd, auto)
+                .implement(
+                    objective,
+                    files_to_provide,
+                    validate_cmd,
+                    auto,
+                    max_retries,
+                )
                 .await?;
         }
         Commands::Run { prompt_file } => {

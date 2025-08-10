@@ -22,10 +22,12 @@ steps:
       - `thiserror`: For custom error handling.
       - `tokio`: For the async runtime.
       - `tracing`: For logging.
+    context: "all"
 
   - type: plan
     objective: |
       Create a command-line tool in Rust named `audio_db` that uses LanceDB to manage a collection of `.wav` audio files.
+      Please use the information from the research document to determine the latest versions of the crates to use.
 
       The tool should have the following subcommands:
       1. `add <PATH>`: Reads a `.wav` file from the given path, extracts its properties (channels, sample rate, duration), and adds a record to a LanceDB table. The table should be created if it doesn't exist. The record should store the file path, channels, sample rate, and duration in seconds.
@@ -57,3 +59,4 @@ steps:
     objective: "Implement the plan to create the audio_db tool."
     context: "all"
     validate_cmd: "make test"
+    max_retries: 10

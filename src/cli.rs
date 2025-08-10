@@ -47,6 +47,9 @@ pub enum Commands {
         /// Run in a fully automated loop, attempting to fix errors until validation passes.
         #[arg(long)]
         auto: bool,
+        /// The maximum number of retries for the automated loop.
+        #[arg(long, default_value = "5")]
+        max_retries: u32,
     },
     /// Execute a non-interactive, multi-stage workflow from a config file.
     Run {

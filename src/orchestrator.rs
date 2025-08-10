@@ -26,6 +26,7 @@ enum StepConfig {
         context: String,
         #[serde(default = "default_validate_cmd")]
         validate_cmd: String,
+        max_retries: Option<u32>,
     },
 }
 
@@ -64,7 +65,12 @@ impl Orchestrator {
     }
 
     #[tracing::instrument(skip(self))]
-    pub async fn research(&self, objective: String, files: Vec<String>) -> Result<()> {
+    pub async fn research(
+        &self,
+        objective: String,
+        files: Vec<String>,
+        interactive: bool,
+    ) -> Result<PathBuf> {
         let session = Session::new("research", &objective)?;
         info!(objective, ?files, "Starting research strategy.");
 
@@ -108,20 +114,22 @@ impl Orchestrator {
             research_file_path.display()
         ));
 
-        // Optional: launch aider to refine
-        info!("Launching aider to review and refine the research document.");
-        self.aider
-            .run(
-                &session,
-                vec![research_file_path.to_str().unwrap().to_string()],
-                "Here is the research document I generated. Please review it.",
-                false,
-                None,
-            )
-            .await?;
+        if interactive {
+            // Optional: launch aider to refine
+            info!("Launching aider to review and refine the research document.");
+            self.aider
+                .run(
+                    &session,
+                    vec![research_file_path.to_str().unwrap().to_string()],
+                    "Here is the research document I generated. Please review it.",
+                    false,
+                    None,
+                )
+                .await?;
+        }
 
         self.logger.log_summary("Research strategy completed.");
-        Ok(())
+        Ok(research_file_path)
     }
 
     #[tracing::instrument(skip(self))]
@@ -130,6 +138,7 @@ impl Orchestrator {
         objective: String,
         files: Vec<String>,
         interactive: bool,
+        research_context: Option<String>,
     ) -> Result<PathBuf> {
         let session = Session::new("plan", &objective)?;
         info!(objective, ?files, "Starting plan strategy.");
@@ -148,13 +157,17 @@ impl Orchestrator {
             }
         }
 
+        let research_prompt_addition = research_context
+            .map(|ctx| format!("\n\nHere is some research context to consider:\n{}", ctx))
+            .unwrap_or_default();
+
         let plan_prompt = format!(
             "Please help me plan the tasks for my implementation. I need to do the following:
             '{}'
-
+            {}
             Based on that, and the provided file context, please create a markdown task list.
             {}",
-            objective, file_context
+            objective, research_prompt_addition, file_context
         );
 
         let contents = vec![crate::gemini_types::Content {
@@ -207,6 +220,7 @@ impl Orchestrator {
         files: Vec<String>,
         validate_cmd: String,
         auto: bool,
+        max_retries: u32,
     ) -> Result<()> {
         let session = Session::new("implement", &objective)?;
         info!(objective, ?files, %validate_cmd, %auto, "Starting implement strategy.");
@@ -230,7 +244,6 @@ impl Orchestrator {
         }
 
         // Automated loop
-        let max_retries = 5;
         for i in 0..max_retries {
             info!(attempt = i + 1, max_attempts = max_retries, "Running aider in auto mode.");
 
@@ -340,6 +353,7 @@ impl Orchestrator {
         let config: RunConfig = serde_yaml::from_str(&file_content)?;
 
         let mut plan_file_path: Option<PathBuf> = None;
+        let mut research_file_path: Option<PathBuf> = None;
         let mut last_objective: Option<String> = None;
 
         for step in config.steps {
@@ -349,20 +363,27 @@ impl Orchestrator {
                     last_objective = Some(objective.clone());
                     let files =
                         file_provider::get_files(&[".".to_string()], Some(&context), None)?;
-                    self.research(objective, files).await?;
+                    let path = self.research(objective, files, false).await?;
+                    research_file_path = Some(path);
                 }
                 StepConfig::Plan { objective, context } => {
                     info!(objective = %objective, "Running plan step.");
                     last_objective = Some(objective.clone());
                     let files =
                         file_provider::get_files(&[".".to_string()], Some(&context), None)?;
-                    let path = self.plan(objective, files, false).await?;
+                    let research_content = if let Some(path) = &research_file_path {
+                        Some(std::fs::read_to_string(path)?)
+                    } else {
+                        None
+                    };
+                    let path = self.plan(objective, files, false, research_content).await?;
                     plan_file_path = Some(path);
                 }
                 StepConfig::Implement {
                     objective,
                     context,
                     validate_cmd,
+                    max_retries,
                 } => {
                     info!(objective = %objective, "Running implement step.");
                     let mut files =
@@ -379,8 +400,18 @@ impl Orchestrator {
                         files.push(plan_path.to_str().unwrap().to_string());
                     }
 
-                    self.implement(implement_objective, files, validate_cmd, true)
-                        .await?;
+                    if let Some(research_path) = &research_file_path {
+                        files.push(research_path.to_str().unwrap().to_string());
+                    }
+
+                    self.implement(
+                        implement_objective,
+                        files,
+                        validate_cmd,
+                        true,
+                        max_retries.unwrap_or(5),
+                    )
+                    .await?;
                 }
             }
         }
