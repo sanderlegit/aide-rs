@@ -221,3 +221,124 @@ async fn test_research_command_e2e() {
     let aider_prompt = fs::read_to_string(aider_prompt_file).unwrap();
     assert!(aider_prompt.contains("Here is the research document I generated. Please review it."));
 }
+
+#[tokio::test]
+async fn test_run_command_e2e_with_debug_loop() {
+    let env = TestEnv::new().await;
+    env.init_git_repo();
+
+    // 1. Create a test crate for doc_retriever to use
+    let lib_content = r#"
+        //! A test crate
+        /// A test function that will be "retrieved" by the debug loop.
+        pub fn the_fix() {}
+    "#;
+    env.create_test_crate("test_crate", lib_content);
+
+    // 2. Create config file for the `run` command
+    let config_content = r#"
+objective: "Implement a feature that will initially fail"
+files:
+  - "src/main.rs"
+validate_cmd: "true" # The mock aider script controls success/failure
+"#;
+    env.create_file("run.yml", config_content);
+    env.create_file("src/main.rs", "fn main() {}");
+
+    // 3. Mock Gemini for the 'plan' stage
+    let plan_response = json!({
+        "candidates": [{
+            "content": { "role": "model", "parts": [{"text": "1. This is the plan."}] },
+            "finishReason": "STOP"
+        }]
+    });
+    // 4. Mock Gemini for the 'implement' debug stage
+    let implement_debug_response = json!({
+        "candidates": [{
+            "content": {
+                "role": "model",
+                "parts": [{"functionCall": { "name": "doc_retriever", "args": { "crate_name": "test_crate", "path": "test_crate::the_fix" } } }]
+            },
+            "finishReason": "TOOL_USE"
+        }]
+    });
+
+    // The first POST is for the plan, the second is for the debug step.
+    Mock::given(method("POST"))
+        .and(path_regex(r"/v1beta/models/gemini-1.5-pro:generateContent.*"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(plan_response))
+        .up_to_n_times(1)
+        .mount(&env.mock_server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path_regex(r"/v1beta/models/gemini-1.5-pro:generateContent.*"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(implement_debug_response))
+        .up_to_n_times(1)
+        .mount(&env.mock_server)
+        .await;
+
+    // 5. Mock `aider` to fail once, then succeed.
+    let counter_file = env.full_path("run_count.txt");
+    fs::write(&counter_file, "0").unwrap();
+    let docs_prompt_file = env.full_path("docs_prompt.txt");
+
+    let mock_aider_path = env.full_path("mock_aider.sh");
+    let script_content = format!(
+        r#"#!/bin/bash
+        RUN_COUNT=$(cat {counter})
+        if [ "$RUN_COUNT" -eq "0" ]; then
+            echo "first run, failing"
+            echo "1" > {counter}
+            exit 1
+        else
+            # On second run, capture all arguments (which includes the prompt with docs) and succeed
+            echo "second run, succeeding"
+            echo "$*" > {docs_prompt}
+            exit 0
+        fi
+        "#,
+        counter = counter_file.to_str().unwrap(),
+        docs_prompt = docs_prompt_file.to_str().unwrap(),
+    );
+    fs::write(&mock_aider_path, script_content).unwrap();
+    StdCommand::new("chmod")
+        .arg("+x")
+        .arg(&mock_aider_path)
+        .status()
+        .unwrap();
+
+    // 6. Run the `aide-rs run` command
+    let mut cmd = Command::cargo_bin("aide-rs").unwrap();
+    cmd.current_dir(env.path());
+    env.apply_env(&mut cmd);
+    cmd.env("AIDER_COMMAND", mock_aider_path.to_str().unwrap());
+
+    cmd.arg("run").arg("run.yml");
+
+    // 7. Assertions
+    let output = cmd.assert().success();
+    let stderr = String::from_utf8(output.get_output().stderr.clone()).unwrap();
+
+    // Check that the full flow happened
+    assert!(stderr.contains("Starting run from config file."));
+    assert!(stderr.contains("Starting plan strategy."));
+    assert!(stderr.contains("Plan saved to"));
+    assert!(stderr.contains("Starting implement strategy."));
+    assert!(stderr.contains("Aider failed on attempt 1/5. Analyzing failure..."));
+    assert!(stderr.contains("Gemini requested a tool call for debugging"));
+    assert!(stderr.contains("Retrieved documentation"));
+    assert!(stderr.contains("Aider succeeded on attempt 2/5."));
+    assert!(stderr.contains("Committing changes"));
+
+    // Check that the final commit was made with the right message
+    let last_commit = env.get_last_commit_message();
+    assert!(last_commit.contains("Implement: Implement the tasks described in the plan file"));
+    assert!(last_commit.contains(
+        "The original objective was: Implement a feature that will initially fail"
+    ));
+
+    // Check that the docs were passed to aider on the second run
+    let final_prompt = fs::read_to_string(docs_prompt_file).unwrap();
+    assert!(final_prompt.contains("pub fn the_fix()"));
+    assert!(final_prompt.contains("Please use this information to fix the code."));
+}

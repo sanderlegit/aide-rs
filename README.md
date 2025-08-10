@@ -52,46 +52,70 @@ Instead of a simple prompt-and-response loop, `aide-rs` manages complex, multi-s
 
 `aide-rs` is designed to be run from the root of the project you want to modify. It acts as an orchestrator for the `aider` tool, enriching its context with research and structured planning.
 
-### Example Workflow
+### Workflows
 
-Here's how you might use `aide-rs` to add a new feature to your project.
+`aide-rs` supports several workflows, from interactive, step-by-step development to fully automated execution.
 
-#### 1. Research (Optional)
+#### Interactive Workflow: `research`, `plan`, and `implement`
 
-If you're unsure about the best libraries or patterns to use, you can start with a research step. `aide-rs` will use a search-enabled LLM to gather information.
+For complex tasks, you can use the commands sequentially. This gives you full control at each stage.
 
-```bash
-aide-rs research "best rust crates for audio processing" src/main.rs
-```
-This will produce a research document in a new session directory (e.g., `.ai/sessions/.../research.md`).
+1.  **Research (Optional)**: If you're unsure about the best libraries or patterns to use, start with a research step. `aide-rs` will use a search-enabled LLM to gather information.
+    ```bash
+    aide-rs research "best rust crates for audio processing" src/main.rs
+    ```
+    This produces a `research.md` file and launches `aider` for you to review and refine it.
 
-#### 2. Plan
+2.  **Plan**: Once you have a clear goal, use the `plan` command. This uses an LLM to break down your objective into a markdown task list.
+    ```bash
+    aide-rs plan "Create a command-line tool to manage audio files using lancedb" src/main.rs Cargo.toml
+    ```
+    This creates a `plan.md` and launches `aider` for refinement.
 
-Once you have a clear goal, use the `plan` command. This will use an LLM to break down your objective into a markdown task list, which is then passed to `aider` for you to review and refine.
+3.  **Implement**: After planning, use the `implement` command to start coding. This command launches `aider` with your objective and files, ready for you to start pair-programming with the AI.
+    ```bash
+    aide-rs implement "Implement the 'add' subcommand for the audio tool" src/main.rs src/db.rs
+    ```
 
-```bash
-aide-rs plan "Create a command-line tool to manage audio files using lancedb" src/main.rs Cargo.toml
-```
+#### Automated Implementation: `implement --auto`
 
-#### 3. Implement
-
-After planning, use the `implement` command to start coding. This command launches `aider` with your objective and files, ready for you to start pair-programming with the AI.
-
-```bash
-aide-rs implement "Implement the 'add' subcommand for the audio tool" src/main.rs src/db.rs
-```
-
-For automated workflows, you can use the `--auto` flag, which will run a validation command in a loop until it succeeds.
+For smaller, well-defined tasks like fixing a bug, you can use the automated implementation loop.
 
 ```bash
 aide-rs implement "Fix the compilation errors" src/main.rs src/db.rs --auto --validate-cmd "cargo check"
 ```
 
 This loop will:
-1. Run `aider` to attempt a fix.
-2. Run `cargo check`.
-3. If it fails, feed the error back into the context for the next attempt.
-4. If it succeeds, the loop finishes.
+1.  Run `aider` to attempt a fix.
+2.  Run `cargo check`.
+3.  If it fails, `aide-rs` uses an LLM to analyze the error, looks up relevant documentation with its `doc_retriever` tool, and feeds the context back to `aider` for the next attempt.
+4.  If it succeeds, the loop finishes and the changes are committed.
+
+#### Fully Automated Workflow: The `run` Command
+
+The `run` command orchestrates a complete, non-interactive workflow from a single configuration file. This is ideal for CI/CD pipelines or complex, automated refactoring tasks.
+
+First, create a YAML file (e.g., `feature.yml`):
+```yaml
+# feature.yml
+objective: "Add a new 'list' subcommand to the audio tool to display all entries from the database."
+files:
+  - src/main.rs
+  - src/db.rs
+validate_cmd: "cargo check"
+```
+
+Then, execute it:
+```bash
+aide-rs run feature.yml
+```
+
+This single command will:
+1.  Start a new session.
+2.  Run the **plan** strategy to generate a task list (`plan.md`).
+3.  Run the **implement** strategy in fully automated mode, using the generated plan as the objective.
+4.  Use the automated debugging loop (`--auto`) to fix issues until `validate_cmd` succeeds.
+5.  Commit the final changes.
 
 ## Development
 
