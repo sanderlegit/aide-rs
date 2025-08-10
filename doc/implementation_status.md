@@ -19,6 +19,7 @@ The following key features from the V2 architecture are now implemented and func
 -   **Automated Debugging Loop**: The `implement --auto` command successfully runs a validation command, analyzes failures, uses the LLM to retrieve documentation, and retries the implementation until success or a retry limit is reached.
 -   **Comprehensive Logging**: A robust logging system (`RunLogger`) captures detailed information about each run, including prompts, responses, tool calls, and performance metrics.
 -   **End-to-End Testing**: The project includes a suite of end-to-end tests that validate the core workflows (`plan`, `research`, `implement`, `run`), ensuring the system works as expected.
+-   **Model Configuration**: The Gemini model can be specified globally via a `--model` command-line flag, or on a per-step basis within a `run` configuration file.
 
 ## Conclusion
 

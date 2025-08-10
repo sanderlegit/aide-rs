@@ -23,6 +23,7 @@ steps:
       - `tokio`: For the async runtime.
       - `tracing`: For logging.
     context: "all"
+    model: "gemini-1.5-flash"
 
   - type: plan
     objective: |

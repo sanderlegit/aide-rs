@@ -57,6 +57,8 @@ Instead of a simple prompt-and-response loop, `aide-rs` manages complex, multi-s
 
 `aide-rs` is designed to be run from the root of the project you want to modify. It acts as an orchestrator for the `aider` tool, enriching its context with research and structured planning.
 
+You can specify the Gemini model to use with the global `--model` flag (e.g., `--model gemini-1.5-flash`). This will apply to all commands.
+
 ### Workflows
 
 `aide-rs` supports several workflows, from interactive, step-by-step development to fully automated execution.
@@ -107,6 +109,7 @@ steps:
   - type: plan
     objective: "Add a new 'list' subcommand to the audio tool to display all entries from the database."
     context: "all"
+    model: "gemini-1.5-flash" # Optional: specify a model for this step
   - type: implement
     objective: "Implement the plan."
     context: "all"
@@ -179,7 +182,6 @@ When you provide file paths to commands like `plan` or `implement`, or use the `
 
 With the core architecture in place, future work will focus on enhancing the agent's capabilities and improving user experience. Key areas for development include:
 
--   **Model Configuration**: Allow users to specify the LLM model (e.g., `gemini-1.5-pro` vs. `gemini-1.5-flash`) via a command-line argument or configuration file.
 -   **Expanded Toolset**: Implement additional tools beyond `doc_retriever`, such as a `file_system` tool for creating, reading, and listing files, which would enhance the agent's ability to interact with the project structure.
 -   **Improved Interactive Experience**: Enhance the interactive modes (`plan`, `research`, `implement`) with better user feedback and more control over the agent's actions.
 -   **Configuration Flexibility**: Allow more granular configuration of strategies within the `run.yml` file, such as specifying which tools are enabled for a given run.

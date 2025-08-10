@@ -43,6 +43,7 @@ impl GeminiClientWrapper {
         &self,
         contents: Vec<Content>,
         tools: Option<Vec<Tool>>,
+        model_override: Option<&str>,
     ) -> Result<GenerateContentResponse> {
         let start_time = Instant::now();
         let request_body = GenerateContentRequest {
@@ -50,20 +51,22 @@ impl GeminiClientWrapper {
             tools,
         };
 
+        let model_to_use = model_override.unwrap_or(&self.model_name);
+
         self.logger.log_request(&RequestLog {
-            model_name: self.model_name.clone(),
+            model_name: model_to_use.to_string(),
             request: request_body.clone(),
         });
 
         info!(
             "Sending request to Gemini model '{}' at '{}'.",
-            self.model_name, self.base_url
+            model_to_use, self.base_url
         );
         debug!(request = %serde_json::to_string_pretty(&request_body).unwrap_or_else(|_| "Failed to format request body".to_string()), "Gemini request body");
 
         let url = format!(
             "{}/v1beta/models/{}:generateContent?key={}",
-            self.base_url, self.model_name, self.api_key
+            self.base_url, model_to_use, self.api_key
         );
 
         debug!(url = %url, "Requesting URL");
@@ -94,7 +97,7 @@ impl GeminiClientWrapper {
 
         let time_taken = start_time.elapsed();
         self.logger.log_response(ResponseLog {
-            model_name: self.model_name.clone(),
+            model_name: model_to_use.to_string(),
             response: response.clone(),
             time_taken_ms: time_taken.as_millis(),
         });

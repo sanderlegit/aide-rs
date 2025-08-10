@@ -8,6 +8,9 @@ use clap::{Parser, Subcommand};
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,
+    /// The Gemini model to use (e.g., 'gemini-1.5-pro', 'gemini-1.5-flash').
+    #[arg(long, global = true)]
+    pub model: Option<String>,
 }
 
 #[derive(Subcommand, Debug)]

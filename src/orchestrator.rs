@@ -16,10 +16,12 @@ enum StepConfig {
     Research {
         objective: String,
         context: String,
+        model: Option<String>,
     },
     Plan {
         objective: String,
         context: String,
+        model: Option<String>,
     },
     Implement {
         objective: String,
@@ -27,6 +29,7 @@ enum StepConfig {
         #[serde(default = "default_validate_cmd")]
         validate_cmd: String,
         max_retries: Option<u32>,
+        model: Option<String>,
     },
 }
 
@@ -49,10 +52,11 @@ pub struct Orchestrator {
 }
 
 impl Orchestrator {
-    pub fn new() -> Result<Self> {
+    pub fn new(model_override: Option<String>) -> Result<Self> {
         let logger = RunLogger::new()?;
-        // TODO: Make model configurable
-        let gemini = GeminiClientWrapper::new("gemini-1.5-pro".to_string(), logger.clone())?;
+        let default_model = "gemini-1.5-pro".to_string();
+        let model_name = model_override.unwrap_or(default_model);
+        let gemini = GeminiClientWrapper::new(model_name, logger.clone())?;
         let aider = AiderWrapper;
         // For now, enable all tools. Later this could be configured per-strategy.
         let tool_executor = ToolExecutor::new(&["doc_retriever".to_string()]);
@@ -71,6 +75,7 @@ impl Orchestrator {
         files: Vec<String>,
         interactive: bool,
         output_path: Option<String>,
+        model_override: Option<&str>,
     ) -> Result<PathBuf> {
         let session = Session::new("research", &objective)?;
         info!(objective, ?files, "Starting research strategy.");
@@ -98,7 +103,10 @@ impl Orchestrator {
         };
         let tools = Some(vec![research_tool]);
 
-        let response = self.gemini.generate_content(contents, tools).await?;
+        let response = self
+            .gemini
+            .generate_content(contents, tools, model_override)
+            .await?;
 
         let research_text = response
             .candidates
@@ -144,6 +152,7 @@ impl Orchestrator {
         files: Vec<String>,
         interactive: bool,
         research_context: Option<String>,
+        model_override: Option<&str>,
     ) -> Result<PathBuf> {
         let session = Session::new("plan", &objective)?;
         info!(objective, ?files, "Starting plan strategy.");
@@ -180,7 +189,10 @@ impl Orchestrator {
             role: crate::gemini_types::Role::User,
         }];
 
-        let response = self.gemini.generate_content(contents, None).await?;
+        let response = self
+            .gemini
+            .generate_content(contents, None, model_override)
+            .await?;
 
         let plan_text = response
             .candidates
@@ -226,6 +238,7 @@ impl Orchestrator {
         validate_cmd: String,
         auto: bool,
         max_retries: u32,
+        model_override: Option<&str>,
     ) -> Result<()> {
         let session = Session::new("implement", &objective)?;
         info!(objective, ?files, %validate_cmd, %auto, "Starting implement strategy.");
@@ -310,7 +323,10 @@ impl Orchestrator {
                 ..Default::default()
             }]);
 
-            let response = self.gemini.generate_content(contents, tools).await?;
+            let response = self
+                .gemini
+                .generate_content(contents, tools, model_override)
+                .await?;
 
             let mut retrieved_docs = "No documentation was retrieved.".to_string();
 
@@ -363,15 +379,25 @@ impl Orchestrator {
 
         for step in config.steps {
             match step {
-                StepConfig::Research { objective, context } => {
+                StepConfig::Research {
+                    objective,
+                    context,
+                    model,
+                } => {
                     info!(objective = %objective, "Running research step.");
                     last_objective = Some(objective.clone());
                     let files =
                         file_provider::get_files(&[".".to_string()], Some(&context), None)?;
-                    let path = self.research(objective, files, false, None).await?;
+                    let path = self
+                        .research(objective, files, false, None, model.as_deref())
+                        .await?;
                     research_file_path = Some(path);
                 }
-                StepConfig::Plan { objective, context } => {
+                StepConfig::Plan {
+                    objective,
+                    context,
+                    model,
+                } => {
                     info!(objective = %objective, "Running plan step.");
                     last_objective = Some(objective.clone());
                     let files =
@@ -381,7 +407,9 @@ impl Orchestrator {
                     } else {
                         None
                     };
-                    let path = self.plan(objective, files, false, research_content).await?;
+                    let path = self
+                        .plan(objective, files, false, research_content, model.as_deref())
+                        .await?;
                     plan_file_path = Some(path);
                 }
                 StepConfig::Implement {
@@ -389,6 +417,7 @@ impl Orchestrator {
                     context,
                     validate_cmd,
                     max_retries,
+                    model,
                 } => {
                     info!(objective = %objective, "Running implement step.");
                     let mut files =
@@ -415,6 +444,7 @@ impl Orchestrator {
                         validate_cmd,
                         true,
                         max_retries.unwrap_or(5),
+                        model.as_deref(),
                     )
                     .await?;
                 }

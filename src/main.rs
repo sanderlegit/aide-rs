@@ -26,7 +26,7 @@ fn setup_logging() {
 
 async fn run() -> Result<()> {
     let cli = Cli::parse();
-    let orchestrator = Orchestrator::new()?;
+    let orchestrator = Orchestrator::new(cli.model)?;
 
     info!(command = ?cli.command, "Executing command");
 
@@ -45,7 +45,7 @@ async fn run() -> Result<()> {
                 vec![]
             };
             orchestrator
-                .research(objective, files_to_provide, true, output)
+                .research(objective, files_to_provide, true, output, None)
                 .await?;
         }
         Commands::Plan {
@@ -63,7 +63,7 @@ async fn run() -> Result<()> {
                 ));
             };
             let _ = orchestrator
-                .plan(objective, files_to_provide, true, None)
+                .plan(objective, files_to_provide, true, None, None)
                 .await?;
         }
         Commands::Implement {
@@ -90,6 +90,7 @@ async fn run() -> Result<()> {
                     validate_cmd,
                     auto,
                     max_retries,
+                    None,
                 )
                 .await?;
         }
