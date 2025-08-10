@@ -28,7 +28,7 @@ steps:
   - type: implement
     objective: "Implement the plan"
     context: "all"
-    validate_cmd: "true"
+    validateCmd: "true"
 "#;
     env.create_file("run.yml", config_content);
     env.create_file("src/main.rs", "fn main() {}");
@@ -290,7 +290,7 @@ steps:
   - type: implement
     objective: "Implement the plan"
     context: "all"
-    validate_cmd: "true" # The mock aider script controls success/failure
+    validateCmd: "true" # The mock aider script controls success/failure
 "#;
     env.create_file("run.yml", config_content);
     env.create_file("src/main.rs", "fn main() {}");

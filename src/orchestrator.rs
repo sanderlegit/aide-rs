@@ -518,7 +518,6 @@ impl Orchestrator {
         let file_content = std::fs::read_to_string(&prompt_file)?;
         let config: RunConfig = serde_yaml::from_str(&file_content)?;
 
-        let mut plan_file_path: Option<PathBuf> = None;
         let mut research_file_path: Option<PathBuf> = None;
         let total_steps = config.steps.len();
         let mut step_number = 1;
@@ -571,10 +570,9 @@ impl Orchestrator {
                     } else {
                         None
                     };
-                    let path = self
+                    let _ = self
                         .plan(objective, files, false, research_content, model.as_deref())
                         .await?;
-                    plan_file_path = Some(path);
                     self.logger.log_summary(&format!(
                         "--- Completed Step {}/{}: Plan ---\n",
                         step_number, total_steps
