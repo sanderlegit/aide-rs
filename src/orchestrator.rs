@@ -337,15 +337,20 @@ impl Orchestrator {
 
             let mut retrieved_docs = "No documentation was retrieved.".to_string();
 
-            if let Some(function_call) = response
+            let function_call = response
                 .candidates
                 .as_ref()
                 .and_then(|c| c.first())
-                .and_then(|c| c.content.parts.first())
-                .and_then(|p| p.function_call.as_ref())
-            {
-                info!(call = ?function_call, "Gemini requested a tool call for debugging");
-                match self.tool_executor.execute(function_call).await {
+                .and_then(|c| {
+                    c.content
+                        .parts
+                        .iter()
+                        .find_map(|p| p.function_call.as_ref())
+                });
+
+            if let Some(call) = function_call {
+                info!(call = ?call, "Gemini requested a tool call for debugging");
+                match self.tool_executor.execute(call).await {
                     Ok(docs) => {
                         retrieved_docs = serde_json::to_string_pretty(&docs)
                             .unwrap_or_else(|_| "Failed to format documentation.".to_string());
