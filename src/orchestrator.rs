@@ -92,7 +92,7 @@ impl Orchestrator {
         }];
 
         let research_tool = crate::gemini_types::Tool {
-            google_search: Some(crate::gemini_types::GoogleSearch::default()),
+            google_search_retrieval: Some(crate::gemini_types::GoogleSearchRetrieval::default()),
             ..Default::default()
         };
         let tools = Some(vec![research_tool]);

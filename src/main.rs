@@ -41,9 +41,7 @@ async fn run() -> Result<()> {
             } else if !files.is_empty() {
                 file_provider::get_files(&files, None, None)?
             } else {
-                return Err(aide_rs::error::Error::Config(
-                    "You must provide either a list of files or a --context flag.".to_string(),
-                ));
+                vec![]
             };
             orchestrator.research(objective, files_to_provide, true).await?;
         }
