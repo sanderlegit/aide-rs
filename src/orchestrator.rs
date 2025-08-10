@@ -115,7 +115,7 @@ impl Orchestrator {
         })
     }
 
-    #[tracing::instrument(skip(self))]
+    #[tracing::instrument(skip(self, objective, files))]
     pub async fn research(
         &self,
         objective: String,
@@ -201,7 +201,7 @@ impl Orchestrator {
         Ok(user_visible_path)
     }
 
-    #[tracing::instrument(skip(self))]
+    #[tracing::instrument(skip(self, objective, files, research_context))]
     pub async fn plan(
         &self,
         objective: String,
@@ -311,7 +311,7 @@ impl Orchestrator {
     /// 6.  The loop repeats with a new, context-enriched prompt for `aider`,
     //      containing the error and the retrieved documentation, until the
     //      `max_retries` limit is reached.
-    #[tracing::instrument(skip(self))]
+    #[tracing::instrument(skip(self, objective, files))]
     pub async fn implement(
         &self,
         objective: String,
@@ -561,7 +561,7 @@ impl Orchestrator {
                         "\n--- Starting Step {}/{}: Research ---",
                         step_number, total_steps
                     ));
-                    info!(objective = %objective, "Running research step.");
+                    info!("Running research step.");
                     let mut files =
                         file_provider::get_files(&[".".to_string()], Some(&context), None)?;
                     if let Some(mut new_files) = extra_files {
@@ -588,7 +588,7 @@ impl Orchestrator {
                         "\n--- Starting Step {}/{}: Plan ---",
                         step_number, total_steps
                     ));
-                    info!(objective = %objective, "Running plan step.");
+                    info!("Running plan step.");
                     let files =
                         file_provider::get_files(&[".".to_string()], Some(&context), None)?;
                     let research_content = if let Some(path) = &research_file_path {
@@ -617,7 +617,7 @@ impl Orchestrator {
                         "\n--- Starting Step {}/{}: Implement ---",
                         step_number, total_steps
                     ));
-                    info!(objective = %objective, "Running implement step.");
+                    info!("Running implement step.");
                     let files =
                         file_provider::get_files(&[".".to_string()], Some(&context), None)?;
                     let implement_objective = objective.clone();

@@ -17,7 +17,7 @@ pub struct AiderRunResult {
 
 impl AiderWrapper {
     /// Executes `aider` with a given set of files and an initial message.
-    #[instrument(skip(self, session, message))]
+    #[instrument(skip(self, session, files_to_edit, message))]
     pub async fn run(
         &self,
         session: &Session,
@@ -85,11 +85,23 @@ impl AiderWrapper {
             args.push(cmd);
         }
 
-        // Redact the message for cleaner logs
+        // Redact the message and file list for cleaner logs
         let mut log_args = args.clone();
         if let Some(i) = log_args.iter().position(|arg| arg == "--message") {
             if i + 1 < log_args.len() {
                 log_args[i + 1] = "<message content redacted>".to_string();
+            }
+        }
+
+        let chat_history_file_pos = log_args.iter().position(|arg| arg == "--chat-history-file");
+        let message_pos = log_args.iter().position(|arg| arg == "--message");
+
+        if let (Some(ch_pos), Some(msg_pos)) = (chat_history_file_pos, message_pos) {
+            let files_start = ch_pos + 2;
+            let files_end = msg_pos;
+            if files_start < files_end {
+                let file_count = files_end - files_start;
+                log_args.splice(files_start..files_end, [format!("<{} files>", file_count)]);
             }
         }
 
