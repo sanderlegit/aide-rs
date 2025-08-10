@@ -290,7 +290,7 @@ steps:
   - type: implement
     objective: "Implement the plan"
     context: "all"
-    validateCmd: "true"
+    validateCmd: VALIDATE_CMD_PLACEHOLDER
 "#;
     env.create_file("run.yml", config_content);
     env.create_file("src/main.rs", "fn main() {}");
@@ -399,8 +399,10 @@ steps:
 
     // Replace the validate_cmd in the config file with our mock script
     let config_content = fs::read_to_string(env.full_path("run.yml")).unwrap();
-    let new_config_content =
-        config_content.replace("true", &format!("\"{}\"", mock_validate_path.to_str().unwrap()));
+    let new_config_content = config_content.replace(
+        "VALIDATE_CMD_PLACEHOLDER",
+        &format!("\"{}\"", mock_validate_path.to_str().unwrap()),
+    );
     env.create_file("run.yml", &new_config_content);
 
     // 6. Run the `aide-rs run` command
